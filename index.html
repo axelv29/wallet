@@ -54,8 +54,12 @@
     </div>
 
     <div class="sidebar-footer">
+      <button class="sidebar-footer-btn active-nav" id="nav-dash-btn" onclick="showView('dashboard')">
+        <i data-lucide="bar-chart-3"></i>
+        Dashboard
+      </button>
       <button class="sidebar-footer-btn" id="nav-main-btn" onclick="showView('main')">
-        <i data-lucide="layout-dashboard"></i>
+        <i data-lucide="list"></i>
         Movimientos
       </button>
       <button class="sidebar-footer-btn" id="nav-settings-btn" onclick="showView('settings')">
@@ -76,20 +80,11 @@
           <div class="header-sub" id="view-subtitle">Resumen general de movimientos</div>
         </div>
         <div class="header-right">
-          <div class="coverage-strip">
-            <div class="cov-item">
-              <span class="cov-label">Cobertura líquida</span>
-              <span class="cov-value" id="metric-liquid-val">$0,00</span>
-              <span class="cov-badge" id="metric-liquid-status"></span>
-            </div>
-            <div class="cov-item">
-              <span class="cov-label">Cobertura proyectada</span>
-              <span class="cov-value" id="metric-projected-val">$0,00</span>
-              <span class="cov-badge" id="metric-projected-status"></span>
-            </div>
-          </div>
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon"></i>
+          </button>
+          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?" style="font-size:14px;font-weight:600;">
+            ?
           </button>
         </div>
       </header>
@@ -122,8 +117,7 @@
                 <th style="width:150px;">Beneficiario</th>
                 <th>Notas / Detalle</th>
                 <th style="width:130px;">Categoría</th>
-                <th class="r" style="width:100px;">Pago</th>
-                <th class="r" style="width:100px;">Ingreso</th>
+                <th class="r" style="width:110px;">Monto</th>
                 <th class="c" style="width:60px;">—</th>
               </tr>
             </thead>
@@ -131,6 +125,104 @@
           </table>
         </div>
       </section>
+    </div>
+
+    <!-- ── Vista: Dashboard ── -->
+    <div id="view-dashboard" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+      <header class="main-header">
+        <div class="header-left">
+          <div class="header-title">Dashboard</div>
+          <div class="header-sub" id="dash-subtitle">Resumen del período actual</div>
+        </div>
+        <div class="header-right">
+          <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
+            <i data-lucide="sun" id="theme-icon-dash"></i>
+          </button>
+          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?" style="font-size:14px;font-weight:600;">
+            ?
+          </button>
+        </div>
+      </header>
+
+      <div class="dash-scroll">
+        <!-- Hero summary -->
+        <div class="dash-hero">
+          <div class="dash-hero-metric">
+            <div class="dash-hero-icon income-bg"><i data-lucide="trending-up"></i></div>
+            <div class="dash-hero-info">
+              <span class="dash-hero-label">Ingresos</span>
+              <span class="dash-hero-val income" id="dash-income">$0</span>
+            </div>
+          </div>
+          <div class="dash-hero-divider"></div>
+          <div class="dash-hero-metric">
+            <div class="dash-hero-icon expense-bg"><i data-lucide="trending-down"></i></div>
+            <div class="dash-hero-info">
+              <span class="dash-hero-label">Gastos</span>
+              <span class="dash-hero-val expense" id="dash-expenses">$0</span>
+            </div>
+          </div>
+          <div class="dash-hero-divider"></div>
+          <div class="dash-hero-metric">
+            <div class="dash-hero-icon net-bg"><i data-lucide="wallet"></i></div>
+            <div class="dash-hero-info">
+              <span class="dash-hero-label">Diferencia</span>
+              <span class="dash-hero-val" id="dash-net">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <!-- Categories -->
+          <div class="dash-card" id="dash-categories">
+            <div class="dash-card-header">
+              <i data-lucide="pie-chart"></i>
+              <span>Gastos por categoría</span>
+            </div>
+            <div id="dash-category-list" class="dash-cat-list"></div>
+          </div>
+
+          <!-- Coverage -->
+          <div class="dash-card" id="dash-coverage">
+            <div class="dash-card-header">
+              <i data-lucide="shield-check"></i>
+              <span>Cobertura</span>
+            </div>
+            <div class="dash-cov-list">
+              <div class="dash-cov-item">
+                <div class="dash-cov-top">
+                  <span class="dash-cov-label">Cobertura líquida</span>
+                  <span class="dash-cov-val" id="dash-liquid-cov">$0</span>
+                </div>
+                <div class="dash-cov-desc">Efectivo + saldo tarjetas</div>
+              </div>
+              <div class="dash-cov-item">
+                <div class="dash-cov-top">
+                  <span class="dash-cov-label">Cobertura proyectada</span>
+                  <span class="dash-cov-val" id="dash-proj-cov">$0</span>
+                </div>
+                <div class="dash-cov-desc">Lo anterior + préstamos a cobrar</div>
+              </div>
+              <div class="dash-cov-item">
+                <div class="dash-cov-top">
+                  <span class="dash-cov-label">Patrimonio neto</span>
+                  <span class="dash-cov-val" id="dash-net-worth">$0</span>
+                </div>
+                <div class="dash-cov-desc">Total de tu posición financiera</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent activity -->
+          <div class="dash-card dash-card-wide" id="dash-recent">
+            <div class="dash-card-header">
+              <i data-lucide="clock"></i>
+              <span>Actividad reciente</span>
+            </div>
+            <div id="dash-recent-list" class="dash-recent-list"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ── Vista: Ajustes ── -->
@@ -143,6 +235,9 @@
         <div class="header-right">
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon-settings"></i>
+          </button>
+          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?" style="font-size:14px;font-weight:600;">
+            ?
           </button>
         </div>
       </header>
@@ -237,7 +332,7 @@
             <div class="pane-section-title">Beneficiarios</div>
             <div style="max-width:340px;">
               <div class="predefined-add-row" style="margin-bottom:10px;">
-                <input type="text" id="add-payee-val" placeholder="Nuevo beneficiario…">
+                <input type="text" id="add-payee-val" placeholder="Nuevo beneficiario…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('payees')}">
                 <button class="btn btn-primary" onclick="addPredefined('payees')"><i data-lucide="plus"></i> Agregar</button>
               </div>
               <ul class="predefined-scroll" id="predefined-payees-list"></ul>
@@ -249,7 +344,7 @@
             <div class="pane-section-title">Categorías</div>
             <div style="max-width:340px;">
               <div class="predefined-add-row" style="margin-bottom:10px;">
-                <input type="text" id="add-category-val" placeholder="Nueva categoría…">
+                <input type="text" id="add-category-val" placeholder="Nueva categoría…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
                 <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i> Agregar</button>
               </div>
               <ul class="predefined-scroll" id="predefined-categories-list"></ul>
@@ -261,7 +356,7 @@
             <div class="pane-section-title">Etiquetas</div>
             <div style="max-width:340px;">
               <div class="predefined-add-row" style="margin-bottom:10px;">
-                <input type="text" id="add-tag-val" placeholder="Nueva etiqueta…">
+                <input type="text" id="add-tag-val" placeholder="Nueva etiqueta…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('tags')}">
                 <button class="btn btn-primary" onclick="addPredefined('tags')"><i data-lucide="plus"></i> Agregar</button>
               </div>
               <ul class="predefined-scroll" id="predefined-tags-list"></ul>
@@ -406,6 +501,36 @@
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Ayuda ══════════════ -->
+<div class="modal-overlay" id="help-modal">
+  <div class="modal-card" style="max-width:460px;">
+    <div class="modal-head">
+      <span class="modal-title">¿Cómo funciona Wallet?</span>
+      <button class="modal-close" onclick="closeHelpModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body help-body">
+      <div class="help-section">
+        <div class="help-section-title">Cuentas</div>
+        <p><strong>Líquidas:</strong> efectivo o débito — es el dinero que tenés disponible. El balance se actualiza automáticamente al sumar tus transacciones.</p>
+        <p><strong>Tarjetas de crédito:</strong> registran deudas. Al agregar un gasto con tarjeta, el saldo se vuelve más negativo (debés más).</p>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">Cobertura</div>
+        <p><strong>Cobertura líquida</strong> = todo tu efectivo disponible + el saldo de tus tarjetas. Este número te dice si tenés suficiente dinero para pagar el total de las tarjetas. Si es positivo, cubrís toda la deuda. Si es negativo, estás en déficit.</p>
+        <p><strong>Cobertura proyectada</strong> = lo mismo + los préstamos que tenés a cobrar. Es una visión optimista de lo que tendrías si cobraras todas las deudas pendientes.</p>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">Transacciones</div>
+        <p>Usá <strong>Gasto</strong> / <strong>Ingreso</strong> para indicar si es dinero que sale o entra. Podés etiquetar con <strong>etiquetas</strong> y asignar una <strong>categoría</strong> para llevar un mejor control. También podés marcar un gasto como <strong>préstamo a cobrar</strong> si vos pagaste pero alguien te lo debe.</p>
+      </div>
+      <div class="help-section">
+        <div class="help-section-title">Dashboard</div>
+        <p>Mostra un resumen del mes actual: ingresos vs gastos, las categorías donde más gastás, la cobertura de tus deudas y la actividad más reciente.</p>
+      </div>
     </div>
   </div>
 </div>

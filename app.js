@@ -8,7 +8,7 @@ let state = {
   transactions: [],
   predefined: {
     payees: ['Leo', 'Escaramuza', 'Rocío', 'Nati', 'Tienda Inglesa', 'El Tío', 'Supermercado Coto'],
-    categories: ['Fuera del presupuesto', 'Entretenimiento', 'Supermercado', 'Sueldo', 'Pasajes', 'Limpieza', 'Otros'],
+    categories: ['Supermercado', 'Alimentos', 'Compras', 'Transporte', 'Servicios', 'Entretenimiento', 'Salud', 'Educación', 'Sueldo', 'Freelance', 'Regalos', 'Hogar', 'Ropa', 'Tecnología', 'Otros'],
     tags: ['Rocio', 'NyL', 'pan', 'viaje', 'compras']
   },
   settings: { geminiKey: '', theme: 'light' },
@@ -24,25 +24,30 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData();
   setupSearchableSelects();
   setupKeyboardShortcuts();
-  showView('main');
+  showView('dashboard');
   renderAll();
 });
 
 // ── VIEW SWITCHING ────────────────────────────────────────────
 function showView(name) {
-  ['main', 'settings'].forEach(v => {
+  ['dashboard', 'main', 'settings'].forEach(v => {
     const el = document.getElementById('view-' + v);
     if (el) el.style.display = v === name ? 'flex' : 'none';
   });
 
+  document.getElementById('nav-dash-btn').classList.toggle('active-nav', name === 'dashboard');
   document.getElementById('nav-main-btn').classList.toggle('active-nav', name === 'main');
   document.getElementById('nav-settings-btn').classList.toggle('active-nav', name === 'settings');
 
+  if (name === 'dashboard') {
+    renderDashboard();
+    // Sync theme icon
+    applyTheme();
+  }
+
   if (name === 'settings') {
-    // Refresh all pane lists when opening settings
     renderSettingsAccountsList();
     renderPredefinedLists();
-    // Sync gemini key
     const keyInput = document.getElementById('set-gemini-key');
     if (keyInput) keyInput.value = state.settings.geminiKey || '';
   }
@@ -429,6 +434,7 @@ function renderAll() {
   renderSidebar();
   renderHeaderAndMetrics();
   renderTransactions();
+  renderDashboard();
   updateSelectors();
 }
 
@@ -473,7 +479,6 @@ function renderSidebar() {
 function renderHeaderAndMetrics() {
   const titleEl    = document.getElementById('view-title');
   const subtitleEl = document.getElementById('view-subtitle');
-  const balances   = calculateBalances();
 
   let title    = 'Todas las cuentas';
   let subtitle = 'Resumen general de movimientos';
@@ -493,28 +498,6 @@ function renderHeaderAndMetrics() {
 
   if (titleEl)    titleEl.textContent    = title;
   if (subtitleEl) subtitleEl.textContent = subtitle;
-
-  // Coverage metrics
-  const liquidCoverage    = balances.liquid + balances.credit_card;
-  const projectedCoverage = balances.liquid + balances.receivables + balances.credit_card;
-
-  const setMetric = (valId, statusId, value, isGood, isPending) => {
-    const vEl = document.getElementById(valId);
-    const sEl = document.getElementById(statusId);
-    if (!vEl || !sEl) return;
-    vEl.textContent = formatCurrency(value);
-    if (balances.credit_card === 0) {
-      sEl.className = 'cov-badge ok'; sEl.textContent = 'Sin deudas';
-    } else if (isGood) {
-      if (isPending) { sEl.className = 'cov-badge warn'; sEl.textContent = 'Pendiente'; }
-      else           { sEl.className = 'cov-badge ok';   sEl.textContent = 'Cubierto'; }
-    } else {
-      sEl.className = 'cov-badge bad'; sEl.textContent = 'Déficit';
-    }
-  };
-
-  setMetric('metric-liquid-val',    'metric-liquid-status',    liquidCoverage,    liquidCoverage >= 0,    false);
-  setMetric('metric-projected-val', 'metric-projected-status', projectedCoverage, projectedCoverage >= 0, projectedCoverage >= 0 && liquidCoverage < 0);
 }
 
 function renderTransactions() {
@@ -565,8 +548,8 @@ function renderTransactions() {
 
     const notesHtml = `${tx.notes || ''}${tagPills ? ' ' + tagPills : ''}`;
 
-    const paymentVal = isExpense ? formatCurrency(Math.abs(tx.amount)) : '';
-    const incomeVal  = !isExpense ? formatCurrency(tx.amount) : '';
+    const amountVal = isExpense ? '-' + formatCurrency(Math.abs(tx.amount)) : '+' + formatCurrency(tx.amount);
+    const amountClass = isExpense ? 'expense' : 'income';
 
     let actionsHtml = `
       <button class="row-action danger" onclick="deleteTransaction('${tx.id}')" title="Eliminar">
@@ -591,9 +574,8 @@ function renderTransactions() {
       <td class="payee-cell">${tx.payee}</td>
       <td class="notes-cell">${notesHtml}</td>
       <td class="category-cell">${tx.category_name || 'Otros'}</td>
-      <td class="amount-cell expense">${paymentVal}</td>
-      <td class="amount-cell income">${incomeVal}</td>
-      <td class="actions-cell" style="display:flex;gap:2px;justify-content:center;padding:6px 8px;">${actionsHtml}</td>
+      <td class="amount-cell ${amountClass}">${amountVal}</td>
+      <td class="actions-cell">${actionsHtml}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -755,6 +737,114 @@ function confirmImportedTransactions() {
   renderAll();
 }
 
+// ── DASHBOARD ─────────────────────────────────────────────────
+function renderDashboard() {
+  const balances = calculateBalances();
+  const now = new Date();
+  const currMonth = now.getMonth();
+  const currYear = now.getFullYear();
+
+  const monthTxs = state.transactions.filter(tx => {
+    const d = new Date(tx.date + 'T00:00:00');
+    return d.getMonth() === currMonth && d.getFullYear() === currYear;
+  });
+
+  // Monthly summary
+  let totalIncome = 0, totalExpenses = 0;
+  monthTxs.forEach(tx => {
+    if (tx.amount > 0) totalIncome += tx.amount;
+    else totalExpenses += Math.abs(tx.amount);
+  });
+  const netDiff = totalIncome - totalExpenses;
+
+  document.getElementById('dash-income').textContent = formatCurrency(totalIncome);
+  document.getElementById('dash-expenses').textContent = formatCurrency(totalExpenses);
+  const netEl = document.getElementById('dash-net');
+  netEl.textContent = formatCurrency(netDiff);
+  netEl.className = 'dash-hero-val' + (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '');
+
+  // Subtitle
+  document.getElementById('dash-subtitle').textContent =
+    `Resumen de ${now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`;
+
+  // Coverage
+  const liquidCov = balances.liquid + balances.credit_card;
+  const projCov = balances.liquid + balances.receivables + balances.credit_card;
+  const netWorth = liquidCov + balances.receivables;
+
+  const setCov = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = formatCurrency(val);
+  };
+  setCov('dash-liquid-cov', liquidCov);
+  setCov('dash-proj-cov', projCov);
+  setCov('dash-net-worth', netWorth);
+
+  // Categories breakdown (expenses only)
+  const catTotals = {};
+  monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
+    const cat = tx.category_name || 'Otros';
+    catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount);
+  });
+
+  const catList = document.getElementById('dash-category-list');
+  catList.innerHTML = '';
+
+  const catEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  const maxCat = catEntries.length > 0 ? catEntries[0][1] : 0;
+
+  if (catEntries.length === 0) {
+    catList.innerHTML = '<div class="dash-empty">Sin gastos este mes</div>';
+  } else {
+    catEntries.forEach(([cat, amount]) => {
+      const pct = maxCat > 0 ? (amount / maxCat) * 100 : 0;
+      const row = document.createElement('div');
+      row.className = 'dash-cat-row';
+      row.innerHTML = `
+        <div class="dash-cat-top">
+          <span class="dash-cat-label">${cat}</span>
+          <span class="dash-cat-amount">${formatCurrency(amount)}</span>
+        </div>
+        <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
+      `;
+      catList.appendChild(row);
+    });
+  }
+
+  // Recent activity (last 5)
+  const recentList = document.getElementById('dash-recent-list');
+  recentList.innerHTML = '';
+
+  const recent = state.transactions.slice(0, 5);
+  if (recent.length === 0) {
+    recentList.innerHTML = '<div class="dash-empty">Sin movimientos aún</div>';
+  } else {
+    recent.forEach(tx => {
+      const isExpense = tx.amount < 0;
+      const item = document.createElement('div');
+      item.className = 'dash-recent-item';
+      item.innerHTML = `
+        <span class="dash-recent-date">${formatDate(tx.date)}</span>
+        <span class="dash-recent-payee">${tx.payee}</span>
+        <span class="dash-recent-amount ${isExpense ? 'expense' : 'income'}">${isExpense ? '-' : '+'}${formatCurrency(Math.abs(tx.amount))}</span>
+      `;
+      recentList.appendChild(item);
+    });
+  }
+
+  lucide.createIcons();
+}
+
+// ── HELP MODAL ─────────────────────────────────────────────────
+function openHelpModal() {
+  document.getElementById('help-modal').classList.add('open');
+}
+
+function closeHelpModal() {
+  document.getElementById('help-modal').classList.remove('open');
+}
+
 // ── UTILITIES ─────────────────────────────────────────────────
 function formatCurrency(value) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
@@ -789,3 +879,5 @@ window.processImportWithGemini   = processImportWithGemini;
 window.confirmImportedTransactions = confirmImportedTransactions;
 window.updateImportedTx          = updateImportedTx;
 window.renderTransactions        = renderTransactions;
+window.openHelpModal             = openHelpModal;
+window.closeHelpModal            = closeHelpModal;
