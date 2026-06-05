@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-light">
+
+<div class="app-container">
+
+  <!-- ══════════════ SIDEBAR ══════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">
+          <i data-lucide="credit-card"></i>
+        </div>
+        <span class="logo-wordmark">Wallet</span>
+      </div>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- Net worth -->
+      <div class="sidebar-net-block">
+        <span class="sidebar-label">Patrimonio neto</span>
+        <div class="net-worth-amount" id="net-worth-val">$0,00</div>
+      </div>
+
+      <!-- Liquid accounts -->
+      <div class="sidebar-group">
+        <div class="sidebar-group-header">Cuentas líquidas</div>
+        <ul class="account-list" id="sidebar-liquid-list"></ul>
+      </div>
+
+      <!-- Credit cards -->
+      <div class="sidebar-group">
+        <div class="sidebar-group-header">Tarjetas de crédito</div>
+        <ul class="account-list" id="sidebar-credit-list"></ul>
+      </div>
+
+      <!-- Receivables -->
+      <div class="sidebar-group">
+        <div class="sidebar-group-header">Pendientes de cobro</div>
+        <div class="sidebar-receivables-row" onclick="filterTransactions('receivables')">
+          <span>Préstamos activos</span>
+          <span class="receivables-val" id="receivables-sum-val">$0,00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-footer-btn" id="nav-main-btn" onclick="showView('main')">
+        <i data-lucide="layout-dashboard"></i>
+        Movimientos
+      </button>
+      <button class="sidebar-footer-btn" id="nav-settings-btn" onclick="showView('settings')">
+        <i data-lucide="settings-2"></i>
+        Ajustes y cuentas
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══════════════ MAIN PANEL ══════════════ -->
+  <main class="main-content">
+
+    <!-- ── Vista: Movimientos ── -->
+    <div id="view-main" style="display:flex; flex-direction:column; height:100%; overflow:hidden;">
+      <header class="main-header">
+        <div class="header-left">
+          <div class="header-title" id="view-title">Todas las cuentas</div>
+          <div class="header-sub" id="view-subtitle">Resumen general de movimientos</div>
+        </div>
+        <div class="header-right">
+          <div class="coverage-strip">
+            <div class="cov-item">
+              <span class="cov-label">Cobertura líquida</span>
+              <span class="cov-value" id="metric-liquid-val">$0,00</span>
+              <span class="cov-badge" id="metric-liquid-status"></span>
+            </div>
+            <div class="cov-item">
+              <span class="cov-label">Cobertura proyectada</span>
+              <span class="cov-value" id="metric-projected-val">$0,00</span>
+              <span class="cov-badge" id="metric-projected-status"></span>
+            </div>
+          </div>
+          <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
+            <i data-lucide="sun" id="theme-icon"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button class="btn btn-primary" onclick="openTransactionModal()">
+            <i data-lucide="plus"></i> Nueva transacción
+          </button>
+          <button class="btn" onclick="openImportModal()">
+            <i data-lucide="file-up"></i> Importar extracto
+          </button>
+          <span class="tx-count" id="tx-count-badge">0</span>
+        </div>
+        <div class="toolbar-right">
+          <div class="search-box">
+            <i data-lucide="search"></i>
+            <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" oninput="renderTransactions()">
+          </div>
+        </div>
+      </div>
+
+      <section class="table-section">
+        <div class="table-wrap">
+          <table class="ledger">
+            <thead>
+              <tr>
+                <th style="width:96px;">Fecha</th>
+                <th style="width:130px;">Cuenta</th>
+                <th style="width:150px;">Beneficiario</th>
+                <th>Notas / Detalle</th>
+                <th style="width:130px;">Categoría</th>
+                <th class="r" style="width:100px;">Pago</th>
+                <th class="r" style="width:100px;">Ingreso</th>
+                <th class="c" style="width:60px;">—</th>
+              </tr>
+            </thead>
+            <tbody id="tx-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Vista: Ajustes ── -->
+    <div id="view-settings" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+      <header class="main-header">
+        <div class="header-left">
+          <div class="header-title">Ajustes y cuentas</div>
+          <div class="header-sub">Gestión de cuentas, categorías y configuración general</div>
+        </div>
+        <div class="header-right">
+          <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
+            <i data-lucide="sun" id="theme-icon-settings"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Settings body: sidebar + pane -->
+      <div class="settings-layout" style="flex:1; overflow:hidden;">
+
+        <nav class="settings-nav">
+          <button class="settings-nav-btn active" id="snav-general" onclick="switchSettingsPane('general')">
+            <i data-lucide="key-round"></i> General
+          </button>
+          <button class="settings-nav-btn" id="snav-accounts" onclick="switchSettingsPane('accounts')">
+            <i data-lucide="wallet"></i> Cuentas
+          </button>
+          <button class="settings-nav-btn" id="snav-payees" onclick="switchSettingsPane('payees')">
+            <i data-lucide="users"></i> Beneficiarios
+          </button>
+          <button class="settings-nav-btn" id="snav-categories" onclick="switchSettingsPane('categories')">
+            <i data-lucide="tag"></i> Categorías
+          </button>
+          <button class="settings-nav-btn" id="snav-tags" onclick="switchSettingsPane('tags')">
+            <i data-lucide="hash"></i> Etiquetas
+          </button>
+        </nav>
+
+        <div class="settings-pane-wrap">
+
+          <!-- General -->
+          <div class="settings-pane active" id="spane-general">
+            <div class="pane-section-title">Configuración general</div>
+            <form onsubmit="saveGeneralSettings(event)">
+              <div class="form-group">
+                <label class="form-label">Gemini API Key</label>
+                <input type="password" id="set-gemini-key" placeholder="AIzaSy…" style="max-width:380px;">
+                <span class="help-note">La clave se almacena únicamente en el almacenamiento local de tu navegador.</span>
+              </div>
+              <div style="margin-top:14px;">
+                <button type="submit" class="btn btn-primary">Guardar configuración</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Accounts -->
+          <div class="settings-pane" id="spane-accounts">
+            <div class="pane-section-title">Cuentas</div>
+            <div class="accounts-split">
+              <div>
+                <div style="font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:10px;">Nueva cuenta</div>
+                <form onsubmit="createNewAccount(event)">
+                  <div class="form-group">
+                    <label class="form-label">Nombre</label>
+                    <input type="text" id="acc-name" placeholder="Ej. Visa Santander, Efectivo" required>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Tipo</label>
+                      <select id="acc-type" onchange="toggleAccountClosingFields(this.value)" required>
+                        <option value="liquid">Líquida (Efectivo / Débito)</option>
+                        <option value="credit_card">Tarjeta de crédito</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Saldo inicial</label>
+                      <input type="number" step="0.01" id="acc-balance" value="0.00" required>
+                    </div>
+                  </div>
+                  <div class="closing-fields" id="cc-closing-fields" style="display:none;">
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label">Día de cierre</label>
+                        <input type="number" id="acc-close-day" min="1" max="31" placeholder="20">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Día de vencimiento</label>
+                        <input type="number" id="acc-due-day" min="1" max="31" placeholder="30">
+                      </div>
+                    </div>
+                    <div class="cc-note">Los días de cierre y vencimiento se usan para calcular la deuda del período activo.</div>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-full" style="margin-top:10px;">Crear cuenta</button>
+                </form>
+              </div>
+              <div>
+                <div style="font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:10px;">Cuentas registradas</div>
+                <div class="accounts-list-scroll" id="accounts-scroll-container"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payees -->
+          <div class="settings-pane" id="spane-payees">
+            <div class="pane-section-title">Beneficiarios</div>
+            <div style="max-width:340px;">
+              <div class="predefined-add-row" style="margin-bottom:10px;">
+                <input type="text" id="add-payee-val" placeholder="Nuevo beneficiario…">
+                <button class="btn btn-primary" onclick="addPredefined('payees')"><i data-lucide="plus"></i> Agregar</button>
+              </div>
+              <ul class="predefined-scroll" id="predefined-payees-list"></ul>
+            </div>
+          </div>
+
+          <!-- Categories -->
+          <div class="settings-pane" id="spane-categories">
+            <div class="pane-section-title">Categorías</div>
+            <div style="max-width:340px;">
+              <div class="predefined-add-row" style="margin-bottom:10px;">
+                <input type="text" id="add-category-val" placeholder="Nueva categoría…">
+                <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i> Agregar</button>
+              </div>
+              <ul class="predefined-scroll" id="predefined-categories-list"></ul>
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div class="settings-pane" id="spane-tags">
+            <div class="pane-section-title">Etiquetas</div>
+            <div style="max-width:340px;">
+              <div class="predefined-add-row" style="margin-bottom:10px;">
+                <input type="text" id="add-tag-val" placeholder="Nueva etiqueta…">
+                <button class="btn btn-primary" onclick="addPredefined('tags')"><i data-lucide="plus"></i> Agregar</button>
+              </div>
+              <ul class="predefined-scroll" id="predefined-tags-list"></ul>
+            </div>
+          </div>
+
+        </div><!-- /.settings-pane-wrap -->
+      </div><!-- /.settings-layout -->
+    </div><!-- /#view-settings -->
+
+  </main>
+</div>
+
+<!-- ══════════════ MODAL: Nueva Transacción ══════════════ -->
+<div class="modal-overlay" id="tx-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="modal-title">Registrar movimiento</span>
+      <button class="modal-close" onclick="closeTransactionModal()"><i data-lucide="x"></i></button>
+    </div>
+    <form id="tx-form" onsubmit="handleTransactionSubmit(event)">
+      <div class="modal-body">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha</label>
+            <input type="date" id="tx-date" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cuenta</label>
+            <select id="tx-account" required></select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Beneficiario</label>
+          <div class="searchable-wrap">
+            <input type="text" id="tx-payee-search" placeholder="Nombre de quien envía o recibe…" autocomplete="off" required>
+            <div class="searchable-dropdown" id="dropdown-payee"><ul id="dropdown-payee-list"></ul></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <div class="searchable-wrap">
+            <input type="text" id="tx-category-search" placeholder="Buscar o crear categoría…" autocomplete="off" required>
+            <div class="searchable-dropdown" id="dropdown-category"><ul id="dropdown-category-list"></ul></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Monto</label>
+          <div class="amount-row">
+            <div class="sign-toggle">
+              <button type="button" class="sign-btn active-expense" id="btn-sign-expense" onclick="setTxSign(-1)">Gasto</button>
+              <button type="button" class="sign-btn" id="btn-sign-income" onclick="setTxSign(1)">Ingreso</button>
+            </div>
+            <input type="number" id="tx-amount" step="0.01" min="0" placeholder="0.00" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Etiquetas</label>
+          <div class="tags-box" id="tx-tags-checklist"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notas</label>
+          <input type="text" id="tx-notes" placeholder="Comentario opcional…">
+        </div>
+
+        <div class="form-group" style="flex-direction:row; align-items:center; gap:8px; margin-top:4px;">
+          <input type="checkbox" id="tx-is-receivable" onchange="toggleReceivableFields(this.checked)" style="width:auto; height:auto;">
+          <label for="tx-is-receivable" style="font-size:12px; color:var(--text-mid); cursor:pointer;">Marcar como préstamo a cobrar</label>
+        </div>
+
+        <div id="tx-receivable-details" class="receivable-section" style="display:none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Persona / Deudor</label>
+              <input type="text" id="tx-debtor" placeholder="Nombre del deudor">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha de cobro estimada</label>
+              <input type="date" id="tx-due-date">
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" onclick="closeTransactionModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar transacción</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Importar extracto ══════════════ -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal-card wide">
+    <div class="modal-head">
+      <span class="modal-title">Importar extracto bancario</span>
+      <button class="modal-close" onclick="closeImportModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body import-body">
+
+      <div id="import-setup-view">
+        <div class="form-group">
+          <label class="form-label">Pegá el texto del extracto o CSV</label>
+          <textarea id="import-text" rows="8" placeholder="Ejemplo:
+02/06  Supermercado    -12000
+03/06  Sueldo recibido  150000"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Asignar movimientos a la cuenta</label>
+          <select id="import-account-id"></select>
+        </div>
+        <button class="btn btn-primary w-full" id="btn-process-import" onclick="processImportWithGemini()">
+          <i data-lucide="sparkles"></i> Procesar con Gemini IA
+        </button>
+      </div>
+
+      <div id="import-review-view" style="display:none;">
+        <p style="font-size:12px; color:var(--text-lo); margin-bottom:8px;">Revisá y ajustá las transacciones detectadas antes de confirmar.</p>
+        <div class="compact-table">
+          <table class="ledger">
+            <thead>
+              <tr>
+                <th style="width:100px;">Fecha</th>
+                <th>Beneficiario</th>
+                <th style="width:140px;">Categoría</th>
+                <th class="r" style="width:110px;">Monto</th>
+              </tr>
+            </thead>
+            <tbody id="import-review-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:12px;">
+          <button class="btn" onclick="backToImportSetup()">← Atrás</button>
+          <button class="btn btn-primary" onclick="confirmImportedTransactions()">Importar movimientos</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
