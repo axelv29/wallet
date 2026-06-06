@@ -27,13 +27,13 @@ let state = {
     ],
     tags: ['Rocio', 'NyL', 'pan', 'viaje', 'compras']
   },
-  settings: { geminiKey: '', theme: 'light' },
+  settings: { geminiKey: '', theme: 'light', currency: 'ARS', showSymbol: true, decimals: 2 },
   currentTxSign: -1,
   importedTransactions: [],
   currentView: 'all',
   editingTxId: null,
   selectedTxIds: new Set(),
-  sidebarCollapse: { liquid: true, credit: true }
+
 };
 
 // ── INIT ──────────────────────────────────────────────────────
@@ -43,7 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData();
   setupSearchableSelects();
   setupKeyboardShortcuts();
-  showView('dashboard');
+  const lastView = localStorage.getItem('wallet_last_view') || 'dashboard';
+  const lastFilter = localStorage.getItem('wallet_last_filter');
+  if (lastView === 'main' && lastFilter) {
+    filterTransactions(lastFilter);
+  } else {
+    showView(lastView);
+  }
   renderAll();
   initColumnResize();
   initCatIconPicker();
@@ -57,6 +63,7 @@ function showView(name) {
   });
 
   document.getElementById('nav-dash-pill').classList.toggle('active', name === 'dashboard');
+  localStorage.setItem('wallet_last_view', name);
 
   if (name === 'dashboard') {
     renderDashboard();
@@ -69,12 +76,18 @@ function showView(name) {
     renderPredefinedLists();
     const keyInput = document.getElementById('set-gemini-key');
     if (keyInput) keyInput.value = state.settings.geminiKey || '';
+    const curSel = document.getElementById('set-currency');
+    if (curSel) curSel.value = state.settings.currency || 'ARS';
+    const symCb = document.getElementById('set-show-symbol');
+    if (symCb) symCb.checked = state.settings.showSymbol !== false;
+    const decSel = document.getElementById('set-decimals');
+    if (decSel) decSel.value = String(state.settings.decimals ?? 2);
   }
 }
 
 // ── SETTINGS PANE SWITCHING ───────────────────────────────────
 function switchSettingsPane(name) {
-  const panes = ['general', 'accounts', 'payees', 'categories', 'tags'];
+  const panes = ['general', 'accounts', 'payees', 'categories', 'tags', 'currency'];
   panes.forEach(p => {
     const pane = document.getElementById('spane-' + p);
     const btn  = document.getElementById('snav-' + p);
@@ -437,6 +450,17 @@ function toggleAccountClosingFields(type) {
 }
 
 // ── GENERAL SETTINGS ──────────────────────────────────────────
+function saveCurrencySettings(event) {
+  event.preventDefault();
+  state.settings.currency = document.getElementById('set-currency').value;
+  state.settings.showSymbol = document.getElementById('set-show-symbol').checked;
+  state.settings.decimals = parseInt(document.getElementById('set-decimals').value);
+  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
+  const btn = event.submitter;
+  if (btn) { const t = btn.textContent; btn.textContent = '✓ Guardado'; setTimeout(() => { btn.textContent = t; }, 1500); }
+  renderAll();
+}
+
 function saveGeneralSettings(event) {
   event.preventDefault();
   state.settings.geminiKey = document.getElementById('set-gemini-key').value.trim();
@@ -542,11 +566,15 @@ function closeTransactionModal() {
   document.getElementById('tx-modal').classList.remove('open');
   document.getElementById('tx-form').reset();
   state.editingTxId = null;
+  state._batchEditIds = null;
 
   const modalTitle = document.querySelector('#tx-modal .modal-title');
   const submitBtn  = document.querySelector('#tx-form button[type="submit"]');
   modalTitle.textContent = 'Registrar movimiento';
   submitBtn.textContent  = 'Guardar transacción';
+
+  const banner = document.getElementById('tx-batch-banner');
+  if (banner) banner.style.display = 'none';
 
   // Hide installment fields
   const instFields = document.getElementById('tx-installment-fields');
@@ -664,11 +692,38 @@ function handleTransactionSubmit(event) {
   const isReceivable = document.getElementById('tx-is-receivable').checked;
   const dueDate     = document.getElementById('tx-due-date').value;
 
-  if (!accountId || !payee || !categoryName || isNaN(rawAmount)) return;
+  if (state._batchEditIds) {
+    const activeTags = [];
+    document.querySelectorAll('input[name="tx-tags"]:checked').forEach(c => activeTags.push(c.value));
+    const amount = !isNaN(rawAmount) ? Math.abs(rawAmount) * state.currentTxSign : null;
 
-  if (!state.predefined.payees.includes(payee)) { state.predefined.payees.push(payee); saveData('predefined'); }
+    const tagsChanged = document.querySelectorAll('input[name="tx-tags"]').length > 0;
+    state._batchEditIds.forEach(id => {
+      const tx = state.transactions.find(t => t.id === id);
+      if (!tx) return;
+      if (dateVal) tx.date = dateVal;
+      if (accountId) tx.account_id = accountId;
+      if (payee) tx.payee = payee;
+      if (categoryName) tx.category_name = categoryName;
+      if (amount !== null) tx.amount = amount;
+      if (notes) tx.notes = notes;
+      if (tagsChanged) tx.tags = activeTags;
+    });
+    saveData('transactions');
+    state._batchEditIds = null;
+    document.getElementById('tx-modal').classList.remove('open');
+    document.getElementById('tx-form').reset();
+    const banner = document.getElementById('tx-batch-banner');
+    if (banner) banner.style.display = 'none';
+    renderAll();
+    return;
+  }
+
+  if (!accountId || isNaN(rawAmount)) return;
+
+  if (payee && !state.predefined.payees.includes(payee)) { state.predefined.payees.push(payee); saveData('predefined'); }
   const catNames = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name);
-  if (!catNames.includes(categoryName)) {
+  if (categoryName && !catNames.includes(categoryName)) {
     state.predefined.categories.push({ name: categoryName, icon: 'tag' });
     saveData('predefined');
   }
@@ -749,6 +804,8 @@ async function deleteTransaction(txId) {
   const tx = state.transactions.find(t => t.id === txId);
   if (!tx) return;
 
+  document.querySelectorAll('.row-action-menu').forEach(m => m.style.display = 'none');
+
   if (tx.installment_group) {
     if (!await showConfirm('¿Eliminar todas las cuotas de esta compra?', { title: 'Eliminar cuotas', confirmText: 'Eliminar todo', danger: true })) return;
     state.transactions = state.transactions.filter(t => t.installment_group !== tx.installment_group);
@@ -787,6 +844,7 @@ async function markAsCollected(txId) {
 function filterTransactions(viewId) {
   showView('main');
   state.currentView = viewId;
+  localStorage.setItem('wallet_last_filter', viewId);
   clearTxSelection();
   renderAll();
 }
@@ -866,36 +924,10 @@ function renderSidebar() {
     netEl.classList.toggle('negative', netWorth < 0);
   }
 
-  // Collapse state
-  document.querySelectorAll('.sidebar-collapse').forEach(group => {
-    const key = group.dataset.collapse;
-    const body = group.querySelector('.sidebar-collapse-body');
-    const arrow = group.querySelector('.collapse-arrow');
-    const collapsed = state.sidebarCollapse[key] === false;
-    if (body) body.classList.toggle('collapsed', collapsed);
-    if (arrow) arrow.classList.toggle('collapsed', collapsed);
-  });
-
   // Active states
-  const allRow = document.getElementById('sidebar-all-row');
-  if (allRow) allRow.classList.toggle('active', state.currentView === 'all');
-
-  const titleEl = document.querySelector('.sidebar-section-title');
-  if (titleEl) titleEl.classList.toggle('active', state.currentView === 'all');
-
-  document.querySelectorAll('.sidebar-filter-label').forEach(label => {
-    const header = label.closest('.sidebar-collapse');
-    if (!header) return;
-    const key = header.dataset.collapse;
-    const typeView = 'type-' + (key === 'liquid' ? 'liquid' : 'credit_card');
-    label.classList.toggle('active', state.currentView === typeView);
-  });
-}
-
-function toggleCollapse(key) {
-  if (state.sidebarCollapse[key] === undefined) return;
-  state.sidebarCollapse[key] = !state.sidebarCollapse[key];
-  renderSidebar();
+  document.getElementById('sidebar-all-row')?.classList.toggle('active', state.currentView === 'all');
+  document.getElementById('sidebar-liquid-list')?.closest('.sidebar-section-group')?.querySelector('.section-filter-label')?.classList.toggle('active', state.currentView === 'type-liquid');
+  document.getElementById('sidebar-credit-list')?.closest('.sidebar-section-group')?.querySelector('.section-filter-label')?.classList.toggle('active', state.currentView === 'type-credit_card');
 }
 
 function renderHeaderAndMetrics() {
@@ -1018,26 +1050,17 @@ function renderTransactions() {
     }
 
     let actionsHtml = `
-      <button class="row-action" onclick="openTransactionModal('${tx.id}')" title="Editar">
-        <i data-lucide="pencil"></i>
-      </button>
-      <button class="row-action danger" onclick="deleteTransaction('${tx.id}')" title="Eliminar">
-        <i data-lucide="trash-2"></i>
-      </button>
+      <div class="row-action-dropdown">
+        <button class="row-action" onclick="event.stopPropagation();toggleRowMenu(this)" title="Acciones">
+          <i data-lucide="more-horizontal"></i>
+        </button>
+        <div class="row-action-menu" style="display:none;">
+          ${tx.is_receivable ? `<button class="ram-item" onclick="markAsCollected('${tx.id}');closeRowMenu(this)"><i data-lucide="check-square"></i> Cobrado</button>` : ''}
+          <button class="ram-item" onclick="openTransactionModal('${tx.id}');closeRowMenu(this)"><i data-lucide="pencil"></i> Editar</button>
+          <button class="ram-item danger" onclick="deleteTransaction('${tx.id}')"><i data-lucide="trash-2"></i> Eliminar</button>
+        </div>
+      </div>
     `;
-    if (tx.is_receivable) {
-      actionsHtml = `
-        <button class="row-action success" onclick="markAsCollected('${tx.id}')" title="Marcar como cobrado">
-          <i data-lucide="check-square"></i>
-        </button>
-        <button class="row-action" onclick="openTransactionModal('${tx.id}')" title="Editar">
-          <i data-lucide="pencil"></i>
-        </button>
-        <button class="row-action danger" onclick="deleteTransaction('${tx.id}')" title="Eliminar">
-          <i data-lucide="trash-2"></i>
-        </button>
-      `;
-    }
 
     const tr = document.createElement('tr');
     tr.dataset.txId = tx.id;
@@ -1174,8 +1197,10 @@ async function processImportWithGemini() {
   lucide.createIcons();
 
   const categoriesList = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name).join(', ');
+  const curCode = state.settings.currency || 'ARS';
   const prompt = `Actúas como un procesador estructurado de extractos bancarios en español.
 Analiza el siguiente texto y extrae todas las transacciones financieras.
+Moneda del usuario: ${curCode}.
 
 Texto:
 "${text}"
@@ -1188,6 +1213,7 @@ Reglas:
 - Ingresos/cobros: monto POSITIVO.
 - Fechas en formato YYYY-MM-DD. Si no hay año, usá 2026.
 - Respondé ÚNICAMENTE con un arreglo JSON válido, sin markdown ni texto adicional.
+- Todos los montos deben expresarse numéricamente en ${curCode}.
 
 Formato:
 [{"date":"YYYY-MM-DD","payee":"Nombre","amount":-120.00,"category":"Categoría","notes":""}]`;
@@ -1438,6 +1464,121 @@ function clearTxSelection() {
   updateSelectAllCheckbox();
   updateSelectionBar();
 }
+
+// ── SELECTION BAR DROPDOWN ───────────────────────────────
+function toggleSelMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('sel-dropdown-menu');
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+
+function closeSelMenu() {
+  const menu = document.getElementById('sel-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.sel-dropdown')) {
+    const m = document.getElementById('sel-dropdown-menu');
+    if (m) m.style.display = 'none';
+  }
+});
+
+// ── BATCH OPERATIONS ─────────────────────────────────────
+function openBatchEditModal() {
+  if (state.selectedTxIds.size === 0) return;
+  // Single selection → open regular edit modal with data
+  if (state.selectedTxIds.size === 1) {
+    const id = [...state.selectedTxIds][0];
+    clearTxSelection();
+    openTransactionModal(id);
+    return;
+  }
+  updateSelectors();
+  state.editingTxId = null;
+  state._batchEditIds = [...state.selectedTxIds];
+
+  const modalTitle = document.querySelector('#tx-modal .modal-title');
+  modalTitle.textContent = `Editar ${state._batchEditIds.length} transacciones`;
+
+  // Add batch warning
+  let banner = document.getElementById('tx-batch-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'tx-batch-banner';
+    banner.className = 'tx-batch-banner';
+    document.querySelector('#tx-form .modal-body').insertBefore(banner, document.querySelector('#tx-form .modal-body').firstChild);
+  }
+  banner.textContent = `Los cambios se aplicarán a las ${state._batchEditIds.length} transacciones seleccionadas. Solo se modificarán los campos que completes.`;
+  banner.style.display = 'block';
+
+  // Reset form
+  document.getElementById('tx-date').value = '';
+  document.getElementById('tx-account').value = '';
+  document.getElementById('tx-payee-search').value = '';
+  document.getElementById('tx-category-search').value = '';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-notes').value = '';
+  setTxSign(-1);
+
+  document.getElementById('tx-tags-checklist').innerHTML = '';
+  state.predefined.tags.forEach(tag => {
+    const label = document.createElement('label');
+    label.className = 'tag-check-label';
+    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}"><span>#${tag}</span>`;
+    document.getElementById('tx-tags-checklist').appendChild(label);
+  });
+
+  document.getElementById('tx-is-receivable').checked = false;
+  toggleReceivableFields(false);
+  document.getElementById('tx-due-date').value = '';
+  document.getElementById('tx-installment-fields').style.display = 'none';
+  document.getElementById('tx-installment-editor').style.display = 'none';
+  document.getElementById('tx-is-installment').checked = false;
+  document.getElementById('tx-is-installment').disabled = false;
+
+  document.getElementById('tx-modal').classList.add('open');
+  lucide.createIcons();
+}
+
+function batchDeleteTransactions() {
+  if (state.selectedTxIds.size === 0) return;
+  const count = state.selectedTxIds.size;
+  showConfirm(`¿Eliminar ${count} transacciones seleccionadas? Esta acción no se puede deshacer.`, {
+    title: 'Eliminar transacciones',
+    confirmText: `Eliminar ${count}`,
+    danger: true
+  }).then(ok => {
+    if (!ok) return;
+    state.transactions = state.transactions.filter(t => !state.selectedTxIds.has(t.id));
+    state.selectedTxIds.clear();
+    saveData('transactions');
+    renderAll();
+  });
+}
+
+// ── ROW ACTION DROPDOWN ──────────────────────────────────
+function toggleRowMenu(btn) {
+  const allMenus = document.querySelectorAll('.row-action-menu');
+  const menu = btn.closest('.row-action-dropdown').querySelector('.row-action-menu');
+  const isOpen = menu.style.display === 'block';
+  allMenus.forEach(m => m.style.display = 'none');
+  menu.style.display = isOpen ? 'none' : 'block';
+}
+
+function closeRowMenu(el) {
+  if (!el) return;
+  const menu = el.closest ? el.closest('.row-action-menu') : null;
+  if (menu) menu.style.display = 'none';
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.row-action-dropdown')) {
+    document.querySelectorAll('.row-action-menu').forEach(m => m.style.display = 'none');
+  }
+});
 
 function updateSelectAllCheckbox() {
   const checkboxes = document.querySelectorAll('.tx-checkbox');
@@ -1829,7 +1970,25 @@ function startInlineEdit(cell, txId, field, type, options) {
 
 // ── UTILITIES ─────────────────────────────────────────────────
 function formatCurrency(value) {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);
+  const cur = state.settings.currency || 'ARS';
+  const decimals = state.settings.decimals ?? 2;
+  const localeMap = { ARS: 'es-AR', USD: 'en-US', EUR: 'es-ES', UYU: 'es-UY' };
+  const locale = localeMap[cur] || 'es-AR';
+
+  if (state.settings.showSymbol !== false) {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: cur,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(value);
+  } else {
+    return new Intl.NumberFormat(locale, {
+      style: 'decimal',
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(value);
+  }
 }
 
 function formatDate(dateString) {
@@ -1842,6 +2001,7 @@ window.showView                  = showView;
 window.switchSettingsPane        = switchSettingsPane;
 window.setTxSign                 = setTxSign;
 window.saveGeneralSettings       = saveGeneralSettings;
+window.saveCurrencySettings      = saveCurrencySettings;
 window.toggleAccountClosingFields = toggleAccountClosingFields;
 window.createNewAccount          = createNewAccount;
 window.removeAccount             = removeAccount;
@@ -1925,4 +2085,9 @@ window.toggleSelectAll           = toggleSelectAll;
 window.clearTxSelection          = clearTxSelection;
 window.startInlineEdit           = startInlineEdit;
 window.closeInlineEditor         = closeInlineEditor;
-window.toggleCollapse            = toggleCollapse;
+window.toggleRowMenu             = toggleRowMenu;
+window.closeRowMenu              = closeRowMenu;
+window.toggleSelMenu             = toggleSelMenu;
+window.closeSelMenu              = closeSelMenu;
+window.openBatchEditModal        = openBatchEditModal;
+window.batchDeleteTransactions   = batchDeleteTransactions;

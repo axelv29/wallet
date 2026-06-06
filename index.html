@@ -34,39 +34,32 @@
 
     <div class="sd"></div>
 
-    <div class="sidebar-scroll">
-      <div class="sidebar-section-title" style="cursor:pointer;">
-        <span onclick="filterTransactions('all')">Cuentas</span>
-        <button class="sidebar-add-btn" onclick="openAccountCreator(null)" title="Añadir cuenta"><i data-lucide="plus"></i></button>
-      </div>
-
-      <div class="sidebar-all-row" onclick="filterTransactions('all')" id="sidebar-all-row">
-        <span>Todas las cuentas</span>
-        <span class="sidebar-all-arrow">→</span>
-      </div>
-
-      <div class="sidebar-collapse" data-collapse="liquid">
-        <div class="sidebar-collapse-header">
-          <span class="collapse-arrow" onclick="toggleCollapse('liquid')">▾</span>
-          <span class="sidebar-filter-label" onclick="filterTransactions('type-liquid')">Líquidas</span>
-          <button class="sidebar-add-btn" onclick="openAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
+      <div class="sidebar-scroll">
+        <div class="sidebar-section-title" style="cursor:pointer;">
+          <span onclick="filterTransactions('all')">Cuentas</span>
+          <button class="sidebar-add-btn" onclick="openAccountCreator(null)" title="Añadir cuenta"><i data-lucide="plus"></i></button>
         </div>
-        <div class="sidebar-collapse-body" id="sidebar-liquid-wrap">
+
+        <div class="sidebar-header-row" onclick="filterTransactions('all')" id="sidebar-all-row" style="cursor:pointer;">
+          <span class="section-filter-label">Todas las cuentas</span>
+        </div>
+
+        <div class="sidebar-section-group">
+          <div class="sidebar-header-row">
+            <span class="section-filter-label" onclick="filterTransactions('type-liquid')">Líquidas</span>
+            <button class="sidebar-add-btn" onclick="openAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
+          </div>
           <ul class="account-list" id="sidebar-liquid-list"></ul>
         </div>
-      </div>
 
-      <div class="sidebar-collapse" data-collapse="credit">
-        <div class="sidebar-collapse-header">
-          <span class="collapse-arrow" onclick="toggleCollapse('credit')">▾</span>
-          <span class="sidebar-filter-label" onclick="filterTransactions('type-credit_card')">Tarjetas de crédito</span>
-          <button class="sidebar-add-btn" onclick="openAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
-        </div>
-        <div class="sidebar-collapse-body" id="sidebar-credit-wrap">
+        <div class="sidebar-section-group">
+          <div class="sidebar-header-row">
+            <span class="section-filter-label" onclick="filterTransactions('type-credit_card')">Tarjetas de crédito</span>
+            <button class="sidebar-add-btn" onclick="openAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
+          </div>
           <ul class="account-list" id="sidebar-credit-list"></ul>
         </div>
       </div>
-    </div>
 
     <div class="sidebar-footer">
       <button class="sidebar-footer-btn" id="nav-settings-btn" onclick="showView('settings')">
@@ -111,6 +104,13 @@
           <span class="tx-count" id="tx-count-badge">0</span>
           <div class="tx-selection-bar" id="tx-selection-bar" style="display:none;">
             <span id="tx-selection-text"></span>
+            <div class="sel-dropdown">
+              <button class="sel-dropdown-btn" onclick="toggleSelMenu(event)" title="Acciones"><i data-lucide="more-horizontal"></i></button>
+              <div class="sel-dropdown-menu" id="sel-dropdown-menu" style="display:none;">
+                <button class="sel-dropdown-item" onclick="openBatchEditModal();closeSelMenu()"><i data-lucide="pencil"></i> Editar</button>
+                <button class="sel-dropdown-item danger" onclick="batchDeleteTransactions();closeSelMenu()"><i data-lucide="trash-2"></i> Eliminar</button>
+              </div>
+            </div>
             <button class="tx-selection-clear" onclick="clearTxSelection()" title="Limpiar selección"><i data-lucide="x"></i></button>
           </div>
         </div>
@@ -279,6 +279,9 @@
           <button class="settings-nav-btn" id="snav-tags" onclick="switchSettingsPane('tags')">
             <i data-lucide="hash"></i> Etiquetas
           </button>
+          <button class="settings-nav-btn" id="snav-currency" onclick="switchSettingsPane('currency')">
+            <i data-lucide="dollar-sign"></i> Moneda
+          </button>
         </nav>
 
         <div class="settings-pane-wrap">
@@ -387,6 +390,41 @@
             </div>
           </div>
 
+          <!-- Currency -->
+          <div class="settings-pane" id="spane-currency">
+            <div class="pane-section-title">Moneda</div>
+            <form onsubmit="saveCurrencySettings(event)">
+              <div class="form-group">
+                <label class="form-label">Divisa</label>
+                <select id="set-currency" class="sel-fit">
+                  <option value="ARS">ARS Peso argentino</option>
+                  <option value="USD">USD Dólar</option>
+                  <option value="EUR">EUR Euro</option>
+                  <option value="UYU">UYU Peso uruguayo</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Símbolo de moneda</label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                  <input type="checkbox" id="set-show-symbol" checked>
+                  <span>Mostrar símbolo ($, €, etc.)</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Decimales</label>
+                <select id="set-decimals" class="sel-fit">
+                  <option value="0">0</option>
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                </select>
+              </div>
+              <div style="margin-top:14px;">
+                <button type="submit" class="btn btn-primary">Guardar</button>
+              </div>
+            </form>
+          </div>
+
         </div><!-- /.settings-pane-wrap -->
       </div><!-- /.settings-layout -->
     </div><!-- /#view-settings -->
@@ -401,13 +439,13 @@
       <span class="modal-title">Registrar movimiento</span>
       <button class="modal-close" onclick="closeTransactionModal()"><i data-lucide="x"></i></button>
     </div>
-    <form id="tx-form" onsubmit="handleTransactionSubmit(event)">
+    <form id="tx-form" onsubmit="handleTransactionSubmit(event)" novalidate>
       <div class="modal-body">
 
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Fecha</label>
-            <input type="date" id="tx-date" required>
+            <input type="date" id="tx-date">
           </div>
           <div class="form-group">
             <label class="form-label">Cuenta</label>
@@ -418,7 +456,7 @@
         <div class="form-group">
           <label class="form-label">Beneficiario</label>
           <div class="searchable-wrap">
-            <input type="text" id="tx-payee-search" placeholder="Nombre de quien envía o recibe…" autocomplete="off" required>
+            <input type="text" id="tx-payee-search" placeholder="Nombre de quien envía o recibe…" autocomplete="off">
             <div class="searchable-dropdown" id="dropdown-payee"><ul id="dropdown-payee-list"></ul></div>
           </div>
         </div>
