@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wallet</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -15,56 +16,61 @@
 
   <!-- ══════════════ SIDEBAR ══════════════ -->
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="logo">
-        <div class="logo-icon">
-          <i data-lucide="credit-card"></i>
-        </div>
-        <span class="logo-wordmark">Wallet</span>
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <i data-lucide="credit-card"></i>
       </div>
+      <span class="sidebar-brand-name">Wallet</span>
     </div>
 
-    <div class="sidebar-content">
-      <!-- Net worth -->
-      <div class="sidebar-net-block">
-        <span class="sidebar-label">Patrimonio neto</span>
-        <div class="net-worth-amount" id="net-worth-val">$0,00</div>
+    <div class="sidebar-primary">
+      <div class="sidebar-label-sm">Patrimonio neto</div>
+      <div class="net-worth-amount" id="net-worth-val">$0,00</div>
+    </div>
+
+    <button class="sidebar-dash-btn" id="nav-dash-pill" onclick="showView('dashboard')">
+      <i data-lucide="bar-chart-3"></i> Dashboard
+    </button>
+
+    <div class="sd"></div>
+
+    <div class="sidebar-scroll">
+      <div class="sidebar-section-title" style="cursor:pointer;">
+        <span onclick="filterTransactions('all')">Cuentas</span>
+        <button class="sidebar-add-btn" onclick="openAccountCreator(null)" title="Añadir cuenta"><i data-lucide="plus"></i></button>
       </div>
 
-      <!-- Liquid accounts -->
-      <div class="sidebar-group">
-        <div class="sidebar-group-header">Cuentas líquidas</div>
-        <ul class="account-list" id="sidebar-liquid-list"></ul>
+      <div class="sidebar-all-row" onclick="filterTransactions('all')" id="sidebar-all-row">
+        <span>Todas las cuentas</span>
+        <span class="sidebar-all-arrow">→</span>
       </div>
 
-      <!-- Credit cards -->
-      <div class="sidebar-group">
-        <div class="sidebar-group-header">Tarjetas de crédito</div>
-        <ul class="account-list" id="sidebar-credit-list"></ul>
+      <div class="sidebar-collapse" data-collapse="liquid">
+        <div class="sidebar-collapse-header">
+          <span class="collapse-arrow" onclick="toggleCollapse('liquid')">▾</span>
+          <span class="sidebar-filter-label" onclick="filterTransactions('type-liquid')">Líquidas</span>
+          <button class="sidebar-add-btn" onclick="openAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
+        </div>
+        <div class="sidebar-collapse-body" id="sidebar-liquid-wrap">
+          <ul class="account-list" id="sidebar-liquid-list"></ul>
+        </div>
       </div>
 
-      <!-- Receivables -->
-      <div class="sidebar-group">
-        <div class="sidebar-group-header">Pendientes de cobro</div>
-        <div class="sidebar-receivables-row" onclick="filterTransactions('receivables')">
-          <span>Préstamos activos</span>
-          <span class="receivables-val" id="receivables-sum-val">$0,00</span>
+      <div class="sidebar-collapse" data-collapse="credit">
+        <div class="sidebar-collapse-header">
+          <span class="collapse-arrow" onclick="toggleCollapse('credit')">▾</span>
+          <span class="sidebar-filter-label" onclick="filterTransactions('type-credit_card')">Tarjetas de crédito</span>
+          <button class="sidebar-add-btn" onclick="openAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
+        </div>
+        <div class="sidebar-collapse-body" id="sidebar-credit-wrap">
+          <ul class="account-list" id="sidebar-credit-list"></ul>
         </div>
       </div>
     </div>
 
     <div class="sidebar-footer">
-      <button class="sidebar-footer-btn active-nav" id="nav-dash-btn" onclick="showView('dashboard')">
-        <i data-lucide="bar-chart-3"></i>
-        Dashboard
-      </button>
-      <button class="sidebar-footer-btn" id="nav-main-btn" onclick="showView('main')">
-        <i data-lucide="list"></i>
-        Movimientos
-      </button>
       <button class="sidebar-footer-btn" id="nav-settings-btn" onclick="showView('settings')">
-        <i data-lucide="settings-2"></i>
-        Ajustes y cuentas
+        <i data-lucide="settings-2"></i> Ajustes
       </button>
     </div>
   </aside>
@@ -77,17 +83,22 @@
       <header class="main-header">
         <div class="header-left">
           <div class="header-title" id="view-title">Todas las cuentas</div>
-          <div class="header-sub" id="view-subtitle">Resumen general de movimientos</div>
+          <div class="header-sub" id="view-subtitle">
+            <span id="view-subtitle-text">Resumen general de movimientos</span>
+            <button class="subtitle-add-btn" id="subtitle-add-btn" title="Añadir cuenta"><i data-lucide="plus"></i></button>
+          </div>
         </div>
         <div class="header-right">
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon"></i>
           </button>
-          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?" style="font-size:14px;font-weight:600;">
-            ?
+          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?">
+            <i data-lucide="circle-help"></i>
           </button>
         </div>
       </header>
+
+      <div class="coverage-strip" id="coverage-strip"></div>
 
       <div class="toolbar">
         <div class="toolbar-left">
@@ -98,11 +109,15 @@
             <i data-lucide="file-up"></i> Importar extracto
           </button>
           <span class="tx-count" id="tx-count-badge">0</span>
+          <div class="tx-selection-bar" id="tx-selection-bar" style="display:none;">
+            <span id="tx-selection-text"></span>
+            <button class="tx-selection-clear" onclick="clearTxSelection()" title="Limpiar selección"><i data-lucide="x"></i></button>
+          </div>
         </div>
         <div class="toolbar-right">
           <div class="search-box">
-            <i data-lucide="search"></i>
             <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" oninput="renderTransactions()">
+            <i data-lucide="search"></i>
           </div>
         </div>
       </div>
@@ -112,13 +127,16 @@
           <table class="ledger">
             <thead>
               <tr>
-                <th style="width:96px;">Fecha</th>
-                <th style="width:130px;">Cuenta</th>
-                <th style="width:150px;">Beneficiario</th>
-                <th>Notas / Detalle</th>
-                <th style="width:130px;">Categoría</th>
-                <th class="r" style="width:110px;">Monto</th>
-                <th class="c" style="width:60px;">—</th>
+                <th class="c" style="width:36px; min-width:36px;"><input type="checkbox" class="tx-select-all" id="tx-select-all" onchange="toggleSelectAll()"></th>
+                <th class="col-resizable" style="min-width:95px; width:95px;">Fecha<span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-account" style="min-width:115px; width:130px;">Cuenta<span class="col-resize-handle"></span></th>
+                <th class="col-resizable" style="min-width:150px; width:160px;">Beneficiario<span class="col-resize-handle"></span></th>
+                <th class="col-resizable c" style="width:80px; min-width:70px;">Cuota<span class="col-resize-handle"></span></th>
+                <th class="col-resizable" style="min-width:160px; width:100%;">Notas / Detalle<span class="col-resize-handle"></span></th>
+                <th class="col-resizable" style="min-width:120px; width:140px;">Etiquetas<span class="col-resize-handle"></span></th>
+                <th class="col-resizable" style="min-width:120px; width:140px;">Categoría<span class="col-resize-handle"></span></th>
+                <th class="col-resizable r" style="min-width:110px; width:120px;">Monto<span class="col-resize-handle"></span></th>
+                <th class="c" style="width:70px; min-width:55px;">—</th>
               </tr>
             </thead>
             <tbody id="tx-table-body"></tbody>
@@ -138,8 +156,8 @@
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon-dash"></i>
           </button>
-          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?" style="font-size:14px;font-weight:600;">
-            ?
+          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?">
+            <i data-lucide="circle-help"></i>
           </button>
         </div>
       </header>
@@ -236,8 +254,8 @@
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon-settings"></i>
           </button>
-          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?" style="font-size:14px;font-weight:600;">
-            ?
+          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?">
+            <i data-lucide="circle-help"></i>
           </button>
         </div>
       </header>
@@ -343,7 +361,13 @@
           <div class="settings-pane" id="spane-categories">
             <div class="pane-section-title">Categorías</div>
             <div style="max-width:340px;">
-              <div class="predefined-add-row" style="margin-bottom:10px;">
+              <div class="predefined-add-row cat-add-row" style="margin-bottom:10px;">
+                <div class="cat-picker-wrap">
+                  <button class="cat-picker-btn" id="cat-picker-btn" onclick="toggleCatIconPicker()" type="button" title="Elegir ícono"><i data-lucide="tag"></i></button>
+                  <div class="cat-picker-popover" id="cat-picker-popover">
+                    <div class="cat-picker-grid" id="cat-picker-grid"></div>
+                  </div>
+                </div>
                 <input type="text" id="add-category-val" placeholder="Nueva categoría…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
                 <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i> Agregar</button>
               </div>
@@ -387,7 +411,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Cuenta</label>
-            <select id="tx-account" required></select>
+            <select id="tx-account" required onchange="onAccountChangeInModal()"></select>
           </div>
         </div>
 
@@ -415,6 +439,34 @@
               <button type="button" class="sign-btn" id="btn-sign-income" onclick="setTxSign(1)">Ingreso</button>
             </div>
             <input type="number" id="tx-amount" step="0.01" min="0" placeholder="0.00" required>
+          </div>
+        </div>
+
+        <div class="tx-installment-fields" id="tx-installment-fields" style="display:none;">
+          <div class="installment-toggle-row">
+            <label class="installment-toggle-label">
+              <input type="checkbox" id="tx-is-installment" onchange="onInstallmentCheck(this.checked)" style="width:auto;height:auto;">
+              <span>Pago en cuotas</span>
+            </label>
+            <span id="tx-installment-index-display" class="installment-edit-badge" style="display:none;"></span>
+          </div>
+
+          <div id="tx-installment-editor" style="display:none;">
+            <div class="installment-editor-body">
+              <div class="form-group" style="flex:1;">
+                <label class="form-label">Número de cuotas</label>
+                <div class="installment-count-row">
+                  <button type="button" class="inst-step-btn" onclick="stepInstallment(-1)">−</button>
+                  <input type="number" id="tx-installment-count" min="2" max="48" value="3" oninput="updateInstallmentPreview()">
+                  <button type="button" class="inst-step-btn" onclick="stepInstallment(1)">+</button>
+                </div>
+              </div>
+              <div class="installment-preview" id="installment-preview">
+                <span class="inst-preview-label">Por cuota</span>
+                <span class="inst-preview-val" id="inst-preview-val">—</span>
+              </div>
+            </div>
+            <div class="installment-timeline" id="installment-timeline"></div>
           </div>
         </div>
 
@@ -531,6 +583,23 @@
         <div class="help-section-title">Dashboard</div>
         <p>Mostra un resumen del mes actual: ingresos vs gastos, las categorías donde más gastás, la cobertura de tus deudas y la actividad más reciente.</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Confirmar acción ══════════════ -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-card" style="max-width:360px;">
+    <div class="modal-head">
+      <span class="modal-title" id="confirm-title">Confirmar</span>
+      <button class="modal-close" onclick="resolveConfirm(false)"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-message" style="font-size:12.5px; color:var(--text-mid); line-height:1.6;"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="resolveConfirm(false)">Cancelar</button>
+      <button class="btn btn-primary" id="confirm-action-btn" onclick="resolveConfirm(true)">Confirmar</button>
     </div>
   </div>
 </div>
