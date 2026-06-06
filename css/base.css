@@ -1,0 +1,107 @@
+/* ============================================================
+   WALLET — Sistema de diseño
+   Fuente: Sistema nativa (sin imports externos)
+   Paleta: Blanco roto + carbón oscuro + acento índigo frío
+   ============================================================ */
+
+/* Sin imports de Google Fonts — se usa la fuente nativa del sistema */
+
+:root {
+  --font-ui:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-mono:  var(--font-ui);
+
+  /* --- Escala de color (tema claro) --- */
+  --bg-root:      #f5f4f1;
+  --bg-surface:   #ffffff;
+  --bg-raised:    #f0eeeb;
+  --bg-sunken:    #ebe9e5;
+
+  --border:       #e3e0db;
+  --border-focus: #8b83f7;
+
+  --text-hi:      #18181b;
+  --text-mid:     #52525b;
+  --text-lo:      #a1a1aa;
+  --text-inv:     #ffffff;
+
+  --accent:       #5b52f5;
+  --accent-soft:  #eceafd;
+  --accent-hover: #4740e8;
+
+  --positive:     #16a34a;
+  --positive-bg:  #dcfce7;
+  --negative:     #dc2626;
+  --negative-bg:  #fee2e2;
+  --warn:         #c47b0a;
+  --warn-bg:      #fef3c7;
+
+  --tag-a-bg:     #fce7f3;  --tag-a-tx: #9d174d;
+  --tag-b-bg:     #fef9c3;  --tag-b-tx: #854d0e;
+  --tag-c-bg:     #dbeafe;  --tag-c-tx: #1e40af;
+
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-pop:  0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+
+  /* Sidebar width */
+  --sidebar-w: 228px;
+}
+
+/* ── DARK THEME ─────────────────────────────────────────── */
+.theme-dark {
+  --bg-root:    #111113;
+  --bg-surface: #18181b;
+  --bg-raised:  #1f1f23;
+  --bg-sunken:  #27272a;
+
+  --border:       #303036;
+  --border-focus: #8b83f7;
+
+  --text-hi:  #f4f4f5;
+  --text-mid: #a1a1aa;
+  --text-lo:  #52525b;
+  --text-inv: #18181b;
+
+  --accent:       #7c75f8;
+  --accent-soft:  #1e1c3a;
+  --accent-hover: #6a62f6;
+
+  --positive:    #4ade80;
+  --positive-bg: #052e16;
+  --negative:    #f87171;
+  --negative-bg: #450a0a;
+  --warn:        #fbbf24;
+  --warn-bg:     #431407;
+
+  --tag-a-bg: #3b0764; --tag-a-tx: #e9d5ff;
+  --tag-b-bg: #422006; --tag-b-tx: #fde68a;
+  --tag-c-bg: #172554; --tag-c-tx: #bfdbfe;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-pop:  0 10px 30px rgba(0,0,0,0.5);
+}
+
+/* ── RESET ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg-root);
+  color: var(--text-hi);
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar global */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-lo); }
+

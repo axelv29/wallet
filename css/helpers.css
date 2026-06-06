@@ -1,0 +1,720 @@
+.dash-cat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.dash-cat-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dash-cat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.inline-tag-pill .remove-tag {
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.inline-tag-pill .remove-tag:hover { opacity: 1; }
+
+.inline-tag-add {
+  font-size: 11px;
+  color: var(--text-lo);
+  font-style: italic;
+  padding: 2px 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   IMPORT MODAL
+   ═══════════════════════════════════════════════════════════ */
+.import-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── MISC ────────────────────────────────────────────────── */
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-lo);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-xs);
+  flex-shrink: 0;
+  transition: background 0.08s, color 0.08s;
+}
+
+.delete-btn:hover { background: var(--negative-bg); color: var(--negative); }
+.delete-btn svg { width: 12px; height: 12px; }
+
+.closing-fields { margin-top: 4px; }
+
+.cc-note {
+  font-size: 10.5px;
+  color: var(--text-lo);
+  padding: 6px 8px;
+  background: var(--warn-bg);
+  border-radius: var(--r-xs);
+  border-left: 2px solid var(--warn);
+  margin-top: 4px;
+}
+
+/* Import review table container */
+.compact-table { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.compact-table table.ledger { font-size: 12px; }
+.compact-table table.ledger thead th { font-size: 10px; }
+.compact-table table.ledger td input,
+.compact-table table.ledger td select { height: 26px; font-size: 11.5px; padding: 3px 6px; }
+
+/* ═══════════════════════════════════════════════════════════
+   HELP MODAL
+   ═══════════════════════════════════════════════════════════ */
+.help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.help-section { }
+
+.help-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.help-section p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-mid);
+  margin-bottom: 6px;
+}
+
+.help-section p:last-child { margin-bottom: 0; }
+
+.help-section strong {
+  color: var(--text-hi);
+  font-weight: 600;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   INSTALLMENT / CUOTAS — Modal y tabla
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Modal: sección cuotas ─────────────────────────────── */
+.tx-installment-fields {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.installment-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.installment-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-mid);
+  cursor: pointer;
+  user-select: none;
+}
+
+.installment-edit-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.installment-editor-body {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.installment-count-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inst-step-btn {
+  width: 28px;
+  height: 32px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-mid);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.inst-step-btn:hover { background: var(--bg-sunken); color: var(--text-hi); }
+
+.installment-count-row input {
+  width: 64px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.installment-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 6px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 120px;
+}
+
+.inst-preview-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-lo);
+}
+
+.inst-preview-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-hi);
+  letter-spacing: -0.02em;
+}
+
+/* Installment timeline dots */
+.installment-timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 4px 0 2px;
+  scrollbar-width: none;
+}
+
+.installment-timeline::-webkit-scrollbar { display: none; }
+
+.inst-dot-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.inst-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.inst-dot.now {
+  background: var(--accent);
+  color: #fff;
+}
+
+.inst-dot.future {
+  background: var(--bg-sunken);
+  border: 1.5px dashed var(--border);
+  color: var(--text-lo);
+}
+
+.inst-dot-label {
+  font-size: 9px;
+  color: var(--text-lo);
+  white-space: nowrap;
+}
+
+.inst-dot-label.now { color: var(--accent); font-weight: 600; }
+
+.inst-connector {
+  height: 1.5px;
+  width: 14px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin-bottom: 14px; /* align with dot center */
+}
+
+/* ── Tabla: columna de cuota ──────────────────────────── */
+.payee-cell .payee-name { display: block; }
+
+.cuota-cell {
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.cuota-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* ── Tabla: filas de cuotas futuras ───────────────────── */
+tr.tx-future {
+  opacity: 0.6;
+}
+
+tr.tx-future td {
+  background: transparent !important;
+}
+
+tr.tx-future:hover { opacity: 0.75; }
+
+/* subtle separator between future and present */
+tr.future-spacer td {
+  padding: 0 !important;
+  border-bottom: none !important;
+  height: 6px;
+  background: var(--bg-raised);
+}
+
+/* Separador "Cuotas futuras" colapsable */
+.future-group-row td {
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+
+.future-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-lo);
+  transition: color 0.1s;
+}
+
+.future-group-header:hover { color: var(--text-mid); }
+
+.future-group-arrow {
+  font-size: 13px;
+  transition: transform 0.15s;
+  line-height: 1;
+}
+
+.future-group-arrow.open { transform: rotate(90deg); }
+
+.future-group-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 20px;
+}
+
+/* ── CSV / XLS IMPORT MODAL ────────────────────────────── */
+.csv-import-card {
+  max-width: 820px !important;
+}
+
+.csv-import-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Drop zone */
+.csv-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 36px 20px;
+  border: 2px dashed var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.csv-dropzone:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.csv-dropzone-icon {
+  width: 36px;
+  height: 36px;
+  color: var(--text-lo);
+}
+
+.csv-dropzone-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.csv-dropzone-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.csv-dropzone-sub {
+  font-size: 11.5px;
+  color: var(--text-lo);
+}
+
+/* Sample buttons */
+.csv-samples {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.csv-samples-label {
+  font-size: 11px;
+  color: var(--text-lo);
+  margin-right: 4px;
+}
+
+/* File info bar */
+.csv-file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+}
+
+.csv-file-info-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-hi);
+}
+
+.csv-file-info-left svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.csv-file-dims {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-lo);
+}
+
+/* Settings row */
+.csv-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.csv-settings .form-group {
+  margin: 0;
+  min-width: 120px;
+}
+
+.csv-settings .form-group select {
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--text-hi);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  padding: 0 8px;
+  outline: none;
+  width: 100%;
+}
+
+.csv-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-mid);
+  cursor: pointer;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.csv-header-toggle input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* Column mapping */
+.csv-mapping-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.csv-mapping-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.csv-mapping-hint {
+  font-size: 11px;
+  color: var(--text-lo);
+  margin-bottom: 4px;
+}
+
+.csv-preview-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.csv-mapping-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.csv-mapping-table th {
+  background: var(--bg-raised);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-mid);
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.csv-mapping-table th.csv-col-ignore {
+  opacity: 0.5;
+}
+
+.csv-mapping-table th select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--text-hi);
+  font-size: 11px;
+  font-family: var(--font-ui);
+  padding: 0 6px;
+  outline: none;
+}
+
+.csv-mapping-table th select:hover {
+  border-color: var(--accent);
+}
+
+.csv-mapping-table th select option.csv-opt-ignore {
+  color: var(--text-lo);
+  font-style: italic;
+}
+
+.csv-mapping-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-mid);
+  font-size: 11.5px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.csv-mapping-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.csv-mapping-table tbody tr:hover td {
+  background: var(--bg-raised);
+}
+
+.csv-mapping-table td.csv-cell-mapped {
+  color: var(--text-hi);
+}
+
+.csv-mapping-table td.csv-cell-ignore {
+  opacity: 0.35;
+}
+
+/* Preview section */
+.csv-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.csv-preview-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+/* Footer */
+.csv-import-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.csv-import-foot-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.csv-import-errors {
+  font-size: 11.5px;
+  color: #e74c3c;
+  flex: 1;
+}
+
+/* Sample CSV collapse */
+.csv-sample-collapse {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.csv-sample-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-raised);
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--text-mid);
+  user-select: none;
+}
+
+.csv-sample-header:hover {
+  background: var(--bg-surface);
+}
+
+.csv-sample-body {
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-lo);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+/* ── AI import entry inside CSV modal ───────────────────── */
+.csv-ai-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
+}
+
+.csv-ai-divider::before,
+.csv-ai-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.csv-ai-divider span {
+  font-size: 11px;
+  color: var(--text-lo);
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+
+.csv-ai-btn {
+  width: 100%;
+  justify-content: center;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+.csv-ai-btn:hover {
+  background: var(--accent-soft) !important;
+}
+

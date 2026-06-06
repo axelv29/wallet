@@ -33,6 +33,7 @@ let state = {
   currentView: 'all',
   editingTxId: null,
   selectedTxIds: new Set(),
+  tableFilters: [],
 
 };
 
@@ -53,6 +54,18 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   initColumnResize();
   initCatIconPicker();
+  initCsvDropzone();
+
+  // Re-draw charts on resize
+  let _resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+      if (document.getElementById('view-dashboard')?.style.display !== 'none') {
+        renderDashCharts();
+      }
+    }, 120);
+  });
 });
 
 // ── VIEW SWITCHING ────────────────────────────────────────────
@@ -64,6 +77,11 @@ function showView(name) {
 
   document.getElementById('nav-dash-pill').classList.toggle('active', name === 'dashboard');
   localStorage.setItem('wallet_last_view', name);
+
+  if (name !== 'main') {
+    state.currentView = '';
+    renderSidebar();
+  }
 
   if (name === 'dashboard') {
     renderDashboard();
@@ -111,7 +129,7 @@ function applyTheme() {
   document.body.classList.toggle('theme-dark', isDark);
   document.body.classList.toggle('theme-light', !isDark);
   const icon = isDark ? 'moon' : 'sun';
-  ['theme-icon', 'theme-icon-settings'].forEach(id => {
+  ['theme-icon', 'theme-icon-settings', 'theme-icon-dash'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.setAttribute('data-lucide', icon);
   });
@@ -883,6 +901,7 @@ function renderAll() {
   renderTransactions();
   renderDashboard();
   updateSelectors();
+  updateFilterBadge();
 }
 
 function renderSidebar() {
@@ -1002,6 +1021,74 @@ function renderTransactions() {
     filtered = filtered.filter(t => t.account_id === state.currentView);
   }
 
+  // Apply table filters
+  if (state.tableFilters.length > 0) {
+    filtered = filtered.filter(tx => {
+      const acc = state.accounts.find(a => a.id === tx.account_id);
+      return state.tableFilters.every(f => {
+        if (!f.value) return true;
+        const val = f.value.toLowerCase();
+        switch (f.column) {
+          case 'payee': {
+            const text = (tx.payee || '').toLowerCase();
+            if (f.operator === 'contains') return text.includes(val);
+            if (f.operator === 'equals') return text === val;
+            if (f.operator === 'not_equals') return text !== val;
+            return true;
+          }
+          case 'notes': {
+            const text = (tx.notes || '').toLowerCase();
+            if (f.operator === 'contains') return text.includes(val);
+            if (f.operator === 'equals') return text === val;
+            if (f.operator === 'not_equals') return text !== val;
+            return true;
+          }
+          case 'tags': {
+            const tags = (tx.tags || []).map(t => t.toLowerCase());
+            if (f.operator === 'contains') return tags.some(t => t.includes(val));
+            if (f.operator === 'equals') return tags.some(t => t === val);
+            if (f.operator === 'not_equals') return !tags.some(t => t === val);
+            return true;
+          }
+          case 'category_name': {
+            const text = (tx.category_name || '').toLowerCase();
+            if (f.operator === 'contains') return text.includes(val);
+            if (f.operator === 'equals') return text === val;
+            if (f.operator === 'not_equals') return text !== val;
+            return true;
+          }
+          case 'account_name': {
+            const text = (acc ? acc.name : '').toLowerCase();
+            if (f.operator === 'contains') return text.includes(val);
+            if (f.operator === 'equals') return text === val;
+            if (f.operator === 'not_equals') return text !== val;
+            return true;
+          }
+          case 'amount': {
+            const num = Number(tx.amount);
+            const filterNum = Number(f.value);
+            if (isNaN(filterNum)) return true;
+            if (f.operator === 'equals') return num === filterNum;
+            if (f.operator === 'gt') return num > filterNum;
+            if (f.operator === 'lt') return num < filterNum;
+            if (f.operator === 'gte') return num >= filterNum;
+            if (f.operator === 'lte') return num <= filterNum;
+            return true;
+          }
+          case 'date': {
+            const d = tx.date || '';
+            if (f.operator === 'equals') return d === f.value;
+            if (f.operator === 'before') return d < f.value;
+            if (f.operator === 'after') return d > f.value;
+            return true;
+          }
+          default:
+            return true;
+        }
+      });
+    });
+  }
+
   if (search) {
     filtered = filtered.filter(tx => {
       const acc = state.accounts.find(a => a.id === tx.account_id);
@@ -1094,10 +1181,7 @@ function renderTransactions() {
     }
   };
 
-  // Render present rows
-  present.forEach(tx => appendTxRow(tx, false));
-
-  // Render future group if any
+  // Render future group first (above present)
   if (futures.length > 0) {
     const colCount  = isSingleAccount ? 10 : 11;
     const groupKey  = 'future-group-open';
@@ -1111,7 +1195,7 @@ function renderTransactions() {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'future-group-header';
     headerDiv.innerHTML = `
-      <span class="future-group-arrow ${isOpen ? 'open' : ''}">▶</span>
+      <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
       <span>Cuotas futuras</span>
       <span class="future-group-count">${futures.length}</span>
     `;
@@ -1127,8 +1211,18 @@ function renderTransactions() {
     // Future rows (collapsible)
     if (isOpen) {
       futures.forEach(tx => appendTxRow(tx, true));
+      // spacer between future and present
+      const spacer = document.createElement('tr');
+      spacer.className = 'future-spacer';
+      const td = document.createElement('td');
+      td.colSpan = colCount;
+      spacer.appendChild(td);
+      tbody.appendChild(spacer);
     }
   }
+
+  // Render present rows below future
+  present.forEach(tx => appendTxRow(tx, false));
 
   updateSelectAllCheckbox();
   updateSelectionBar();
@@ -1163,19 +1257,20 @@ function updateSelectors() {
 }
 
 // ── IMPORT (GEMINI) ───────────────────────────────────────────
-function openImportModal() {
+function openGeminiImportModal() {
   if (!state.settings.geminiKey) {
     alert('Configurá primero tu Gemini API Key en Ajustes → General.');
     showView('settings');
     return;
   }
+  closeImportModal();
   updateSelectors();
   document.getElementById('import-setup-view').style.display  = 'block';
   document.getElementById('import-review-view').style.display = 'none';
   document.getElementById('import-modal').classList.add('open');
 }
 
-function closeImportModal() {
+function closeGeminiImportModal() {
   document.getElementById('import-modal').classList.remove('open');
   state.importedTransactions = [];
 }
@@ -1289,23 +1384,221 @@ function confirmImportedTransactions() {
   }));
   state.transactions = [...newTxs, ...state.transactions];
   saveData('transactions');
-  closeImportModal();
+  closeGeminiImportModal();
   renderAll();
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────
-function renderDashboard() {
-  const balances = calculateBalances();
-  const now = new Date();
-  const currMonth = now.getMonth();
-  const currYear = now.getFullYear();
+// ── DASHBOARD STATE ───────────────────────────────────────────
+let dashState = {
+  month: null, // { year, month } — null = current
+  activeTab: 'resumen',
+  barChartInstance: null,
+  donutChartInstance: null,
+  donutIncomeChartInstance: null,
+};
 
-  const monthTxs = state.transactions.filter(tx => {
-    const d = new Date(tx.date + 'T00:00:00');
-    return d.getMonth() === currMonth && d.getFullYear() === currYear;
+function dashGetPeriod() {
+  if (dashState.month) return dashState.month;
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() };
+}
+
+function dashPrevMonth() {
+  const p = dashGetPeriod();
+  let m = p.month - 1, y = p.year;
+  if (m < 0) { m = 11; y--; }
+  dashState.month = { year: y, month: m };
+  renderDashboard();
+}
+
+function dashNextMonth() {
+  const p = dashGetPeriod();
+  let m = p.month + 1, y = p.year;
+  if (m > 11) { m = 0; y++; }
+  dashState.month = { year: y, month: m };
+  renderDashboard();
+}
+
+function switchDashTab(name) {
+  ['resumen','gastos','ingresos','cobertura'].forEach(t => {
+    document.getElementById('dash-tab-' + t)?.classList.toggle('active', t === name);
+    document.getElementById('dash-panel-' + t)?.classList.toggle('active', t === name);
+  });
+  dashState.activeTab = name;
+  // Trigger chart redraws after panel becomes visible
+  setTimeout(() => renderDashCharts(), 10);
+}
+
+// ── Chart helpers (pure canvas, no dependencies) ──────────────
+
+function destroyChart(instance) {
+  if (instance && typeof instance.destroy === 'function') instance.destroy();
+}
+
+function getChartColors(n) {
+  const palette = [
+    '#5b52f5','#7c75f8','#38bdf8','#34d399','#fbbf24',
+    '#f87171','#a78bfa','#fb923c','#4ade80','#60a5fa',
+  ];
+  return Array.from({ length: n }, (_, i) => palette[i % palette.length]);
+}
+
+function drawBarChart(canvas, labels, incomeData, expenseData) {
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = rect.height;
+  const padL = 52, padR = 12, padT = 16, padB = 36;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const n = labels.length;
+  const groupW = chartW / n;
+  const barW = Math.min(18, groupW * 0.35);
+  const gap = 3;
+
+  // styles
+  const isDark = document.body.classList.contains('theme-dark');
+  const textColor = isDark ? '#a1a1aa' : '#71717a';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const incomeColor = isDark ? '#4ade80' : '#22c55e';
+  const expenseColor = isDark ? '#f87171' : '#ef4444';
+
+  const maxVal = Math.max(...incomeData, ...expenseData, 1);
+
+  // grid lines
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    const val = maxVal * (1 - i / 4);
+    ctx.fillStyle = textColor;
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val.toFixed(0), padL - 5, y + 3.5);
+  }
+
+  // bars
+  labels.forEach((label, i) => {
+    const cx = padL + i * groupW + groupW / 2;
+    // income bar
+    const iH = (incomeData[i] / maxVal) * chartH;
+    ctx.fillStyle = incomeColor;
+    ctx.beginPath();
+    ctx.roundRect(cx - barW - gap / 2, padT + chartH - iH, barW, iH, [3, 3, 0, 0]);
+    ctx.fill();
+    // expense bar
+    const eH = (expenseData[i] / maxVal) * chartH;
+    ctx.fillStyle = expenseColor;
+    ctx.beginPath();
+    ctx.roundRect(cx + gap / 2, padT + chartH - eH, barW, eH, [3, 3, 0, 0]);
+    ctx.fill();
+    // label
+    ctx.fillStyle = textColor;
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, cx, H - 8);
   });
 
-  // Monthly summary
+  // Legend
+  const legY = padT - 4;
+  ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = incomeColor;
+  ctx.fillRect(padL, legY - 7, 10, 7);
+  ctx.fillStyle = textColor;
+  ctx.fillText('Ingresos', padL + 13, legY);
+  ctx.fillStyle = expenseColor;
+  ctx.fillRect(padL + 70, legY - 7, 10, 7);
+  ctx.fillStyle = textColor;
+  ctx.fillText('Gastos', padL + 83, legY);
+}
+
+function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = rect.height;
+  const cx = W / 2, cy = H / 2;
+  const outerR = Math.min(W, H) / 2 - 10;
+  const innerR = outerR * 0.62;
+
+  const total = values.reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    const isDark = document.body.classList.contains('theme-dark');
+    ctx.strokeStyle = isDark ? '#303036' : '#e3e0db';
+    ctx.lineWidth = outerR - innerR;
+    ctx.beginPath();
+    ctx.arc(cx, cy, (outerR + innerR) / 2, 0, Math.PI * 2);
+    ctx.stroke();
+    return;
+  }
+
+  let startAngle = -Math.PI / 2;
+  values.forEach((v, i) => {
+    const sweep = (v / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep);
+    ctx.closePath();
+    // Outer
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep);
+    ctx.arc(cx, cy, innerR, startAngle + sweep, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.fill();
+    startAngle += sweep;
+  });
+}
+
+// ── MAIN renderDashboard ──────────────────────────────────────
+function renderDashboard() {
+  const balances = calculateBalances();
+  const period = dashGetPeriod();
+  const now = new Date();
+
+  // ── Greeting ──
+  const hour = now.getHours();
+  let greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const greetEl = document.getElementById('dash-greeting');
+  if (greetEl) greetEl.textContent = greet;
+
+  const dateEl = document.getElementById('dash-date-display');
+  if (dateEl) {
+    dateEl.textContent = now.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  // ── Net worth in banner ──
+  const liquidCov = balances.liquid + balances.credit_card;
+  const projCov   = balances.liquid + balances.receivables + balances.credit_card;
+  const netWorth  = liquidCov + balances.receivables;
+  const nwEl = document.getElementById('dash-net-worth');
+  if (nwEl) nwEl.textContent = formatCurrency(netWorth);
+
+  // ── Month label ──
+  const monthLabel = document.getElementById('dash-month-label');
+  if (monthLabel) {
+    const d = new Date(period.year, period.month, 1);
+    monthLabel.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' })
+      .replace(/^./, s => s.toUpperCase());
+  }
+
+  // ── Filter transactions for selected month ──
+  const monthTxs = state.transactions.filter(tx => {
+    const d = new Date(tx.date + 'T00:00:00');
+    return d.getMonth() === period.month && d.getFullYear() === period.year;
+  });
+
   let totalIncome = 0, totalExpenses = 0;
   monthTxs.forEach(tx => {
     if (tx.amount > 0) totalIncome += tx.amount;
@@ -1313,85 +1606,225 @@ function renderDashboard() {
   });
   const netDiff = totalIncome - totalExpenses;
 
-  document.getElementById('dash-income').textContent = formatCurrency(totalIncome);
-  document.getElementById('dash-expenses').textContent = formatCurrency(totalExpenses);
+  // ── Metric strip ──
+  const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+  setEl('dash-income', formatCurrency(totalIncome));
+  setEl('dash-expenses', formatCurrency(totalExpenses));
   const netEl = document.getElementById('dash-net');
-  netEl.textContent = formatCurrency(netDiff);
-  netEl.className = 'dash-hero-val' + (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '');
+  if (netEl) {
+    netEl.textContent = (netDiff >= 0 ? '+' : '') + formatCurrency(netDiff);
+    netEl.className = 'dash-strip-val' + (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '');
+  }
+  setEl('dash-tx-count', monthTxs.length);
 
-  // Subtitle
-  document.getElementById('dash-subtitle').textContent =
-    `Resumen de ${now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`;
+  // ── Savings rate ──
+  const savingsPct = totalIncome > 0 ? Math.max(0, Math.min(100, (netDiff / totalIncome) * 100)) : 0;
+  const savingsFill = document.getElementById('dash-savings-fill');
+  const savingsPctEl = document.getElementById('dash-savings-pct');
+  const savingsDesc = document.getElementById('dash-savings-desc');
+  if (savingsFill) savingsFill.style.width = savingsPct.toFixed(1) + '%';
+  if (savingsPctEl) savingsPctEl.textContent = savingsPct.toFixed(1) + '%';
+  if (savingsDesc) {
+    if (totalIncome === 0) savingsDesc.textContent = 'Sin ingresos registrados en este período.';
+    else if (savingsPct <= 0) savingsDesc.textContent = 'Los gastos superan los ingresos este mes.';
+    else if (savingsPct < 10) savingsDesc.textContent = `Ahorrás ${savingsPct.toFixed(1)}% de tus ingresos. Meta sugerida: 20%.`;
+    else if (savingsPct < 20) savingsDesc.textContent = `Ahorrás ${savingsPct.toFixed(1)}% de tus ingresos. Vas bien, seguí así.`;
+    else savingsDesc.textContent = `¡Excelente! Ahorrás ${savingsPct.toFixed(1)}% de tus ingresos este mes.`;
+  }
 
-  // Coverage
-  const liquidCov = balances.liquid + balances.credit_card;
-  const projCov = balances.liquid + balances.receivables + balances.credit_card;
-  const netWorth = liquidCov + balances.receivables;
+  // ── Coverage tab ──
+  setEl('dash-liquid-cov', formatCurrency(liquidCov));
+  setEl('dash-proj-cov', formatCurrency(projCov));
+  setEl('dash-net-worth-tab', formatCurrency(netWorth));
 
-  const setCov = (id, val) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = formatCurrency(val);
-  };
-  setCov('dash-liquid-cov', liquidCov);
-  setCov('dash-proj-cov', projCov);
-  setCov('dash-net-worth', netWorth);
+  const covDetails = document.getElementById('dash-cov-details');
+  if (covDetails) {
+    const rows = [
+      { label: 'Efectivo disponible (cuentas líquidas)', val: balances.liquid, max: Math.max(balances.liquid, 1) },
+      { label: 'Deuda en tarjetas de crédito', val: balances.credit_card, max: Math.max(Math.abs(balances.credit_card), 1), invert: true },
+      { label: 'Préstamos a cobrar', val: balances.receivables, max: Math.max(balances.receivables, 1) },
+    ];
+    covDetails.innerHTML = rows.map(r => {
+      const pct = Math.min(100, r.max > 0 ? Math.abs(r.val) / r.max * 100 : 0);
+      const colorClass = r.invert ? (r.val < 0 ? 'bad' : 'ok') : (r.val > 0 ? 'ok' : r.val < 0 ? 'bad' : 'warn');
+      return `<div class="dash-cov-detail-row">
+        <div class="dash-cov-detail-top">
+          <span class="dash-cov-detail-label">${r.label}</span>
+          <span class="dash-cov-detail-val">${formatCurrency(r.val)}</span>
+        </div>
+        <div class="dash-cov-bar-track"><div class="dash-cov-bar-fill ${colorClass}" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
 
-  // Categories breakdown (expenses only)
+  // ── Category breakdown (expenses) ──
   const catTotals = {};
   monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
     const cat = tx.category_name || 'Otros';
     catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount);
   });
-
-  const catList = document.getElementById('dash-category-list');
-  catList.innerHTML = '';
-
   const catEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
   const maxCat = catEntries.length > 0 ? catEntries[0][1] : 0;
 
-  if (catEntries.length === 0) {
-    catList.innerHTML = '<div class="dash-empty">Sin gastos este mes</div>';
-  } else {
-    catEntries.forEach(([cat, amount]) => {
-      const pct = maxCat > 0 ? (amount / maxCat) * 100 : 0;
-      const row = document.createElement('div');
-      row.className = 'dash-cat-row';
-      const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
-      const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
-      row.innerHTML = `
-        <div class="dash-cat-top">
-          <span class="dash-cat-label"><span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>${cat}</span>
-          <span class="dash-cat-amount">${formatCurrency(amount)}</span>
-        </div>
-        <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
-      `;
-      catList.appendChild(row);
-    });
+  const catList = document.getElementById('dash-category-list');
+  if (catList) {
+    catList.innerHTML = '';
+    if (catEntries.length === 0) {
+      catList.innerHTML = '<div class="dash-empty">Sin gastos este mes</div>';
+    } else {
+      catEntries.forEach(([cat, amount], idx) => {
+        const pct = maxCat > 0 ? (amount / maxCat) * 100 : 0;
+        const totalPct = totalExpenses > 0 ? (amount / totalExpenses * 100).toFixed(0) : 0;
+        const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
+        const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
+        const row = document.createElement('div');
+        row.className = 'dash-cat-row';
+        row.innerHTML = `
+          <div class="dash-cat-top">
+            <span class="dash-cat-label"><span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>${cat}</span>
+            <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
+          </div>
+          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
+        `;
+        catList.appendChild(row);
+      });
+    }
   }
 
-  // Recent activity (last 5)
-  const recentList = document.getElementById('dash-recent-list');
-  recentList.innerHTML = '';
+  // ── Category breakdown (income) ──
+  const incomeCatTotals = {};
+  monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
+    const cat = tx.category_name || 'Otros';
+    incomeCatTotals[cat] = (incomeCatTotals[cat] || 0) + tx.amount;
+  });
+  const incomeCatEntries = Object.entries(incomeCatTotals).sort((a, b) => b[1] - a[1]);
+  const maxIncomeCat = incomeCatEntries.length > 0 ? incomeCatEntries[0][1] : 0;
 
-  const recent = state.transactions.slice(0, 5);
-  if (recent.length === 0) {
-    recentList.innerHTML = '<div class="dash-empty">Sin movimientos aún</div>';
-  } else {
-    recent.forEach(tx => {
-      const isExpense = tx.amount < 0;
-      const item = document.createElement('div');
-      item.className = 'dash-recent-item';
-      item.innerHTML = `
-        <span class="dash-recent-date">${formatDate(tx.date)}</span>
-        <span class="dash-recent-payee">${tx.payee}</span>
-        <span class="dash-recent-amount ${isExpense ? 'expense' : 'income'}">${isExpense ? '-' : '+'}${formatCurrency(Math.abs(tx.amount))}</span>
-      `;
-      recentList.appendChild(item);
-    });
+  const incomeCatList = document.getElementById('dash-income-category-list');
+  if (incomeCatList) {
+    incomeCatList.innerHTML = '';
+    if (incomeCatEntries.length === 0) {
+      incomeCatList.innerHTML = '<div class="dash-empty">Sin ingresos este mes</div>';
+    } else {
+      incomeCatEntries.forEach(([cat, amount]) => {
+        const pct = maxIncomeCat > 0 ? (amount / maxIncomeCat) * 100 : 0;
+        const totalPct = totalIncome > 0 ? (amount / totalIncome * 100).toFixed(0) : 0;
+        const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
+        const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
+        const row = document.createElement('div');
+        row.className = 'dash-cat-row';
+        row.innerHTML = `
+          <div class="dash-cat-top">
+            <span class="dash-cat-label"><span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>${cat}</span>
+            <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
+          </div>
+          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill income-fill" style="width:${pct}%"></div></div>
+        `;
+        incomeCatList.appendChild(row);
+      });
+    }
+  }
+
+  // ── Donut totals ──
+  const donutTotal = document.getElementById('dash-donut-total');
+  if (donutTotal) donutTotal.textContent = formatCurrency(totalExpenses);
+  const donutIncomeTotal = document.getElementById('dash-donut-income-total');
+  if (donutIncomeTotal) donutIncomeTotal.textContent = formatCurrency(totalIncome);
+
+  // ── Recent activity ──
+  const recentList = document.getElementById('dash-recent-list');
+  if (recentList) {
+    recentList.innerHTML = '';
+    const recent = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+    if (recent.length === 0) {
+      recentList.innerHTML = '<div class="dash-empty">Sin movimientos aún</div>';
+    } else {
+      recent.forEach(tx => {
+        const isExpense = tx.amount < 0;
+        const item = document.createElement('div');
+        item.className = 'dash-recent-item';
+        item.innerHTML = `
+          <span class="dash-recent-date">${formatDate(tx.date)}</span>
+          <span class="dash-recent-dot ${isExpense ? 'expense' : 'income'}"></span>
+          <span class="dash-recent-payee">${tx.payee || '—'}</span>
+          <span class="dash-recent-amount ${isExpense ? 'expense' : 'income'}">${isExpense ? '-' : '+'}${formatCurrency(Math.abs(tx.amount))}</span>
+        `;
+        recentList.appendChild(item);
+      });
+    }
   }
 
   lucide.createIcons();
+  // Draw charts
+  setTimeout(() => renderDashCharts(), 30);
+}
+
+function renderDashCharts() {
+  // ── Bar chart (last 6 months) ──
+  const barCanvas = document.getElementById('dash-bar-chart');
+  if (barCanvas && barCanvas.offsetWidth > 0) {
+    const labels = [];
+    const incomeData = [];
+    const expenseData = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const m = d.getMonth(), y = d.getFullYear();
+      const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
+      labels.push(label.charAt(0).toUpperCase() + label.slice(1));
+      let inc = 0, exp = 0;
+      state.transactions.forEach(tx => {
+        const td = new Date(tx.date + 'T00:00:00');
+        if (td.getMonth() === m && td.getFullYear() === y) {
+          if (tx.amount > 0) inc += tx.amount;
+          else exp += Math.abs(tx.amount);
+        }
+      });
+      incomeData.push(inc);
+      expenseData.push(exp);
+    }
+    drawBarChart(barCanvas, labels, incomeData, expenseData);
+  }
+
+  // ── Donut chart (expenses) ──
+  const donutCanvas = document.getElementById('dash-donut-chart');
+  if (donutCanvas && donutCanvas.offsetWidth > 0) {
+    const period = dashGetPeriod();
+    const monthTxs = state.transactions.filter(tx => {
+      const d = new Date(tx.date + 'T00:00:00');
+      return d.getMonth() === period.month && d.getFullYear() === period.year;
+    });
+    const catTotals = {};
+    monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
+      const cat = tx.category_name || 'Otros';
+      catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount);
+    });
+    const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const colors = getChartColors(entries.length);
+    drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total gastos');
+  }
+
+  // ── Donut chart (income) ──
+  const donutIncomeCanvas = document.getElementById('dash-donut-income-chart');
+  if (donutIncomeCanvas && donutIncomeCanvas.offsetWidth > 0) {
+    const period = dashGetPeriod();
+    const monthTxs = state.transactions.filter(tx => {
+      const d = new Date(tx.date + 'T00:00:00');
+      return d.getMonth() === period.month && d.getFullYear() === period.year;
+    });
+    const catTotals = {};
+    monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
+      const cat = tx.category_name || 'Otros';
+      catTotals[cat] = (catTotals[cat] || 0) + tx.amount;
+    });
+    const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const colors = getChartColors(entries.length).map((_, i) => {
+      const greens = ['#22c55e','#4ade80','#16a34a','#86efac','#15803d','#bbf7d0','#166534','#dcfce7'];
+      return greens[i % greens.length];
+    });
+    drawDonutChart(donutIncomeCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total ingresos');
+  }
 }
 
 // ── HELP MODAL ─────────────────────────────────────────────────
@@ -1476,6 +1909,175 @@ function toggleSelMenu(e) {
 function closeSelMenu() {
   const menu = document.getElementById('sel-dropdown-menu');
   if (menu) menu.style.display = 'none';
+}
+
+// ── TABLE FILTERS ─────────────────────────────────────────
+const FILTER_COLUMNS = [
+  { value: 'payee', label: 'Beneficiario', type: 'text' },
+  { value: 'notes', label: 'Notas', type: 'text' },
+  { value: 'tags', label: 'Etiquetas', type: 'text' },
+  { value: 'category_name', label: 'Categoría', type: 'text' },
+  { value: 'account_name', label: 'Cuenta', type: 'text' },
+  { value: 'amount', label: 'Monto', type: 'number' },
+  { value: 'date', label: 'Fecha', type: 'date' },
+];
+
+function getOperatorsForColumn(col) {
+  if (!col) return [{ value: 'contains', label: 'contiene' }];
+  const def = FILTER_COLUMNS.find(c => c.value === col);
+  if (!def) return [{ value: 'contains', label: 'contiene' }];
+  if (def.type === 'number') {
+    return [
+      { value: 'equals', label: '=' },
+      { value: 'gt', label: '>' },
+      { value: 'lt', label: '<' },
+      { value: 'gte', label: '≥' },
+      { value: 'lte', label: '≤' },
+    ];
+  }
+  if (def.type === 'date') {
+    return [
+      { value: 'equals', label: 'es' },
+      { value: 'before', label: 'antes' },
+      { value: 'after', label: 'después' },
+    ];
+  }
+  return [
+    { value: 'contains', label: 'contiene' },
+    { value: 'equals', label: 'es' },
+    { value: 'not_equals', label: 'no es' },
+  ];
+}
+
+function openFilterPanel() {
+  const panel = document.getElementById('filter-panel');
+  const btn = document.getElementById('filter-toggle-btn');
+  if (panel) {
+    panel.classList.toggle('open');
+    if (btn) btn.classList.toggle('active', panel.classList.contains('open'));
+    if (panel.classList.contains('open')) renderFilterPanel();
+  }
+}
+
+function renderFilterPanel() {
+  const container = document.getElementById('filter-rows');
+  if (!container) return;
+  container.innerHTML = '';
+  if (state.tableFilters.length === 0) {
+    addFilterRow();
+    return;
+  }
+  state.tableFilters.forEach(f => appendFilterRowEl(container, f));
+}
+
+let _filterIdCounter = 0;
+function addFilterRow() {
+  const id = 'f' + (++_filterIdCounter);
+  state.tableFilters.push({ id, column: 'payee', operator: 'contains', value: '' });
+  const container = document.getElementById('filter-rows');
+  if (container) appendFilterRowEl(container, state.tableFilters[state.tableFilters.length - 1]);
+}
+
+function appendFilterRowEl(container, filter) {
+  const row = document.createElement('div');
+  row.className = 'filter-row';
+  row.dataset.fid = filter.id;
+
+  const colSel = document.createElement('select');
+  colSel.className = 'filter-col-sel';
+  FILTER_COLUMNS.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.value;
+    opt.textContent = c.label;
+    if (c.value === filter.column) opt.selected = true;
+    colSel.appendChild(opt);
+  });
+  colSel.onchange = () => {
+    filter.column = colSel.value;
+    filter.operator = getOperatorsForColumn(filter.column)[0].value;
+    filter.value = '';
+    // Update operator select in-place
+    opSel.innerHTML = '';
+    getOperatorsForColumn(filter.column).forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      if (o.value === filter.operator) opt.selected = true;
+      opSel.appendChild(opt);
+    });
+    // Update input type in-place
+    const colDef = FILTER_COLUMNS.find(c => c.value === filter.column);
+    if (colDef && colDef.type === 'number') { valInput.type = 'number'; valInput.step = '0.01'; valInput.placeholder = '0.00'; }
+    else if (colDef && colDef.type === 'date') { valInput.type = 'date'; valInput.placeholder = ''; }
+    else { valInput.type = 'text'; valInput.placeholder = 'Valor…'; }
+    valInput.value = '';
+    applyFilters();
+  };
+
+  const opSel = document.createElement('select');
+  opSel.className = 'filter-op-sel';
+  const ops = getOperatorsForColumn(filter.column);
+  ops.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    if (o.value === filter.operator) opt.selected = true;
+    opSel.appendChild(opt);
+  });
+  opSel.onchange = () => {
+    filter.operator = opSel.value;
+    applyFilters();
+  };
+
+  const valInput = document.createElement('input');
+  valInput.className = 'filter-val-input';
+  const colDef = FILTER_COLUMNS.find(c => c.value === filter.column);
+  if (colDef && colDef.type === 'number') { valInput.type = 'number'; valInput.step = '0.01'; }
+  else if (colDef && colDef.type === 'date') valInput.type = 'date';
+  else valInput.type = 'text';
+  valInput.placeholder = 'Valor…';
+  valInput.value = filter.value;
+  valInput.oninput = () => {
+    filter.value = valInput.value;
+    applyFilters();
+  };
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'filter-remove-btn';
+  removeBtn.innerHTML = '<i data-lucide="x"></i>';
+  removeBtn.title = 'Eliminar filtro';
+  removeBtn.onclick = () => {
+    state.tableFilters = state.tableFilters.filter(f => f.id !== filter.id);
+    renderFilterPanel();
+    applyFilters();
+  };
+
+  row.appendChild(colSel);
+  row.appendChild(opSel);
+  row.appendChild(valInput);
+  row.appendChild(removeBtn);
+  container.appendChild(row);
+  lucide.createIcons();
+}
+
+function applyFilters() {
+  renderTransactions();
+  updateFilterBadge();
+}
+
+function updateFilterBadge() {
+  const active = state.tableFilters.filter(f => f.value).length;
+  const badge = document.getElementById('filter-count-badge');
+  if (badge) {
+    badge.textContent = active;
+    badge.style.display = active > 0 ? '' : 'none';
+  }
+}
+
+function clearAllFilters() {
+  state.tableFilters = [];
+  renderFilterPanel();
+  applyFilters();
 }
 
 document.addEventListener('click', e => {
@@ -2053,6 +2655,654 @@ function initColumnResize() {
   });
 }
 
+// ════════════════════════════════════════════════════════════
+//  CSV / XLS IMPORTER
+// ════════════════════════════════════════════════════════════
+
+const CSV_FIELD_OPTIONS = [
+  { value: 'ignore', label: 'Ignorar', cls: 'csv-opt-ignore' },
+  { value: 'date', label: 'Fecha' },
+  { value: 'payee', label: 'Beneficiario' },
+  { value: 'amount', label: 'Monto (automático)' },
+  { value: 'debit', label: 'Débito (gasto)' },
+  { value: 'credit', label: 'Crédito (ingreso)' },
+  { value: 'category', label: 'Categoría' },
+  { value: 'notes', label: 'Notas' },
+  { value: 'tags', label: 'Etiquetas' },
+];
+
+let csvImportState = {
+  rawData: [],
+  rawText: '',
+  isExcel: false,
+  headers: [],
+  mapping: {},
+  fileName: '',
+  fileDims: '',
+};
+
+function initCsvDropzone() {
+  const dz = document.getElementById('csv-dropzone');
+  if (!dz) return;
+  ['dragenter', 'dragover'].forEach(ev => {
+    dz.addEventListener(ev, e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'var(--accent-soft)'; });
+  });
+  ['dragleave', 'drop'].forEach(ev => {
+    dz.addEventListener(ev, e => { e.preventDefault(); dz.style.borderColor = ''; dz.style.background = ''; });
+  });
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+}
+
+function openImportModal() {
+  document.getElementById('csv-import-modal')?.classList.add('open');
+  resetCsvImport();
+}
+
+function closeImportModal() {
+  document.getElementById('csv-import-modal')?.classList.remove('open');
+}
+
+function resetCsvImport() {
+  csvImportState = { rawData: [], rawText: '', isExcel: false, headers: [], mapping: {}, fileName: '', fileDims: '' };
+  document.getElementById('csv-step-upload').style.display = '';
+  document.getElementById('csv-step-mapping').style.display = 'none';
+  document.getElementById('csv-file-input').value = '';
+  document.getElementById('csv-import-errors').textContent = '';
+  const dropzone = document.getElementById('csv-dropzone');
+  if (dropzone) dropzone.style.display = '';
+}
+
+// ── FILE SELECTION & PARSING ──────────────────────────────
+
+function onCsvFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  processFile(file);
+}
+
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  csvImportState.fileName = file.name;
+
+  const reader = new FileReader();
+
+  if (ext === 'csv') {
+    reader.onload = e => {
+      parseCsvData(e.target.result);
+    };
+    reader.readAsText(file);
+  } else if (ext === 'xls' || ext === 'xlsx') {
+    reader.onload = e => {
+      parseXlsxData(e.target.result, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    showCsvError('Formato no soportado. Usá CSV, XLS o XLSX.');
+  }
+}
+
+function parseCsvData(text) {
+  const sep = getCsvSeparator(text);
+  const raw = parseCsv(text, sep);
+  if (raw.length < 1) { showCsvError('El archivo está vacío o no se pudo leer.'); return; }
+  csvImportState.rawData = raw;
+  csvImportState.rawText = text;
+  csvImportState.isExcel = false;
+  csvImportState.fileDims = `${raw[0].length} columnas · ${raw.length} filas`;
+  afterParse();
+}
+
+function parseXlsxData(buffer, fileName) {
+  if (typeof XLSX === 'undefined') {
+    showCsvError('La librería XLSX no está cargada. Verificá tu conexión.');
+    return;
+  }
+  try {
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    if (data.length < 1) { showCsvError('El archivo Excel está vacío.'); return; }
+    csvImportState.rawData = data.map(row =>
+      row.map(cell => (cell === null || cell === undefined ? '' : String(cell)))
+    );
+    csvImportState.rawText = '';
+    csvImportState.isExcel = true;
+    csvImportState.fileDims = `${csvImportState.rawData[0].length} columnas · ${csvImportState.rawData.length} filas`;
+    afterParse();
+  } catch (err) {
+    showCsvError('Error al leer el archivo Excel: ' + err.message);
+  }
+}
+
+function showCsvError(msg) {
+  const el = document.getElementById('csv-import-errors');
+  if (el) el.textContent = msg;
+}
+
+function getCsvSeparator(text) {
+  const sel = document.getElementById('csv-separator');
+  if (sel && sel.value !== 'auto') return sel.value;
+  const firstLine = text.split('\n')[0] || '';
+  const semicolons = (firstLine.match(/;/g) || []).length;
+  const commas = (firstLine.match(/,/g) || []).length;
+  const tabs = (firstLine.match(/\t/g) || []).length;
+  if (tabs > semicolons && tabs > commas) return '\t';
+  if (semicolons >= commas) return ';';
+  return ',';
+}
+
+function parseCsv(text, separator) {
+  const lines = [];
+  let current = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (ch === '"' && next === '"') { field += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === separator) { current.push(field.trim()); field = ''; }
+      else if (ch === '\n') { current.push(field.trim()); if (current.length > 0 && current.some(c => c !== '')) lines.push(current); current = []; field = ''; }
+      else if (ch === '\r') { /* ignore */ }
+      else { field += ch; }
+    }
+  }
+  // Last field
+  current.push(field.trim());
+  if (current.length > 0 && current.some(c => c !== '')) lines.push(current);
+  return lines;
+}
+
+function afterParse() {
+  const raw = csvImportState.rawData;
+  const hasHeader = document.getElementById('csv-has-header').checked;
+
+  if (hasHeader && raw.length > 0) {
+    csvImportState.headers = raw[0];
+    csvImportState.rawData = raw.slice(1);
+  } else {
+    csvImportState.headers = raw[0].map((_, i) => 'Columna ' + (i + 1));
+  }
+
+  // Auto-map columns
+  autoMapColumns();
+
+  // Show mapping view
+  document.getElementById('csv-step-upload').style.display = 'none';
+  document.getElementById('csv-step-mapping').style.display = '';
+  document.getElementById('csv-dropzone').style.display = 'none';
+
+  document.getElementById('csv-file-name').textContent = csvImportState.fileName;
+  document.getElementById('csv-file-dims').textContent = '· ' + csvImportState.fileDims;
+
+  // Populate account selector
+  const accSel = document.getElementById('csv-target-account');
+  if (accSel) {
+    accSel.innerHTML = '<option value="">Seleccionar cuenta…</option>';
+    state.accounts.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.name + (a.type === 'credit_card' ? ' (TC)' : '');
+      accSel.appendChild(opt);
+    });
+    accSel.onchange = onCsvMappingChange;
+  }
+
+  renderCsvMapping();
+}
+
+// ── AUTO-MAPPING ──────────────────────────────────────────
+
+function autoMapColumns() {
+  const h = csvImportState.headers.map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  const map = {};
+  h.forEach((header, i) => {
+    if (/fecha|fec|date|dt|movimiento/i.test(header)) map[i] = 'date';
+    else if (/beneficiari|payee|descripcion|descrip|detalle|concepto|razon/i.test(header)) map[i] = 'payee';
+    else if (/monto|importe|valor|total|amount/i.test(header)) map[i] = 'amount';
+    else if (/debito|debe|debit|egreso|gasto|salida|retiro/i.test(header)) map[i] = 'debit';
+    else if (/credito|haber|credit|ingreso|deposito|entrada/i.test(header)) map[i] = 'credit';
+    else if (/categoria|category|categ/i.test(header)) map[i] = 'category';
+    else if (/nota|note|obs|observacion|comentario/i.test(header)) map[i] = 'notes';
+    else if (/etiqueta|tag|tags/i.test(header)) map[i] = 'tags';
+    else if (/saldo|balance/i.test(header)) map[i] = 'ignore';
+    else map[i] = 'ignore';
+  });
+  csvImportState.mapping = map;
+}
+
+// ── RENDER MAPPING TABLE ──────────────────────────────────
+
+function renderCsvMapping() {
+  const thead = document.getElementById('csv-mapping-head');
+  const tbody = document.getElementById('csv-mapping-body');
+  if (!thead || !tbody) return;
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+
+  const raw = csvImportState.rawData;
+  const headers = csvImportState.headers;
+  const map = csvImportState.mapping;
+
+  // Header row
+  const headerTr = document.createElement('tr');
+  headers.forEach((h, i) => {
+    const th = document.createElement('th');
+    const isIgnored = map[i] === 'ignore' || !map[i];
+    th.className = isIgnored ? 'csv-col-ignore' : '';
+
+    const label = document.createElement('div');
+    label.textContent = h || 'Columna ' + (i + 1);
+    th.appendChild(label);
+
+    const sel = document.createElement('select');
+    CSV_FIELD_OPTIONS.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if (opt.cls) o.className = opt.cls;
+      if ((map[i] || 'ignore') === opt.value) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => {
+      csvImportState.mapping[i] = sel.value;
+      renderCsvMapping();
+      onCsvMappingChange();
+    };
+    th.appendChild(sel);
+    headerTr.appendChild(th);
+  });
+  thead.appendChild(headerTr);
+
+  // Data rows (max 15)
+  const maxRows = Math.min(raw.length, 15);
+  for (let r = 0; r < maxRows; r++) {
+    const tr = document.createElement('tr');
+    for (let c = 0; c < headers.length; c++) {
+      const td = document.createElement('td');
+      const val = raw[r][c] || '';
+      td.textContent = val;
+      const isIgnored = map[c] === 'ignore' || !map[c];
+      td.className = isIgnored ? 'csv-cell-ignore' : 'csv-cell-mapped';
+      td.title = val;
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  if (raw.length > maxRows) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = headers.length;
+    td.textContent = '… y ' + (raw.length - maxRows) + ' filas más';
+    td.style.cssText = 'text-align:center;color:var(--text-lo);font-style:italic;padding:8px;';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+
+  onCsvMappingChange();
+}
+
+function reparseCsv() {
+  const hasHeader = document.getElementById('csv-has-header')?.checked ?? true;
+  if (csvImportState.isExcel) {
+    const raw = csvImportState.rawData;
+    if (hasHeader && raw.length > 0) {
+      csvImportState.headers = raw[0];
+      csvImportState.rawData = raw.slice(1);
+    } else {
+      csvImportState.headers = raw[0].map((_, i) => 'Columna ' + (i + 1));
+    }
+    autoMapColumns();
+    renderCsvMapping();
+    return;
+  }
+  if (csvImportState.rawText) {
+    const sep = getCsvSeparator(csvImportState.rawText);
+    const allRows = parseCsv(csvImportState.rawText, sep);
+    if (allRows.length > 0) {
+      if (hasHeader) {
+        csvImportState.headers = allRows[0];
+        csvImportState.rawData = allRows.slice(1);
+      } else {
+        csvImportState.headers = allRows[0].map((_, i) => 'Columna ' + (i + 1));
+        csvImportState.rawData = allRows;
+      }
+      csvImportState.fileDims = `${csvImportState.rawData[0]?.length || 0} columnas · ${csvImportState.rawData.length} filas`;
+    }
+  }
+  if (csvImportState.rawData.length > 0) {
+    autoMapColumns();
+    renderCsvMapping();
+  }
+}
+
+// ── PREVIEW & CONFIRM ─────────────────────────────────────
+
+function onCsvMappingChange() {
+  const preview = document.getElementById('csv-preview-section');
+  const tbody = document.getElementById('csv-preview-tbody');
+  const countEl = document.getElementById('csv-import-count');
+  const btn = document.getElementById('btn-csv-import');
+
+  const parsed = buildTransactionsFromMapping();
+  if (parsed.length === 0) {
+    preview.style.display = 'none';
+    btn.disabled = true;
+    return;
+  }
+
+  btn.disabled = false;
+  preview.style.display = '';
+  countEl.textContent = parsed.length;
+
+  tbody.innerHTML = '';
+  parsed.forEach(tx => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${tx.date || '—'}</td>
+      <td>${tx.payee || '—'}</td>
+      <td>${tx.category_name || '—'}</td>
+      <td class="r ${tx.amount < 0 ? 'expense' : 'income'}">${formatCurrency(tx.amount)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildTransactionsFromMapping() {
+  const raw = csvImportState.rawData;
+  const map = csvImportState.mapping;
+  const accountId = document.getElementById('csv-target-account')?.value;
+  if (!accountId) return [];
+
+  const dateFmt = document.getElementById('csv-date-format')?.value || 'auto';
+  const numFmt = document.getElementById('csv-number-format')?.value || 'auto';
+
+  const results = [];
+
+  raw.forEach(row => {
+    let tx = {
+      date: '',
+      payee: '',
+      amount: 0,
+      category_name: '',
+      notes: '',
+      tags: [],
+      account_id: accountId,
+    };
+
+    let hasDate = false, hasPayee = false, hasAmount = false;
+
+    Object.keys(map).forEach(colIdx => {
+      const field = map[colIdx];
+      const val = (row[parseInt(colIdx)] || '').trim();
+      if (!val) return;
+
+      switch (field) {
+        case 'date': {
+          const parsed = parseDate(val, dateFmt);
+          if (parsed) { tx.date = parsed; hasDate = true; }
+          break;
+        }
+        case 'payee': {
+          tx.payee = val;
+          hasPayee = true;
+          break;
+        }
+        case 'amount': {
+          const num = parseNumber(val, numFmt);
+          if (!isNaN(num)) { tx.amount += num; hasAmount = true; }
+          break;
+        }
+        case 'debit': {
+          const num = parseNumber(val, numFmt);
+          if (!isNaN(num) && num > 0) { tx.amount -= Math.abs(num); hasAmount = true; }
+          break;
+        }
+        case 'credit': {
+          const num = parseNumber(val, numFmt);
+          if (!isNaN(num) && num > 0) { tx.amount += Math.abs(num); hasAmount = true; }
+          break;
+        }
+        case 'category': {
+          tx.category_name = val;
+          break;
+        }
+        case 'notes': {
+          tx.notes = val;
+          break;
+        }
+        case 'tags': {
+          tx.tags = val.split(/[,;|]/).map(t => t.trim()).filter(Boolean);
+          break;
+        }
+      }
+    });
+
+    if (hasDate && hasPayee && hasAmount && tx.amount !== 0) {
+      results.push(tx);
+    }
+  });
+
+  return results;
+}
+
+function parseDate(val, format) {
+  val = val.trim();
+  if (!val) return '';
+
+  // Already ISO-like
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+
+  let parts;
+  if (format === 'auto') {
+    // Try common formats
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) parts = val.split('/');
+    else if (/^\d{2}\/\d{2}\/\d{2}$/.test(val)) parts = val.split('/');
+    else if (/^\d{2}-\d{2}-\d{4}$/.test(val)) parts = val.split('-');
+    else if (/^\d{2}-\d{2}-\d{2}$/.test(val)) parts = val.split('-');
+    else if (/^\d{4}\/\d{2}\/\d{2}$/.test(val)) parts = val.split('/');
+    else if (/^\d{8}$/.test(val)) {
+      // DDMMYYYY or YYYYMMDD
+      if (val.substring(0, 4) > '1900' && val.substring(0, 4) < '2100') {
+        return val.substring(0, 4) + '-' + val.substring(4, 6) + '-' + val.substring(6, 8);
+      }
+      return val.substring(4, 6) + '-' + val.substring(6, 8) + '-' + val.substring(0, 4);
+    }
+    else return val; // fallback
+
+    if (parts && parts[2].length === 4 && parseInt(parts[2]) > 1900) {
+      // Likely DD/MM/YYYY
+      return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
+    }
+    if (parts && parts[2].length === 2) {
+      const y = parseInt(parts[2]) + 2000;
+      return y + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
+    }
+    return val;
+  }
+
+  // Specific format
+  if (format === 'dd/mm/yyyy') {
+    parts = val.split(/[\/\-\.]/);
+    if (parts.length === 3) return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
+  }
+  if (format === 'mm/dd/yyyy') {
+    parts = val.split(/[\/\-\.]/);
+    if (parts.length === 3) return parts[2] + '-' + parts[0].padStart(2, '0') + '-' + parts[1].padStart(2, '0');
+  }
+  if (format === 'yyyy-mm-dd') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    parts = val.split(/[\/\-\.]/);
+    if (parts.length === 3) return parts[0] + '-' + parts[1].padStart(2, '0') + '-' + parts[2].padStart(2, '0');
+  }
+  if (format === 'dd/mm/yy') {
+    parts = val.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      let y = parseInt(parts[2]);
+      if (y < 100) y += 2000;
+      return y + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
+    }
+  }
+
+  return val;
+}
+
+function parseNumber(val, format) {
+  if (!val) return NaN;
+  let s = val.trim();
+  // Remove currency symbols and spaces
+  s = s.replace(/[$€£¥$]\s*/g, '').replace(/\s+/g, '');
+
+  if (format === 'auto') {
+    // Detect format: if uses . for thousands and , for decimals → EU
+    // If uses , for thousands and . for decimals → US
+    const hasDot = s.includes('.');
+    const hasComma = s.includes(',');
+    if (hasDot && hasComma) {
+      const lastDot = s.lastIndexOf('.');
+      const lastComma = s.lastIndexOf(',');
+      if (lastComma > lastDot) {
+        // EU: 1.234,56
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        // US: 1,234.56
+        s = s.replace(/,/g, '');
+      }
+    } else if (hasComma) {
+      // Could be EU decimal (1234,56) or US thousands (1,234)
+      // If only one comma and followed by exactly 2 digits → EU decimal
+      const parts = s.split(',');
+      if (parts.length === 2 && parts[1].length <= 2) {
+        s = s.replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    }
+    // If hasDot but no comma, it's either US decimal or thousands separator
+    // Try to interpret: if after last dot there are 2 digits → likely decimal
+    else if (hasDot) {
+      const parts = s.split('.');
+      if (parts.length > 1) {
+        const last = parts[parts.length - 1];
+        if (last.length === 2 && parts.length > 2) {
+          // EU: 1.234.56 → remove dots except last
+          s = s.replace(/\./g, '');
+          s = s.substring(0, s.length - 2) + '.' + s.substring(s.length - 2);
+        }
+        // else: US or simple number with dot → keep as is
+      }
+    }
+  } else if (format === 'eu') {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (format === 'us') {
+    s = s.replace(/,/g, '');
+  }
+
+  const num = parseFloat(s);
+  return isNaN(num) ? NaN : num;
+}
+
+function confirmCsvImport() {
+  const parsed = buildTransactionsFromMapping();
+  if (parsed.length === 0) {
+    showCsvError('No hay movimientos válidos para importar. Revisá el mapeo de columnas.');
+    return;
+  }
+
+  const existingIds = new Set(state.transactions.map(t => t.id));
+  let idCounter = 0;
+
+  parsed.forEach(tx => {
+    let id = 'tx-' + Date.now() + '-' + (++idCounter);
+    while (existingIds.has(id)) id = 'tx-' + Date.now() + '-' + (++idCounter);
+    existingIds.add(id);
+    state.transactions.push({
+      id,
+      date: tx.date,
+      account_id: tx.account_id,
+      payee: tx.payee,
+      category_name: tx.category_name || 'Otros',
+      amount: tx.amount,
+      notes: tx.notes || '',
+      tags: tx.tags || [],
+      is_receivable: false,
+      due_date: '',
+      is_future: false,
+      installment_id: null,
+      installment_total: null,
+      installment_index: null,
+    });
+    // Auto-add new payees and categories
+    if (tx.payee && !state.predefined.payees.includes(tx.payee)) {
+      state.predefined.payees.push(tx.payee);
+    }
+    if (tx.category_name) {
+      const exists = state.predefined.categories.some(c =>
+        (typeof c === 'string' ? c : c.name) === tx.category_name
+      );
+      if (!exists) {
+        state.predefined.categories.push({ name: tx.category_name, icon: 'tag' });
+      }
+    }
+  });
+
+  saveData('transactions');
+  saveData('predefined');
+  renderAll();
+  closeImportModal();
+}
+
+// ── SAMPLE DATA ───────────────────────────────────────────
+
+function loadSampleCsv(type) {
+  let text = '';
+  if (type === 'bank') {
+    text = `Fecha;Descripción;Débito;Crédito;Saldo
+02/06/2026;Supermercado Coto;12580,00;;45200,00
+03/06/2026;Farmacia;3450,00;;41750,00
+04/06/2026;Sueldo Mensual;;250000,00;291750,00
+05/06/2026;Estacionamiento;800,00;;290950,00
+06/06/2026;Netflix;3899,00;;287051,00
+07/06/2026;Recarga SUBE;2000,00;;285051,00
+08/06/2026;Transferencia de Leo;;15000,00;300051,00
+09/06/2026;Mercado Pago - envio;4500,00;;295551,00
+10/06/2026;Restaurante La Farola;8900,00;;286651,00`;
+  } else {
+    text = `Fecha;Establecimiento;Categoría;Monto
+01/06/2026;McDonald's;Comidas;4580,00
+02/06/2026;Spotify;Entretenimiento;1299,00
+03/06/2026;Falabella;Indumentaria;25000,00
+05/06/2026;Disney+;Entretenimiento;3899,00
+07/06/2026;Coto;Supermercado;18750,00
+10/06/2026;YPF;Transporte;15000,00`;
+  }
+
+  // Set separator to semicolon
+  const sepSel = document.getElementById('csv-separator');
+  if (sepSel) sepSel.value = ';';
+
+  // Parse directly
+  const sep = ';';
+  const raw = parseCsv(text, sep);
+  if (raw.length < 1) return;
+  csvImportState.rawData = raw;
+  csvImportState.rawText = text;
+  csvImportState.isExcel = false;
+  csvImportState.fileName = type === 'bank' ? 'extracto_bancario.csv' : 'resumen_tarjeta.csv';
+  csvImportState.fileDims = `${raw[0].length} columnas · ${raw.length} filas`;
+  document.getElementById('csv-dropzone').style.display = 'none';
+  afterParse();
+}
+
 window.initColumnResize = initColumnResize;
 window.toggleCatIconPicker = toggleCatIconPicker;
 window.selectCatIcon = selectCatIcon;
@@ -2072,6 +3322,8 @@ window.filterTransactions        = filterTransactions;
 window.openAccountCreator        = openAccountCreator;
 window.openImportModal           = openImportModal;
 window.closeImportModal          = closeImportModal;
+window.openGeminiImportModal     = openGeminiImportModal;
+window.closeGeminiImportModal    = closeGeminiImportModal;
 window.backToImportSetup         = backToImportSetup;
 window.processImportWithGemini   = processImportWithGemini;
 window.confirmImportedTransactions = confirmImportedTransactions;
@@ -2091,3 +3343,9 @@ window.toggleSelMenu             = toggleSelMenu;
 window.closeSelMenu              = closeSelMenu;
 window.openBatchEditModal        = openBatchEditModal;
 window.batchDeleteTransactions   = batchDeleteTransactions;
+window.onCsvFileSelected         = onCsvFileSelected;
+window.reparseCsv                = reparseCsv;
+window.onCsvMappingChange        = onCsvMappingChange;
+window.confirmCsvImport          = confirmCsvImport;
+window.loadSampleCsv             = loadSampleCsv;
+window.resetCsvImport            = resetCsvImport;

@@ -8,7 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/helpers.css">
 </head>
 <body class="theme-light">
 
@@ -99,7 +105,11 @@
             <i data-lucide="plus"></i> Nueva transacción
           </button>
           <button class="btn" onclick="openImportModal()">
-            <i data-lucide="file-up"></i> Importar extracto
+            <i data-lucide="file-spreadsheet"></i> Importar
+          </button>
+          <button class="btn" id="filter-toggle-btn" onclick="openFilterPanel()">
+            <i data-lucide="list-filter"></i> Filtros
+            <span class="filter-count-badge" id="filter-count-badge" style="display:none;">0</span>
           </button>
           <span class="tx-count" id="tx-count-badge">0</span>
           <div class="tx-selection-bar" id="tx-selection-bar" style="display:none;">
@@ -119,6 +129,17 @@
             <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" oninput="renderTransactions()">
             <i data-lucide="search"></i>
           </div>
+        </div>
+      </div>
+
+      <div class="filter-panel" id="filter-panel">
+        <div class="filter-panel-head">
+          <span>Filtrar movimientos</span>
+          <button class="filter-clear-all" onclick="clearAllFilters()">Limpiar filtros</button>
+        </div>
+        <div class="filter-rows" id="filter-rows"></div>
+        <div class="filter-panel-foot">
+          <button class="btn" onclick="addFilterRow()"><i data-lucide="plus"></i> Agregar filtro</button>
         </div>
       </div>
 
@@ -163,84 +184,182 @@
       </header>
 
       <div class="dash-scroll">
-        <!-- Hero summary -->
-        <div class="dash-hero">
-          <div class="dash-hero-metric">
-            <div class="dash-hero-icon income-bg"><i data-lucide="trending-up"></i></div>
-            <div class="dash-hero-info">
-              <span class="dash-hero-label">Ingresos</span>
-              <span class="dash-hero-val income" id="dash-income">$0</span>
+
+        <!-- Welcome header -->
+        <div class="dash-head">
+          <div class="dash-head-left">
+            <div class="dash-head-greeting" id="dash-greeting">Buenos días</div>
+            <div class="dash-head-sub" id="dash-date-display"></div>
+          </div>
+          <div class="dash-head-right">
+            <div class="dash-head-nw-label">Patrimonio neto</div>
+            <div class="dash-head-nw-val" id="dash-net-worth">$0</div>
+          </div>
+        </div>
+
+        <!-- Month selector + tabs toolbar -->
+        <div class="dash-toolbar">
+          <div class="dash-month-nav">
+            <button class="dash-month-btn" id="dash-month-prev" onclick="dashPrevMonth()"><i data-lucide="chevron-left"></i></button>
+            <span class="dash-month-label" id="dash-month-label">Junio 2026</span>
+            <button class="dash-month-btn" id="dash-month-next" onclick="dashNextMonth()"><i data-lucide="chevron-right"></i></button>
+          </div>
+          <div class="dash-tabs">
+            <button class="dash-tab active" id="dash-tab-resumen" onclick="switchDashTab('resumen')">Resumen</button>
+            <button class="dash-tab" id="dash-tab-gastos" onclick="switchDashTab('gastos')">Gastos</button>
+            <button class="dash-tab" id="dash-tab-ingresos" onclick="switchDashTab('ingresos')">Ingresos</button>
+            <button class="dash-tab" id="dash-tab-cobertura" onclick="switchDashTab('cobertura')">Cobertura</button>
+          </div>
+        </div>
+
+        <!-- ── TAB: Resumen ── -->
+        <div class="dash-tab-content active" id="dash-panel-resumen">
+          <!-- Metric strip -->
+          <div class="dash-strip">
+            <div class="dash-strip-item">
+              <span class="dash-strip-label">Ingresos</span>
+              <span class="dash-strip-val income" id="dash-income">$0</span>
+            </div>
+            <div class="dash-strip-divider"></div>
+            <div class="dash-strip-item">
+              <span class="dash-strip-label">Gastos</span>
+              <span class="dash-strip-val expense" id="dash-expenses">$0</span>
+            </div>
+            <div class="dash-strip-divider"></div>
+            <div class="dash-strip-item">
+              <span class="dash-strip-label">Diferencia</span>
+              <span class="dash-strip-val" id="dash-net">$0</span>
+            </div>
+            <div class="dash-strip-divider"></div>
+            <div class="dash-strip-item">
+              <span class="dash-strip-label">Movimientos</span>
+              <span class="dash-strip-val" id="dash-tx-count">0</span>
             </div>
           </div>
-          <div class="dash-hero-divider"></div>
-          <div class="dash-hero-metric">
-            <div class="dash-hero-icon expense-bg"><i data-lucide="trending-down"></i></div>
-            <div class="dash-hero-info">
-              <span class="dash-hero-label">Gastos</span>
-              <span class="dash-hero-val expense" id="dash-expenses">$0</span>
+
+          <!-- Savings rate -->
+          <div class="dash-section">
+            <div class="dash-section-head">
+              <i data-lucide="piggy-bank"></i>
+              <span>Tasa de ahorro del mes</span>
+              <span class="dash-savings-pct" id="dash-savings-pct">0%</span>
             </div>
+            <div class="dash-savings-track">
+              <div class="dash-savings-fill" id="dash-savings-fill" style="width:0%"></div>
+            </div>
+            <div class="dash-savings-desc" id="dash-savings-desc">Sin datos suficientes</div>
           </div>
-          <div class="dash-hero-divider"></div>
-          <div class="dash-hero-metric">
-            <div class="dash-hero-icon net-bg"><i data-lucide="wallet"></i></div>
-            <div class="dash-hero-info">
-              <span class="dash-hero-label">Diferencia</span>
-              <span class="dash-hero-val" id="dash-net">$0</span>
+
+          <!-- Two columns: chart + recent -->
+          <div class="dash-cols">
+            <!-- Bar chart -->
+            <div class="dash-section">
+              <div class="dash-section-head">
+                <i data-lucide="bar-chart-2"></i>
+                <span>Ingresos vs Gastos — últimos 6 meses</span>
+              </div>
+              <div class="dash-bar-chart-wrap">
+                <canvas id="dash-bar-chart" class="dash-bar-canvas"></canvas>
+              </div>
+            </div>
+
+            <!-- Recent activity -->
+            <div class="dash-section">
+              <div class="dash-section-head">
+                <i data-lucide="clock"></i>
+                <span>Actividad reciente</span>
+              </div>
+              <div id="dash-recent-list" class="dash-recent-list"></div>
             </div>
           </div>
         </div>
 
-        <div class="dash-grid">
-          <!-- Categories -->
-          <div class="dash-card" id="dash-categories">
-            <div class="dash-card-header">
-              <i data-lucide="pie-chart"></i>
-              <span>Gastos por categoría</span>
+        <!-- ── TAB: Gastos ── -->
+        <div class="dash-tab-content" id="dash-panel-gastos">
+          <div class="dash-cols">
+            <!-- Donut chart -->
+            <div class="dash-section">
+              <div class="dash-section-head">
+                <i data-lucide="pie-chart"></i>
+                <span>Distribución de gastos</span>
+              </div>
+              <div class="dash-donut-wrap">
+                <canvas id="dash-donut-chart" class="dash-donut-canvas"></canvas>
+                <div class="dash-donut-center" id="dash-donut-center">
+                  <div class="dash-donut-total-label">Total</div>
+                  <div class="dash-donut-total-val" id="dash-donut-total">$0</div>
+                </div>
+              </div>
             </div>
-            <div id="dash-category-list" class="dash-cat-list"></div>
+
+            <!-- Category bars -->
+            <div class="dash-section">
+              <div class="dash-section-head">
+                <i data-lucide="list"></i>
+                <span>Por categoría</span>
+              </div>
+              <div id="dash-category-list" class="dash-cat-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: Ingresos ── -->
+        <div class="dash-tab-content" id="dash-panel-ingresos">
+          <div class="dash-cols">
+            <div class="dash-section">
+              <div class="dash-section-head">
+                <i data-lucide="pie-chart"></i>
+                <span>Distribución de ingresos</span>
+              </div>
+              <div class="dash-donut-wrap">
+                <canvas id="dash-donut-income-chart" class="dash-donut-canvas"></canvas>
+                <div class="dash-donut-center" id="dash-donut-income-center">
+                  <div class="dash-donut-total-label">Total</div>
+                  <div class="dash-donut-total-val" id="dash-donut-income-total">$0</div>
+                </div>
+              </div>
+            </div>
+            <div class="dash-section">
+              <div class="dash-section-head">
+                <i data-lucide="list"></i>
+                <span>Por categoría</span>
+              </div>
+              <div id="dash-income-category-list" class="dash-cat-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: Cobertura ── -->
+        <div class="dash-tab-content" id="dash-panel-cobertura">
+          <div class="dash-cov-rows">
+            <div class="dash-cov-row">
+              <span class="dash-cov-row-label">Cobertura líquida</span>
+              <span class="dash-cov-row-val" id="dash-liquid-cov">$0</span>
+              <span class="dash-cov-row-desc">Efectivo disponible + saldo de tarjetas</span>
+            </div>
+            <div class="dash-cov-row">
+              <span class="dash-cov-row-label">Cobertura proyectada</span>
+              <span class="dash-cov-row-val" id="dash-proj-cov">$0</span>
+              <span class="dash-cov-row-desc">Lo anterior + préstamos a cobrar</span>
+            </div>
+            <div class="dash-cov-row">
+              <span class="dash-cov-row-label">Patrimonio neto</span>
+              <span class="dash-cov-row-val" id="dash-net-worth-tab">$0</span>
+              <span class="dash-cov-row-desc">Tu posición financiera total</span>
+            </div>
           </div>
 
-          <!-- Coverage -->
-          <div class="dash-card" id="dash-coverage">
-            <div class="dash-card-header">
+          <!-- Coverage details -->
+          <div class="dash-section" style="margin-top:4px;">
+            <div class="dash-section-head">
               <i data-lucide="shield-check"></i>
-              <span>Cobertura</span>
+              <span>Estado de cobertura</span>
             </div>
-            <div class="dash-cov-list">
-              <div class="dash-cov-item">
-                <div class="dash-cov-top">
-                  <span class="dash-cov-label">Cobertura líquida</span>
-                  <span class="dash-cov-val" id="dash-liquid-cov">$0</span>
-                </div>
-                <div class="dash-cov-desc">Efectivo + saldo tarjetas</div>
-              </div>
-              <div class="dash-cov-item">
-                <div class="dash-cov-top">
-                  <span class="dash-cov-label">Cobertura proyectada</span>
-                  <span class="dash-cov-val" id="dash-proj-cov">$0</span>
-                </div>
-                <div class="dash-cov-desc">Lo anterior + préstamos a cobrar</div>
-              </div>
-              <div class="dash-cov-item">
-                <div class="dash-cov-top">
-                  <span class="dash-cov-label">Patrimonio neto</span>
-                  <span class="dash-cov-val" id="dash-net-worth">$0</span>
-                </div>
-                <div class="dash-cov-desc">Total de tu posición financiera</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent activity -->
-          <div class="dash-card dash-card-wide" id="dash-recent">
-            <div class="dash-card-header">
-              <i data-lucide="clock"></i>
-              <span>Actividad reciente</span>
-            </div>
-            <div id="dash-recent-list" class="dash-recent-list"></div>
+            <div id="dash-cov-details" class="dash-cov-details"></div>
           </div>
         </div>
-      </div>
+
+      </div><!-- /dash-scroll -->
     </div>
 
     <!-- ── Vista: Ajustes ── -->
@@ -550,7 +669,7 @@
   <div class="modal-card wide">
     <div class="modal-head">
       <span class="modal-title">Importar extracto bancario</span>
-      <button class="modal-close" onclick="closeImportModal()"><i data-lucide="x"></i></button>
+      <button class="modal-close" onclick="closeGeminiImportModal()"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body import-body">
 
@@ -588,6 +707,137 @@
         <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:12px;">
           <button class="btn" onclick="backToImportSetup()">← Atrás</button>
           <button class="btn btn-primary" onclick="confirmImportedTransactions()">Importar movimientos</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Importar CSV/XLS ══════════════ -->
+<div class="modal-overlay" id="csv-import-modal">
+  <div class="modal-card wide csv-import-card">
+    <div class="modal-head">
+      <span class="modal-title">Importar archivo</span>
+      <button class="modal-close" onclick="closeImportModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body csv-import-body">
+
+      <!-- Step 1: Upload -->
+      <div id="csv-step-upload">
+        <div class="csv-dropzone" id="csv-dropzone" onclick="document.getElementById('csv-file-input').click()">
+          <i data-lucide="upload" class="csv-dropzone-icon"></i>
+          <div class="csv-dropzone-text">
+            <span class="csv-dropzone-title">Arrastrá tu archivo acá</span>
+            <span class="csv-dropzone-sub">o hacé clic para seleccionar · CSV, XLS o XLSX</span>
+          </div>
+          <input type="file" id="csv-file-input" accept=".csv,.xls,.xlsx" style="display:none;" onchange="onCsvFileSelected(event)">
+        </div>
+        <div class="csv-samples">
+          <span class="csv-samples-label">O probá con un archivo de ejemplo:</span>
+          <button class="btn" onclick="loadSampleCsv('bank')"><i data-lucide="file-text"></i> Extracto bancario</button>
+          <button class="btn" onclick="loadSampleCsv('credit')"><i data-lucide="credit-card"></i> Tarjeta de crédito</button>
+        </div>
+        <div class="csv-ai-divider">
+          <span>o importá desde texto con IA</span>
+        </div>
+        <button class="btn csv-ai-btn" onclick="openGeminiImportModal()">
+          <i data-lucide="sparkles"></i> Importar con inteligencia artificial
+        </button>
+      </div>
+
+      <!-- Step 2: Config & Mapping -->
+      <div id="csv-step-mapping" style="display:none;">
+        <!-- File info bar -->
+        <div class="csv-file-info">
+          <div class="csv-file-info-left">
+            <i data-lucide="file-text"></i>
+            <span id="csv-file-name"></span>
+            <span class="csv-file-dims" id="csv-file-dims"></span>
+          </div>
+          <button class="btn btn-ghost" onclick="resetCsvImport()"><i data-lucide="refresh-cw"></i> Cambiar archivo</button>
+        </div>
+
+        <!-- Settings row -->
+        <div class="csv-settings">
+          <div class="form-group">
+            <label class="form-label">Cuenta destino</label>
+            <select id="csv-target-account"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Separador</label>
+            <select id="csv-separator" onchange="reparseCsv()">
+              <option value="auto">Auto-detectar</option>
+              <option value=";">Punto y coma (;)</option>
+              <option value=",">Coma (,)</option>
+              <option value="	">Tabulación</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Formato fecha</label>
+            <select id="csv-date-format" onchange="onCsvMappingChange()">
+              <option value="auto">Auto-detectar</option>
+              <option value="dd/mm/yyyy">DD/MM/YYYY</option>
+              <option value="mm/dd/yyyy">MM/DD/YYYY</option>
+              <option value="yyyy-mm-dd">YYYY-MM-DD</option>
+              <option value="dd/mm/yy">DD/MM/YY</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Formato números</label>
+            <select id="csv-number-format" onchange="reparseCsv()">
+              <option value="auto">Auto-detectar</option>
+              <option value="eu">1.234,56 (Argentina/Europa)</option>
+              <option value="us">1,234.56 (EE.UU.)</option>
+            </select>
+          </div>
+          <label class="csv-header-toggle">
+            <input type="checkbox" id="csv-has-header" checked onchange="reparseCsv()">
+            <span>La primera fila contiene encabezados</span>
+          </label>
+        </div>
+
+        <!-- Column mapping -->
+        <div class="csv-mapping-section">
+          <div class="csv-mapping-head">Asigná cada columna del archivo a un campo de Wallet:</div>
+          <div class="csv-mapping-hint">Usá los selectores sobre cada columna para indicar qué representa.</div>
+          <div class="csv-preview-scroll">
+            <table class="csv-mapping-table" id="csv-mapping-table">
+              <thead id="csv-mapping-head"></thead>
+              <tbody id="csv-mapping-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Preview of parsed transactions -->
+        <div class="csv-preview-section" id="csv-preview-section" style="display:none;">
+          <div class="csv-preview-head">
+            <span>Vista previa de movimientos a importar (<span id="csv-import-count">0</span>)</span>
+          </div>
+          <div class="csv-preview-scroll compact-table">
+            <table class="ledger">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Beneficiario</th>
+                  <th>Categoría</th>
+                  <th class="r">Monto</th>
+                </tr>
+              </thead>
+              <tbody id="csv-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="csv-import-foot">
+          <span class="csv-import-errors" id="csv-import-errors"></span>
+          <div class="csv-import-foot-actions">
+            <button class="btn" onclick="closeImportModal()">Cancelar</button>
+            <button class="btn btn-primary" id="btn-csv-import" onclick="confirmCsvImport()">
+              <i data-lucide="download"></i> Importar movimientos
+            </button>
+          </div>
         </div>
       </div>
 
@@ -642,6 +892,14 @@
   </div>
 </div>
 
-<script src="app.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/modals.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/transactions.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/import.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

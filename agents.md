@@ -9,8 +9,21 @@
 
 ## Estructura de archivos
 - `index.html` — Shell de la SPA (sidebar, main view, settings, modales)
-- `styles.css` — Sistema de diseño completo con tema claro/oscuro
-- `app.js` — Toda la lógica de la aplicación
+- `css/base.css` — Variables, tema claro/oscuro, reset
+- `css/layout.css` — Grid, sidebar, main, toolbar, filter panel
+- `css/components.css` — Botones, tabla, modales, forms, dropdowns, tags
+- `css/settings.css` — Layout de settings, panes, cuentas, predefinidos
+- `css/dashboard.css` — Dashboard, charts, categorías, cobertura
+- `css/helpers.css` — Import modal, help, CSV, installment
+- `js/state.js` — Estado global y persistencia
+- `js/utils.js` — formatCurrency, formatDate, calculateBalances, helpers
+- `js/modals.js` — Help modal, confirm modal
+- `js/sidebar.js` — Sidebar, filtros, métricas de cobertura
+- `js/transactions.js` — CRUD, tabla, batch ops, inline editing, selectores
+- `js/dashboard.js` — Dashboard, charts, navegación mensual
+- `js/settings.js` — Settings, cuentas, predefinidos, icon picker
+- `js/import.js` — Gemini import, CSV/XLS parsing
+- `js/app.js` — Init, showView, theme, shortcuts, renderAll, window.* bindings
 - `schema.sql` — Schema PostgreSQL de referencia (no usado actualmente)
 
 ## Convenciones de código
@@ -167,6 +180,50 @@ state.predefined = {
 - `wallet_transactions` — Array de transacciones
 - `wallet_predefined` — Objeto con payees, categories, tags
 - `wallet_settings` — Objeto con `geminiKey` y `theme`
+
+## Design System
+
+### Layout
+- Sidebar: 228px fija, main: 1fr
+- Altura de inputs: 32px
+- Padding estándar: 12px 16px
+
+### Tipografía
+- UI: sistema nativa (10-15px)
+- Números: misma fuente del sistema
+- Tablas: 12px cuerpo, 10px headers
+
+### Espaciado
+- Gap entre elementos: 6-8px
+- Form rows: gap 10px
+- Section padding: 20px
+
+### Bordes y radios
+- `--r-xs: 4px`, `--r-sm: 6px`, `--r-md: 8px`, `--r-lg: 12px`
+- Inputs/botones: var(--r-sm)
+- Modales/cards: var(--r-lg)
+- Sidebar: sin border-radius
+
+### Sombras
+- Modales: `0 20px 60px rgba(0,0,0,.25)`
+- Dropdowns: `0 4px 12px rgba(0,0,0,.12)`
+- Botones: sin sombra
+
+### Paleta
+- Fondo: `--bg-root` (claro #f5f4f1, oscuro #111113)
+- Superficie: `--bg-surface`
+- Acento: `--accent` (#5b52f5 / #7c75f8)
+- Texto: `--text-hi/mid/lo`
+- Bordes: `--border`
+- Danger: `#dc2626`
+- Success: `#16a34a`
+
+### Componentes clave
+- Botón primario: bg accent, text white, border-radius var(--r-sm), padding 8px 14px
+- Input: bg surface, border var(--border), radius var(--r-sm), height 32px
+- Select: mismo estilo que input
+- Tabla: bordered, hover row, sticky header
+- Etiquetas: pills con 3 colores predefinidos (rosa, amarillo, azul)
 
 ### CSS / Diseño
 - **Layout**: Grid de 2 columnas (sidebar 228px + main 1fr)
