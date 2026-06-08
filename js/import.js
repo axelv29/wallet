@@ -485,13 +485,16 @@ function onCsvMappingChange() {
   countEl.textContent = parsed.length;
 
   tbody.innerHTML = '';
+  const importAccId = document.getElementById('import-account-id')?.value;
+  const importAcc = state.accounts.find(a => a.id === importAccId);
+  const importCur = importAcc?.currency || state.settings.currency || 'ARS';
   parsed.forEach(tx => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${tx.date || '—'}</td>
       <td>${tx.payee || '—'}</td>
       <td>${tx.category_name || '—'}</td>
-      <td class="r ${tx.amount < 0 ? 'expense' : 'income'}">${formatCurrency(tx.amount)}</td>
+      <td class="r ${tx.amount < 0 ? 'expense' : 'income'}">${formatAccountCurrency(tx.amount, importCur)}</td>
     `;
     tbody.appendChild(tr);
   });

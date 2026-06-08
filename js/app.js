@@ -14,15 +14,19 @@ document.addEventListener('DOMContentLoaded', () => {
   setupKeyboardShortcuts();
   const lastView = localStorage.getItem('wallet_last_view') || 'dashboard';
   const lastFilter = localStorage.getItem('wallet_last_filter');
-  if (lastView === 'main' && lastFilter) {
-    filterTransactions(lastFilter);
-  } else {
-    showView(lastView);
-  }
-  renderAll();
-  initColumnResize();
-  initCatIconPicker();
-  initCsvDropzone();
+
+  // Fetch exchange rates, then render
+  fetchExchangeRates().then(() => {
+    if (lastView === 'main' && lastFilter) {
+      filterTransactions(lastFilter);
+    } else {
+      showView(lastView);
+    }
+    renderAll();
+    initColumnResize();
+    initCatIconPicker();
+    initCsvDropzone();
+  });
 
   // Re-draw charts on resize
   let _resizeTimer;
@@ -33,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDashCharts();
       }
     }, 120);
+  });
+
+  // Close section dropdown on outside click
+  document.addEventListener('click', e => {
+    const dd = document.querySelector('.dash-section-dropdown');
+    if (dd && !dd.contains(e.target)) dd.classList.remove('open');
   });
 });
 
@@ -74,30 +84,69 @@ function showView(name) {
     if (keyInput) keyInput.value = state.settings.geminiKey || '';
     const curSel = document.getElementById('set-currency');
     if (curSel) curSel.value = state.settings.currency || 'ARS';
+    const accCurSel = document.getElementById('acc-currency');
+    if (accCurSel) accCurSel.value = state.settings.currency || 'ARS';
     const symCb = document.getElementById('set-show-symbol');
     if (symCb) symCb.checked = state.settings.showSymbol !== false;
     const decSel = document.getElementById('set-decimals');
     if (decSel) decSel.value = String(state.settings.decimals ?? 2);
+    syncThemeUI();
   }
 }
 
 // ── THEME ─────────────────────────────────────────────────────
+const SCHEMES = {
+  'default':      { mode: 'light' },
+  'ocean':        { mode: 'light' },
+  'forest':       { mode: 'light' },
+  'lavender':     { mode: 'light' },
+  'default-dark': { mode: 'dark' },
+  'midnight':     { mode: 'dark' },
+  'ember':        { mode: 'dark' },
+};
+
 function toggleTheme() {
-  state.settings.theme = state.settings.theme === 'light' ? 'dark' : 'light';
+  const current = state.settings.colorScheme || 'default';
+  const currentMode = SCHEMES[current]?.mode || 'light';
+  const newMode = currentMode === 'light' ? 'dark' : 'light';
+  // Find first scheme with the target mode
+  const target = Object.entries(SCHEMES).find(([, v]) => v.mode === newMode);
+  if (target) setColorScheme(target[0]);
+}
+
+function setColorScheme(name) {
+  state.settings.colorScheme = name;
+  state.settings.theme = SCHEMES[name]?.mode || 'light';
   localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
   applyTheme();
+  syncThemeUI();
 }
 
 function applyTheme() {
   const isDark = state.settings.theme === 'dark';
   document.body.classList.toggle('theme-dark', isDark);
   document.body.classList.toggle('theme-light', !isDark);
+
+  // Remove all scheme classes, then apply current
+  Object.keys(SCHEMES).forEach(s => document.body.classList.remove('scheme-' + s));
+  const scheme = state.settings.colorScheme || 'default';
+  if (scheme !== 'default') {
+    document.body.classList.add('scheme-' + scheme);
+  }
+
   const icon = isDark ? 'moon' : 'sun';
   ['theme-icon', 'theme-icon-settings', 'theme-icon-dash'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.setAttribute('data-lucide', icon);
   });
   lucide.createIcons();
+}
+
+function syncThemeUI() {
+  const scheme = state.settings.colorScheme || 'default';
+  document.querySelectorAll('.scheme-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.scheme === scheme);
+  });
 }
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────
@@ -182,6 +231,7 @@ function initColumnResize() {
 // ══════════════════════════════════════════════════════════════
 
 window.toggleTheme               = toggleTheme;
+window.setColorScheme           = setColorScheme;
 window.showView                  = showView;
 window.switchSettingsPane        = switchSettingsPane;
 window.setTxSign                 = setTxSign;
@@ -231,6 +281,9 @@ window.toggleSelMenu             = toggleSelMenu;
 window.closeSelMenu              = closeSelMenu;
 window.openBatchEditModal        = openBatchEditModal;
 window.batchDeleteTransactions   = batchDeleteTransactions;
+window.dashToggleSection         = dashToggleSection;
+window.dashToggleDropdown        = dashToggleDropdown;
+window.dashCloseDropdown         = dashCloseDropdown;
 window.onCsvFileSelected         = onCsvFileSelected;
 window.reparseCsv                = reparseCsv;
 window.onCsvMappingChange        = onCsvMappingChange;

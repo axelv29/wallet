@@ -12,11 +12,19 @@ function renderSidebar() {
   if (listCredit) listCredit.innerHTML = '';
 
   // Compute running balances (exclude future installments)
+  const settingsCur = state.settings.currency || 'ARS';
   const accBalances = {};
-  state.accounts.forEach(acc => { accBalances[acc.id] = Number(acc.balance) || 0; });
+  state.accounts.forEach(acc => { accBalances[acc.id] = 0; });
   state.transactions.forEach(tx => {
     if (tx.is_future) return;
-    if (accBalances[tx.account_id] !== undefined) accBalances[tx.account_id] += Number(tx.amount) || 0;
+    if (accBalances[tx.account_id] !== undefined) {
+      const acc = state.accounts.find(a => a.id === tx.account_id);
+      const accCur = acc?.currency || settingsCur;
+      const rawAmt = Number(tx.amount) || 0;
+      // For the sidebar, show in account's native currency — no conversion needed
+      // since we display each account in its own currency
+      accBalances[tx.account_id] += rawAmt;
+    }
   });
 
   const makeItem = (acc) => {
@@ -25,9 +33,12 @@ function renderSidebar() {
     li.className = 'account-item-sidebar' + (isActive ? ' active' : '');
     li.onclick = () => filterTransactions(acc.id);
     const val = accBalances[acc.id];
+    const accCurrency = acc.currency || settingsCur;
+    const tooltip = getConvertedTooltip(val, accCurrency);
+    const showCurrencyCode = accCurrency !== settingsCur;
     li.innerHTML = `
       <span class="acc-name-sidebar">${acc.name}</span>
-      <span class="acc-balance-sidebar ${val < 0 ? 'negative' : ''}">${formatCurrency(val)}</span>
+      <span class="acc-balance-sidebar ${val < 0 ? 'negative' : ''}" ${tooltip ? 'title="' + tooltip + '"' : ''}>${formatAccountCurrency(val, accCurrency)}${showCurrencyCode ? ' <span class="acc-currency-code">' + accCurrency + '</span>' : ''}</span>
     `;
     return li;
   };
@@ -61,6 +72,7 @@ function filterTransactions(viewId) {
 function renderHeaderAndMetrics() {
   const titleEl    = document.getElementById('view-title');
   const subtitleEl = document.getElementById('view-subtitle');
+  const settingsCur = state.settings.currency || 'ARS';
 
   let title    = 'Todas las cuentas';
   let subtitle = 'Resumen general de movimientos';
@@ -84,10 +96,12 @@ function renderHeaderAndMetrics() {
   } else {
     const acc = state.accounts.find(a => a.id === state.currentView);
     if (acc) {
+      const accCur = acc.currency || settingsCur;
+      const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
       title    = acc.name;
       subtitle = acc.type === 'credit_card'
-        ? `Tarjeta · cierre día ${acc.card_closing_day || '—'} · vencimiento día ${acc.card_due_day || '—'}`
-        : 'Cuenta líquida';
+        ? `Tarjeta · cierre día ${acc.card_closing_day || '—'} · vencimiento día ${acc.card_due_day || '—'}${curLabel}`
+        : 'Cuenta líquida' + curLabel;
     }
   }
 

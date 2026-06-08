@@ -11,6 +11,7 @@ let state = {
   predefined: {
     payees: ['Leo', 'Escaramuza', 'Rocío', 'Nati', 'Tienda Inglesa', 'El Tío', 'Supermercado Coto'],
     categories: [
+      { name: 'Saldo inicial', icon: 'banknote' },
       { name: 'Supermercado', icon: 'shopping-cart' },
       { name: 'Alimentos', icon: 'utensils-crossed' },
       { name: 'Compras', icon: 'package' },
@@ -29,7 +30,7 @@ let state = {
     ],
     tags: ['Rocio', 'NyL', 'pan', 'viaje', 'compras']
   },
-  settings: { geminiKey: '', theme: 'light', currency: 'ARS', showSymbol: true, decimals: 2 },
+  settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'ARS', showSymbol: true, decimals: 2 },
   currentTxSign: -1,
   importedTransactions: [],
   currentView: 'all',
@@ -49,11 +50,11 @@ function loadData() {
     state.accounts = JSON.parse(lsAcc);
   } else {
     state.accounts = [
-      { id: 'acc-1', name: 'Itaú Débito',  type: 'liquid',      balance: 1047.40 },
-      { id: 'acc-2', name: 'Brou',          type: 'liquid',      balance: 1900.00 },
-      { id: 'acc-3', name: 'Efectivo',      type: 'liquid',      balance: 1727.00 },
-      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: -10300.38, card_closing_day: 20, card_due_day: 30 },
-      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: -460.00,   card_closing_day: 15, card_due_day: 25 }
+      { id: 'acc-1', name: 'Itaú Débito',  type: 'liquid',      balance: 0 },
+      { id: 'acc-2', name: 'Brou',          type: 'liquid',      balance: 0 },
+      { id: 'acc-3', name: 'Efectivo',      type: 'liquid',      balance: 0 },
+      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: 0, card_closing_day: 20, card_due_day: 30 },
+      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: 0,   card_closing_day: 15, card_due_day: 25 }
     ];
     saveData('accounts');
   }
@@ -62,6 +63,11 @@ function loadData() {
     state.transactions = JSON.parse(lsTx);
   } else {
     state.transactions = [
+      { id: 'tx-init-1', date: '2026-05-01', account_id: 'acc-1', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  1047.40, notes: '', tags: [], is_receivable: false, due_date: '' },
+      { id: 'tx-init-2', date: '2026-05-01', account_id: 'acc-2', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  1900.00, notes: '', tags: [], is_receivable: false, due_date: '' },
+      { id: 'tx-init-3', date: '2026-05-01', account_id: 'acc-3', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  1727.00, notes: '', tags: [], is_receivable: false, due_date: '' },
+      { id: 'tx-init-4', date: '2026-05-01', account_id: 'acc-4', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount: -10300.38, notes: '', tags: [], is_receivable: false, due_date: '' },
+      { id: 'tx-init-5', date: '2026-05-01', account_id: 'acc-5', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  -460.00, notes: '', tags: [], is_receivable: false, due_date: '' },
       { id: 'tx-1',  date: '2026-06-01', account_id: 'acc-5', payee: 'Leo',            category_name: 'Fuera del presupuesto', amount:  5033.00, notes: 'Pasajes + Préstamo',    tags: [], is_receivable: true  },
       { id: 'tx-2',  date: '2026-05-24', account_id: 'acc-4', payee: 'Escaramuza',     category_name: 'Entretenimiento',       amount:  -258.75, notes: 'Libro w/',              tags: ['Rocio'], is_receivable: false },
       { id: 'tx-3',  date: '2026-05-19', account_id: 'acc-5', payee: 'Rocío',          category_name: 'Fuera del presupuesto', amount:   700.00, notes: 'Comida + Regalo Jessi', tags: [], is_receivable: false },
@@ -90,6 +96,38 @@ function loadData() {
     }
   } else {
     saveData('predefined');
+  }
+
+  // ── Migration: Convert account.balance to "Saldo inicial" transactions ──
+  let migrated = false;
+  state.accounts.forEach(acc => {
+    const bal = Number(acc.balance) || 0;
+    if (bal !== 0) {
+      const alreadyHas = state.transactions.some(t => t.account_id === acc.id && t.category_name === 'Saldo inicial');
+      if (!alreadyHas) {
+        const accTxs = state.transactions.filter(t => t.account_id === acc.id);
+        const dates = accTxs.map(t => t.date).filter(Boolean).sort();
+        const date = dates.length > 0 ? dates[0] : new Date().toISOString().split('T')[0];
+        state.transactions.unshift({
+          id: 'tx-init-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          date,
+          account_id: acc.id,
+          payee: 'Saldo inicial',
+          category_name: 'Saldo inicial',
+          amount: bal,
+          notes: '',
+          tags: [],
+          is_receivable: false,
+          due_date: ''
+        });
+        acc.balance = 0;
+        migrated = true;
+      }
+    }
+  });
+  if (migrated) {
+    saveData('accounts');
+    saveData('transactions');
   }
 }
 

@@ -1,15 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  dashboard.js — Dashboard con resumen mensual, categorías y cobertura
+//  dashboard.js — "nly" style: smooth line/area charts, progress circles
 //  Contiene: renderDashboard(), renderDashCharts(), dashState,
-//  dashPrevMonth(), dashNextMonth(), dashGetPeriod(), switchDashTab(),
-//  destroyChart(), getChartColors(), drawBarChart(), drawDonutChart().
+//  dashPrevMonth(), dashNextMonth(), dashGetPeriod(), dashToggleSection(),
+//  dashToggleDropdown(), dashCloseDropdown(),
+//  drawLineChart(), drawDonutChart(), getChartColors().
 // ═══════════════════════════════════════════════════════════════════════
 
 // ── DASHBOARD STATE ───────────────────────────────────────────
 let dashState = {
   month: null, // { year, month } — null = current
-  activeTab: 'resumen',
-  barChartInstance: null,
+  visibleSections: { resumen: true, gastos: true, ingresos: true, cobertura: true },
+  lineChartInstance: null,
   donutChartInstance: null,
   donutIncomeChartInstance: null,
 };
@@ -36,14 +37,23 @@ function dashNextMonth() {
   renderDashboard();
 }
 
-function switchDashTab(name) {
-  ['resumen','gastos','ingresos','cobertura'].forEach(t => {
-    document.getElementById('dash-tab-' + t)?.classList.toggle('active', t === name);
-    document.getElementById('dash-panel-' + t)?.classList.toggle('active', t === name);
-  });
-  dashState.activeTab = name;
-  // Trigger chart redraws after panel becomes visible
+function dashToggleSection(name) {
+  const checkbox = document.querySelector(`.dash-section-item[data-section="${name}"] input[type="checkbox"]`);
+  if (checkbox) dashState.visibleSections[name] = checkbox.checked;
+  else dashState.visibleSections[name] = !dashState.visibleSections[name];
+  const el = document.getElementById('dash-section-' + name);
+  if (el) el.classList.toggle('dash-hidden', !dashState.visibleSections[name]);
   setTimeout(() => renderDashCharts(), 10);
+}
+
+function dashToggleDropdown() {
+  const dd = document.querySelector('.dash-section-dropdown');
+  if (dd) dd.classList.toggle('open');
+}
+
+function dashCloseDropdown() {
+  const dd = document.querySelector('.dash-section-dropdown');
+  if (dd) dd.classList.remove('open');
 }
 
 // ── Chart helpers (pure canvas, no dependencies) ──────────────
@@ -54,13 +64,13 @@ function destroyChart(instance) {
 
 function getChartColors(n) {
   const palette = [
-    '#818cf8','#7dd3fc','#6ee7b7','#fcd34d','#fda4af',
-    '#c4b5fd','#fdba74','#bef264','#67e8f9','#f9a8d4',
+    '#e6b800','#8b5cf6','#92400e','#22c55e','#3b82f6',
+    '#ec4899','#06b6d4','#d97706','#6366f1','#78350f',
   ];
   return Array.from({ length: n }, (_, i) => palette[i % palette.length]);
 }
 
-function drawBarChart(canvas, labels, incomeData, expenseData) {
+function drawLineChart(canvas, labels, incomeData, expenseData) {
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -69,71 +79,147 @@ function drawBarChart(canvas, labels, incomeData, expenseData) {
   ctx.scale(dpr, dpr);
 
   const W = rect.width, H = rect.height;
-  const padL = 52, padR = 12, padT = 16, padB = 36;
+  const padL = 52, padR = 12, padT = 20, padB = 36;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
   const n = labels.length;
-  const groupW = chartW / n;
-  const barW = Math.min(18, groupW * 0.35);
-  const gap = 3;
 
-  // styles
   const isDark = document.body.classList.contains('theme-dark');
   const textColor = isDark ? '#a1a1aa' : '#71717a';
   const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const incomeColor = isDark ? '#6ee7b7' : '#34d399';
-  const expenseColor = isDark ? '#fda4af' : '#fb7185';
+  const incomeColor = '#22c55e';
+  const incomeFill = isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)';
+  const expenseColor = '#ef4444';
+  const expenseFill = isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)';
 
-  const maxVal = Math.max(...incomeData, ...expenseData, 1);
+  const maxVal = Math.max(...incomeData, ...expenseData, 1) * 1.1;
 
-  // grid lines
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines (dashed)
   ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
   for (let i = 0; i <= 4; i++) {
     const y = padT + (chartH / 4) * i;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
     const val = maxVal * (1 - i / 4);
     ctx.fillStyle = textColor;
-    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.font = '10px "DM Sans", -apple-system, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val.toFixed(0), padL - 5, y + 3.5);
+    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val.toFixed(0), padL - 6, y + 3.5);
+  }
+  ctx.setLineDash([]);
+
+  // Helper: smooth curve through points
+  function smoothCurve(points) {
+    if (points.length < 2) return;
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
   }
 
-  // bars
-  labels.forEach((label, i) => {
-    const cx = padL + i * groupW + groupW / 2;
-    // income bar
-    const iH = (incomeData[i] / maxVal) * chartH;
-    ctx.fillStyle = incomeColor;
-    ctx.beginPath();
-    ctx.roundRect(cx - barW - gap / 2, padT + chartH - iH, barW, iH, [3, 3, 0, 0]);
-    ctx.fill();
-    // expense bar
-    const eH = (expenseData[i] / maxVal) * chartH;
-    ctx.fillStyle = expenseColor;
-    ctx.beginPath();
-    ctx.roundRect(cx + gap / 2, padT + chartH - eH, barW, eH, [3, 3, 0, 0]);
-    ctx.fill();
+  function getPoints(data) {
+    return data.map((val, i) => ({
+      x: padL + (i / (n - 1)) * chartW,
+      y: padT + chartH - (val / maxVal) * chartH,
+    }));
+  }
 
-    // label
+  // Income area fill
+  const incomePoints = getPoints(incomeData);
+  ctx.beginPath();
+  ctx.moveTo(incomePoints[0].x, padT + chartH);
+  ctx.lineTo(incomePoints[0].x, incomePoints[0].y);
+  smoothCurve(incomePoints);
+  ctx.lineTo(incomePoints[incomePoints.length - 1].x, padT + chartH);
+  ctx.closePath();
+  ctx.fillStyle = incomeFill;
+  ctx.fill();
+
+  // Expense area fill
+  const expensePoints = getPoints(expenseData);
+  ctx.beginPath();
+  ctx.moveTo(expensePoints[0].x, padT + chartH);
+  ctx.lineTo(expensePoints[0].x, expensePoints[0].y);
+  smoothCurve(expensePoints);
+  ctx.lineTo(expensePoints[expensePoints.length - 1].x, padT + chartH);
+  ctx.closePath();
+  ctx.fillStyle = expenseFill;
+  ctx.fill();
+
+  // Income line
+  ctx.beginPath();
+  smoothCurve(incomePoints);
+  ctx.strokeStyle = incomeColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Expense line
+  ctx.beginPath();
+  smoothCurve(expensePoints);
+  ctx.strokeStyle = expenseColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Data points (dots)
+  incomePoints.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = incomeColor;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+  expensePoints.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = expenseColor;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // X-axis labels
+  labels.forEach((label, i) => {
+    const cx = padL + (i / (n - 1)) * chartW;
     ctx.fillStyle = textColor;
-    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.font = '10px "DM Sans", -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(label, cx, H - 8);
   });
 
   // Legend
   const legY = padT - 4;
-  ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = '10px "DM Sans", -apple-system, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillStyle = incomeColor;
-  ctx.fillRect(padL, legY - 7, 10, 7);
+  ctx.beginPath();
+  ctx.roundRect(padL, legY - 7, 8, 7, 1.5);
+  ctx.fill();
   ctx.fillStyle = textColor;
-  ctx.fillText('Ingresos', padL + 13, legY);
+  ctx.fillText('Ingresos', padL + 12, legY);
   ctx.fillStyle = expenseColor;
-  ctx.fillRect(padL + 70, legY - 7, 10, 7);
+  ctx.beginPath();
+  ctx.roundRect(padL + 68, legY - 7, 8, 7, 1.5);
+  ctx.fill();
   ctx.fillStyle = textColor;
-  ctx.fillText('Gastos', padL + 83, legY);
+  ctx.fillText('Gastos', padL + 80, legY);
 }
 
 function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
@@ -147,27 +233,28 @@ function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
   const W = rect.width, H = rect.height;
   const cx = W / 2, cy = H / 2;
   const outerR = Math.min(W, H) / 2 - 10;
-  const innerR = outerR * 0.62;
+  const innerR = outerR * 0.55;
+  const lineW = outerR - innerR;
 
   const total = values.reduce((a, b) => a + b, 0);
   if (total === 0) {
     const isDark = document.body.classList.contains('theme-dark');
     ctx.strokeStyle = isDark ? '#303036' : '#e3e0db';
-    ctx.lineWidth = outerR - innerR;
+    ctx.lineWidth = lineW;
     ctx.beginPath();
     ctx.arc(cx, cy, (outerR + innerR) / 2, 0, Math.PI * 2);
     ctx.stroke();
     return;
   }
 
+  // Shadow under each segment
+  ctx.shadowColor = 'rgba(0,0,0,0.04)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1;
+
   let startAngle = -Math.PI / 2;
   values.forEach((v, i) => {
     const sweep = (v / total) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep);
-    ctx.closePath();
-    // Outer
     ctx.beginPath();
     ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep);
     ctx.arc(cx, cy, innerR, startAngle + sweep, startAngle, true);
@@ -176,6 +263,19 @@ function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
     ctx.fill();
     startAngle += sweep;
   });
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+}
+
+// ── Progress circle helper ────────────────────────────────────
+function drawProgressCircle(circleEl, pct) {
+  if (!circleEl) return;
+  const circumference = 2 * Math.PI * 42; // r=42
+  const offset = circumference * (1 - pct / 100);
+  circleEl.style.strokeDasharray = circumference;
+  circleEl.style.strokeDashoffset = offset;
 }
 
 // ── MAIN renderDashboard ──────────────────────────────────────
@@ -223,23 +323,23 @@ function renderDashboard() {
   });
   const netDiff = totalIncome - totalExpenses;
 
-  // ── Metric strip ──
+  // ── Metric cards ──
   const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
   setEl('dash-income', formatCurrency(totalIncome));
   setEl('dash-expenses', formatCurrency(totalExpenses));
   const netEl = document.getElementById('dash-net');
   if (netEl) {
     netEl.textContent = (netDiff >= 0 ? '+' : '') + formatCurrency(netDiff);
-    netEl.className = 'dash-strip-val' + (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '');
+    netEl.className = 'dash-metric-val' + (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '');
   }
   setEl('dash-tx-count', monthTxs.length);
 
-  // ── Savings rate ──
+  // ── Savings progress circle ──
   const savingsPct = totalIncome > 0 ? Math.max(0, Math.min(100, (netDiff / totalIncome) * 100)) : 0;
-  const savingsFill = document.getElementById('dash-savings-fill');
+  const savingsCircle = document.getElementById('dash-savings-circle');
   const savingsPctEl = document.getElementById('dash-savings-pct');
   const savingsDesc = document.getElementById('dash-savings-desc');
-  if (savingsFill) savingsFill.style.width = savingsPct.toFixed(1) + '%';
+  drawProgressCircle(savingsCircle, savingsPct);
   if (savingsPctEl) savingsPctEl.textContent = savingsPct.toFixed(1) + '%';
   if (savingsDesc) {
     if (totalIncome === 0) savingsDesc.textContent = 'Sin ingresos registrados en este período.';
@@ -358,13 +458,16 @@ function renderDashboard() {
     } else {
       recent.forEach(tx => {
         const isExpense = tx.amount < 0;
+        const rAcc = state.accounts.find(a => a.id === tx.account_id);
+        const rCur = rAcc?.currency || state.settings.currency || 'ARS';
+        const rTooltip = getConvertedTooltip(tx.amount, rCur);
         const item = document.createElement('div');
         item.className = 'dash-recent-item';
         item.innerHTML = `
           <span class="dash-recent-date">${formatDate(tx.date)}</span>
           <span class="dash-recent-dot ${isExpense ? 'expense' : 'income'}"></span>
           <span class="dash-recent-payee">${tx.payee || '—'}</span>
-          <span class="dash-recent-amount ${isExpense ? 'expense' : 'income'}">${isExpense ? '-' : '+'}${formatCurrency(Math.abs(tx.amount))}</span>
+          <span class="dash-recent-amount ${isExpense ? 'expense' : 'income'}" ${rTooltip ? 'title="' + rTooltip + '"' : ''}>${isExpense ? '-' : '+'}${formatAccountCurrency(Math.abs(tx.amount), rCur)}</span>
         `;
         recentList.appendChild(item);
       });
@@ -372,14 +475,22 @@ function renderDashboard() {
   }
 
   lucide.createIcons();
+  // Sync section visibility with current state
+  Object.keys(dashState.visibleSections).forEach(name => {
+    const visible = dashState.visibleSections[name];
+    const el = document.getElementById('dash-section-' + name);
+    const cb = document.querySelector(`.dash-section-item[data-section="${name}"] input[type="checkbox"]`);
+    if (el) el.classList.toggle('dash-hidden', !visible);
+    if (cb) cb.checked = visible;
+  });
   // Draw charts
   setTimeout(() => renderDashCharts(), 30);
 }
 
 function renderDashCharts() {
-  // ── Bar chart (last 6 months) ──
-  const barCanvas = document.getElementById('dash-bar-chart');
-  if (barCanvas && barCanvas.offsetWidth > 0) {
+  // ── Line chart (last 6 months) ──
+  const lineCanvas = document.getElementById('dash-line-chart');
+  if (lineCanvas && dashState.visibleSections.resumen && lineCanvas.offsetWidth > 0) {
     const labels = [];
     const incomeData = [];
     const expenseData = [];
@@ -401,12 +512,12 @@ function renderDashCharts() {
       incomeData.push(inc);
       expenseData.push(exp);
     }
-    drawBarChart(barCanvas, labels, incomeData, expenseData);
+    drawLineChart(lineCanvas, labels, incomeData, expenseData);
   }
 
   // ── Donut chart (expenses) ──
   const donutCanvas = document.getElementById('dash-donut-chart');
-  if (donutCanvas && donutCanvas.offsetWidth > 0) {
+  if (donutCanvas && dashState.visibleSections.gastos && donutCanvas.offsetWidth > 0) {
     const period = dashGetPeriod();
     const monthTxs = state.transactions.filter(tx => {
       const d = new Date(tx.date + 'T00:00:00');
@@ -424,7 +535,7 @@ function renderDashCharts() {
 
   // ── Donut chart (income) ──
   const donutIncomeCanvas = document.getElementById('dash-donut-income-chart');
-  if (donutIncomeCanvas && donutIncomeCanvas.offsetWidth > 0) {
+  if (donutIncomeCanvas && dashState.visibleSections.ingresos && donutIncomeCanvas.offsetWidth > 0) {
     const period = dashGetPeriod();
     const monthTxs = state.transactions.filter(tx => {
       const d = new Date(tx.date + 'T00:00:00');
@@ -437,8 +548,8 @@ function renderDashCharts() {
     });
     const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const colors = getChartColors(entries.length).map((_, i) => {
-      const greens = ['#22c55e','#4ade80','#16a34a','#86efac','#15803d','#bbf7d0','#166534','#dcfce7'];
-      return greens[i % greens.length];
+      const pastels = ['#22c55e','#8b5cf6','#92400e','#3b82f6','#d97706','#06b6d4','#6366f1','#78350f'];
+      return pastels[i % pastels.length];
     });
     drawDonutChart(donutIncomeCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total ingresos');
   }

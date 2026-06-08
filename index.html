@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/base.css">
@@ -197,75 +198,109 @@
           </div>
         </div>
 
-        <!-- Month selector + tabs toolbar -->
+        <!-- Month selector -->
         <div class="dash-toolbar">
           <div class="dash-month-nav">
             <button class="dash-month-btn" id="dash-month-prev" onclick="dashPrevMonth()"><i data-lucide="chevron-left"></i></button>
             <span class="dash-month-label" id="dash-month-label">Junio 2026</span>
             <button class="dash-month-btn" id="dash-month-next" onclick="dashNextMonth()"><i data-lucide="chevron-right"></i></button>
           </div>
-          <div class="dash-tabs">
-            <button class="dash-tab active" id="dash-tab-resumen" onclick="switchDashTab('resumen')">Resumen</button>
-            <button class="dash-tab" id="dash-tab-gastos" onclick="switchDashTab('gastos')">Gastos</button>
-            <button class="dash-tab" id="dash-tab-ingresos" onclick="switchDashTab('ingresos')">Ingresos</button>
-            <button class="dash-tab" id="dash-tab-cobertura" onclick="switchDashTab('cobertura')">Cobertura</button>
+          <div class="dash-section-dropdown">
+            <button class="dash-section-btn" id="dash-section-btn" onclick="dashToggleDropdown()">
+              <i data-lucide="columns-3"></i>
+              <span>Secciones</span>
+              <i data-lucide="chevron-down" class="dash-section-chevron"></i>
+            </button>
+            <div class="dash-section-menu" id="dash-section-menu">
+              <label class="dash-section-item" data-section="resumen">
+                <input type="checkbox" checked onchange="dashToggleSection('resumen')">
+                <span>Resumen</span>
+              </label>
+              <label class="dash-section-item" data-section="gastos">
+                <input type="checkbox" checked onchange="dashToggleSection('gastos')">
+                <span>Gastos</span>
+              </label>
+              <label class="dash-section-item" data-section="ingresos">
+                <input type="checkbox" checked onchange="dashToggleSection('ingresos')">
+                <span>Ingresos</span>
+              </label>
+              <label class="dash-section-item" data-section="cobertura">
+                <input type="checkbox" checked onchange="dashToggleSection('cobertura')">
+                <span>Cobertura</span>
+              </label>
+            </div>
           </div>
         </div>
 
-        <!-- ── TAB: Resumen ── -->
-        <div class="dash-tab-content active" id="dash-panel-resumen">
-          <!-- Metric strip -->
-          <div class="dash-strip">
-            <div class="dash-strip-item">
-              <span class="dash-strip-label">Ingresos</span>
-              <span class="dash-strip-val income" id="dash-income">$0</span>
+        <!-- ── SECTION: Resumen ── -->
+        <div class="dash-section-block" id="dash-section-resumen">
+          <!-- Metric cards row -->
+          <div class="dash-metrics-row">
+            <div class="dash-metric-card">
+              <div class="dash-metric-icon income"><i data-lucide="arrow-up-right"></i></div>
+              <div class="dash-metric-info">
+                <span class="dash-metric-label">Ingresos</span>
+                <span class="dash-metric-val income" id="dash-income">$0</span>
+              </div>
             </div>
-            <div class="dash-strip-divider"></div>
-            <div class="dash-strip-item">
-              <span class="dash-strip-label">Gastos</span>
-              <span class="dash-strip-val expense" id="dash-expenses">$0</span>
+            <div class="dash-metric-card">
+              <div class="dash-metric-icon expense"><i data-lucide="arrow-down-left"></i></div>
+              <div class="dash-metric-info">
+                <span class="dash-metric-label">Gastos</span>
+                <span class="dash-metric-val expense" id="dash-expenses">$0</span>
+              </div>
             </div>
-            <div class="dash-strip-divider"></div>
-            <div class="dash-strip-item">
-              <span class="dash-strip-label">Diferencia</span>
-              <span class="dash-strip-val" id="dash-net">$0</span>
+            <div class="dash-metric-card">
+              <div class="dash-metric-icon difference"><i data-lucide="wallet"></i></div>
+              <div class="dash-metric-info">
+                <span class="dash-metric-label">Diferencia</span>
+                <span class="dash-metric-val" id="dash-net">$0</span>
+              </div>
             </div>
-            <div class="dash-strip-divider"></div>
-            <div class="dash-strip-item">
-              <span class="dash-strip-label">Movimientos</span>
-              <span class="dash-strip-val" id="dash-tx-count">0</span>
+            <div class="dash-metric-card">
+              <div class="dash-metric-icon movements"><i data-lucide="activity"></i></div>
+              <div class="dash-metric-info">
+                <span class="dash-metric-label">Movimientos</span>
+                <span class="dash-metric-val" id="dash-tx-count">0</span>
+              </div>
             </div>
           </div>
 
-          <!-- Savings rate -->
-          <div class="dash-section">
-            <div class="dash-section-head">
-              <i data-lucide="piggy-bank"></i>
-              <span>Tasa de ahorro del mes</span>
-              <span class="dash-savings-pct" id="dash-savings-pct">0%</span>
+          <!-- Main chart: line/area -->
+          <div class="dash-card">
+            <div class="dash-card-head">
+              <i data-lucide="bar-chart-2"></i>
+              <span>Ingresos vs Gastos — últimos 6 meses</span>
             </div>
-            <div class="dash-savings-track">
-              <div class="dash-savings-fill" id="dash-savings-fill" style="width:0%"></div>
+            <div class="dash-line-chart-wrap">
+              <canvas id="dash-line-chart" class="dash-line-canvas"></canvas>
             </div>
-            <div class="dash-savings-desc" id="dash-savings-desc">Sin datos suficientes</div>
           </div>
 
-          <!-- Two columns: chart + recent -->
+          <!-- Savings progress circle + recent activity -->
           <div class="dash-cols">
-            <!-- Bar chart -->
-            <div class="dash-section">
-              <div class="dash-section-head">
-                <i data-lucide="bar-chart-2"></i>
-                <span>Ingresos vs Gastos — últimos 6 meses</span>
+            <div class="dash-card">
+              <div class="dash-card-head">
+                <i data-lucide="piggy-bank"></i>
+                <span>Tasa de ahorro del mes</span>
               </div>
-              <div class="dash-bar-chart-wrap">
-                <canvas id="dash-bar-chart" class="dash-bar-canvas"></canvas>
+              <div class="dash-progress-row">
+                <div class="dash-progress-circle-wrap">
+                  <svg class="dash-progress-svg" viewBox="0 0 100 100">
+                    <circle class="dash-progress-track" cx="50" cy="50" r="42"></circle>
+                    <circle class="dash-progress-fill" id="dash-savings-circle" cx="50" cy="50" r="42"></circle>
+                  </svg>
+                  <div class="dash-progress-center">
+                    <span class="dash-progress-pct" id="dash-savings-pct">0%</span>
+                  </div>
+                </div>
+                <div class="dash-progress-info">
+                  <div class="dash-progress-desc" id="dash-savings-desc">Sin datos suficientes</div>
+                </div>
               </div>
             </div>
-
-            <!-- Recent activity -->
-            <div class="dash-section">
-              <div class="dash-section-head">
+            <div class="dash-card">
+              <div class="dash-card-head">
                 <i data-lucide="clock"></i>
                 <span>Actividad reciente</span>
               </div>
@@ -274,12 +309,11 @@
           </div>
         </div>
 
-        <!-- ── TAB: Gastos ── -->
-        <div class="dash-tab-content" id="dash-panel-gastos">
+        <!-- ── SECTION: Gastos ── -->
+        <div class="dash-section-block" id="dash-section-gastos">
           <div class="dash-cols">
-            <!-- Donut chart -->
-            <div class="dash-section">
-              <div class="dash-section-head">
+            <div class="dash-card">
+              <div class="dash-card-head">
                 <i data-lucide="pie-chart"></i>
                 <span>Distribución de gastos</span>
               </div>
@@ -291,10 +325,8 @@
                 </div>
               </div>
             </div>
-
-            <!-- Category bars -->
-            <div class="dash-section">
-              <div class="dash-section-head">
+            <div class="dash-card">
+              <div class="dash-card-head">
                 <i data-lucide="list"></i>
                 <span>Por categoría</span>
               </div>
@@ -303,11 +335,11 @@
           </div>
         </div>
 
-        <!-- ── TAB: Ingresos ── -->
-        <div class="dash-tab-content" id="dash-panel-ingresos">
+        <!-- ── SECTION: Ingresos ── -->
+        <div class="dash-section-block" id="dash-section-ingresos">
           <div class="dash-cols">
-            <div class="dash-section">
-              <div class="dash-section-head">
+            <div class="dash-card">
+              <div class="dash-card-head">
                 <i data-lucide="pie-chart"></i>
                 <span>Distribución de ingresos</span>
               </div>
@@ -319,8 +351,8 @@
                 </div>
               </div>
             </div>
-            <div class="dash-section">
-              <div class="dash-section-head">
+            <div class="dash-card">
+              <div class="dash-card-head">
                 <i data-lucide="list"></i>
                 <span>Por categoría</span>
               </div>
@@ -329,8 +361,8 @@
           </div>
         </div>
 
-        <!-- ── TAB: Cobertura ── -->
-        <div class="dash-tab-content" id="dash-panel-cobertura">
+        <!-- ── SECTION: Cobertura ── -->
+        <div class="dash-section-block" id="dash-section-cobertura">
           <div class="dash-cov-rows">
             <div class="dash-cov-row">
               <span class="dash-cov-row-label">Cobertura líquida</span>
@@ -349,9 +381,8 @@
             </div>
           </div>
 
-          <!-- Coverage details -->
-          <div class="dash-section" style="margin-top:4px;">
-            <div class="dash-section-head">
+          <div class="dash-card">
+            <div class="dash-card-head">
               <i data-lucide="shield-check"></i>
               <span>Estado de cobertura</span>
             </div>
@@ -408,6 +439,80 @@
           <!-- General -->
           <div class="settings-pane active" id="spane-general">
             <div class="pane-section-title">Configuración general</div>
+
+            <!-- Color scheme section -->
+            <div class="theme-section">
+              <div class="theme-section-label">Tema</div>
+              <div class="scheme-grid">
+                <button class="scheme-card active" data-scheme="default" onclick="setColorScheme('default')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#5b52f5"></span>
+                    <span class="scheme-dot" style="background:#f5f4f1"></span>
+                    <span class="scheme-dot" style="background:#16a34a"></span>
+                    <span class="scheme-dot" style="background:#dc2626"></span>
+                  </div>
+                  <span class="scheme-name">Default</span>
+                </button>
+                <button class="scheme-card" data-scheme="ocean" onclick="setColorScheme('ocean')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#0284c7"></span>
+                    <span class="scheme-dot" style="background:#f0f7ff"></span>
+                    <span class="scheme-dot" style="background:#16a34a"></span>
+                    <span class="scheme-dot" style="background:#dc2626"></span>
+                  </div>
+                  <span class="scheme-name">Ocean</span>
+                </button>
+                <button class="scheme-card" data-scheme="forest" onclick="setColorScheme('forest')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#16a34a"></span>
+                    <span class="scheme-dot" style="background:#f0faf4"></span>
+                    <span class="scheme-dot" style="background:#16a34a"></span>
+                    <span class="scheme-dot" style="background:#dc2626"></span>
+                  </div>
+                  <span class="scheme-name">Forest</span>
+                </button>
+                <button class="scheme-card" data-scheme="lavender" onclick="setColorScheme('lavender')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#9333ea"></span>
+                    <span class="scheme-dot" style="background:#f5f0ff"></span>
+                    <span class="scheme-dot" style="background:#16a34a"></span>
+                    <span class="scheme-dot" style="background:#dc2626"></span>
+                  </div>
+                  <span class="scheme-name">Lavender</span>
+                </button>
+                <button class="scheme-card" data-scheme="default-dark" onclick="setColorScheme('default-dark')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#7c75f8"></span>
+                    <span class="scheme-dot" style="background:#111113"></span>
+                    <span class="scheme-dot" style="background:#4ade80"></span>
+                    <span class="scheme-dot" style="background:#f87171"></span>
+                  </div>
+                  <span class="scheme-name">Default Dark</span>
+                </button>
+                <button class="scheme-card" data-scheme="midnight" onclick="setColorScheme('midnight')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#38bdf8"></span>
+                    <span class="scheme-dot" style="background:#0c1222"></span>
+                    <span class="scheme-dot" style="background:#4ade80"></span>
+                    <span class="scheme-dot" style="background:#f87171"></span>
+                  </div>
+                  <span class="scheme-name">Midnight</span>
+                </button>
+                <button class="scheme-card" data-scheme="ember" onclick="setColorScheme('ember')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#f59e0b"></span>
+                    <span class="scheme-dot" style="background:#1a1410"></span>
+                    <span class="scheme-dot" style="background:#4ade80"></span>
+                    <span class="scheme-dot" style="background:#f87171"></span>
+                  </div>
+                  <span class="scheme-name">Ember</span>
+                </button>
+              </div>
+            </div>
+
+            <div style="margin-top:18px;"></div>
+
+            <!-- Gemini API Key -->
             <form onsubmit="saveGeneralSettings(event)">
               <div class="form-group">
                 <label class="form-label">Gemini API Key</label>
@@ -443,6 +548,15 @@
                       <label class="form-label">Saldo inicial</label>
                       <input type="number" step="0.01" id="acc-balance" value="0.00" required>
                     </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Moneda</label>
+                    <select id="acc-currency" required>
+                      <option value="ARS">ARS Peso argentino</option>
+                      <option value="USD">USD Dólar</option>
+                      <option value="EUR">EUR Euro</option>
+                      <option value="UYU">UYU Peso uruguayo</option>
+                    </select>
                   </div>
                   <div class="closing-fields" id="cc-closing-fields" style="display:none;">
                     <div class="form-row">
@@ -893,6 +1007,7 @@
 </div>
 
 <script src="js/state.js"></script>
+<script src="js/currency.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/modals.js"></script>
 <script src="js/sidebar.js"></script>

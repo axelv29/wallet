@@ -204,10 +204,13 @@ function updateInstallmentPreview() {
   const previewVal = document.getElementById('inst-preview-val');
   const timeline   = document.getElementById('installment-timeline');
   const dateVal    = document.getElementById('tx-date').value;
+  const accId      = document.getElementById('tx-account')?.value;
+  const acc        = state.accounts.find(a => a.id === accId);
+  const accCur     = acc?.currency || state.settings.currency || 'ARS';
 
   if (total >= 2 && rawAmt > 0) {
     const perCuota = rawAmt / total;
-    previewVal.textContent = formatCurrency(perCuota);
+    previewVal.textContent = formatAccountCurrency(perCuota, accCur);
   } else {
     previewVal.textContent = total >= 2 ? '—' : 'Mín. 2';
   }
@@ -399,7 +402,9 @@ async function deleteTransaction(txId) {
 async function markAsCollected(txId) {
   const tx = state.transactions.find(t => t.id === txId);
   if (!tx) return;
-  if (await showConfirm(`¿Marcar como cobrado el préstamo de ${formatCurrency(Math.abs(tx.amount))} de ${tx.payee}?`, { title: 'Cobrar préstamo', confirmText: 'Marcar cobrado' })) {
+  const acc = state.accounts.find(a => a.id === tx.account_id);
+  const accCur = acc?.currency || state.settings.currency || 'ARS';
+  if (await showConfirm(`¿Marcar como cobrado el préstamo de ${formatAccountCurrency(Math.abs(tx.amount), accCur)} de ${tx.payee}?`, { title: 'Cobrar préstamo', confirmText: 'Marcar cobrado' })) {
     tx.is_receivable = false;
     state.transactions.unshift({
       id: 'tx-' + Date.now() + '-refund',
@@ -693,10 +698,16 @@ function updateSelectionBar() {
     return;
   }
 
+  const settingsCur = state.settings.currency || 'ARS';
   let total = 0;
   state.selectedTxIds.forEach(id => {
     const tx = state.transactions.find(t => t.id === id);
-    if (tx) total += tx.amount;
+    if (tx) {
+      const acc = state.accounts.find(a => a.id === tx.account_id);
+      const accCur = acc?.currency || settingsCur;
+      const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
+      total += (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+    }
   });
 
   const count = state.selectedTxIds.size;
@@ -1172,13 +1183,15 @@ function renderTransactions() {
     const notesHtml = tx.notes || '';
     const tagsHtml  = tagPills || '<span class="no-tags">—</span>';
 
-    const amountVal   = isExpense ? '-' + formatCurrency(Math.abs(tx.amount)) : '+' + formatCurrency(tx.amount);
+    const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+    const amountVal   = isExpense ? '-' + formatAccountCurrency(Math.abs(tx.amount), accCurrency) : '+' + formatAccountCurrency(tx.amount, accCurrency);
     const amountClass = isExpense ? 'expense' : 'income';
+    const amountTooltip = getConvertedTooltip(tx.amount, accCurrency);
 
     let payeeCellHtml = `<span class="payee-name">${tx.payee}</span>`;
     let cuotaCellHtml = '<span style="color:var(--text-lo)">—</span>';
     if (tx.installment_total) {
-      cuotaCellHtml = `<span class="cuota-badge" title="Total: ${formatCurrency(tx.installment_full_amount)}">${tx.installment_index}/${tx.installment_total}</span>`;
+      cuotaCellHtml = `<span class="cuota-badge" title="Total: ${formatAccountCurrency(tx.installment_full_amount, accCurrency)}">${tx.installment_index}/${tx.installment_total}</span>`;
     }
 
     let actionsHtml = `
@@ -1208,7 +1221,7 @@ function renderTransactions() {
       <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">${notesHtml || '<span style="color:var(--text-lo)">—</span>'}</td>
       <td class="tags-cell editable-cell" data-field="tags" title="Click para editar">${tagsHtml}</td>
       <td class="category-cell editable-cell" data-field="category_name" title="Click para editar">${getCategoryIcon(tx.category_name)} ${tx.category_name || 'Otros'}</td>
-      <td class="amount-cell ${amountClass} editable-cell" data-field="amount" title="Click para editar">${amountVal}</td>
+      <td class="amount-cell ${amountClass} editable-cell" data-field="amount" title="${amountTooltip ? amountTooltip + ' — Click para editar' : 'Click para editar'}">${amountVal}</td>
       <td class="actions-cell">${actionsHtml}</td>
     `;
     tbody.appendChild(tr);

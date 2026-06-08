@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  utils.js — Utilidades / helpers
-//  Contiene: formatCurrency(), formatDate(), getCategoryIcon(),
-//  calculateBalances(), _tagColor(), getEditOptions().
+//  Contiene: formatCurrency(), formatAccountCurrency(), getConvertedTooltip(),
+//  formatDate(), getCategoryIcon(), calculateBalances(), _tagColor(), getEditOptions().
 // ═══════════════════════════════════════════════════════════════════════
 
 // ── UTILITIES ─────────────────────────────────────────────────
@@ -27,6 +27,29 @@ function formatCurrency(value) {
   }
 }
 
+function formatAccountCurrency(value, currency) {
+  const cur     = currency || state.settings.currency || 'ARS';
+  const decimals = state.settings.decimals ?? 2;
+  const localeMap = { ARS: 'es-AR', USD: 'en-US', EUR: 'es-ES', UYU: 'es-UY' };
+  const locale = localeMap[cur] || 'es-AR';
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: cur,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
+function getConvertedTooltip(value, currency) {
+  const settingsCur = state.settings.currency || 'ARS';
+  const accCur = currency || settingsCur;
+  if (accCur === settingsCur) return null;
+  const converted = convertCurrency(value, accCur, settingsCur);
+  if (converted === null || converted === undefined) return null;
+  return formatCurrency(converted);
+}
+
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
 }
@@ -40,19 +63,25 @@ function getCategoryIcon(catName) {
 }
 
 function calculateBalances() {
+  const settingsCur = state.settings.currency || 'ARS';
   const balances = { liquid: 0, credit_card: 0, receivables: 0 };
-  state.accounts.forEach(acc => {
-    if (acc.type === 'liquid')      balances.liquid      += Number(acc.balance) || 0;
-    if (acc.type === 'credit_card') balances.credit_card += Number(acc.balance) || 0;
-  });
   state.transactions.forEach(tx => {
-    if (tx.is_future) return;   // cuotas futuras no afectan balances actuales
+    if (tx.is_future) return;
     const acc = state.accounts.find(a => a.id === tx.account_id);
     if (acc) {
-      if (acc.type === 'liquid')      balances.liquid      += Number(tx.amount) || 0;
-      if (acc.type === 'credit_card') balances.credit_card += Number(tx.amount) || 0;
+      const accCur = acc.currency || settingsCur;
+      const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
+      const val = (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+      if (acc.type === 'liquid')      balances.liquid      += val;
+      if (acc.type === 'credit_card') balances.credit_card += val;
     }
-    if (tx.is_receivable) balances.receivables += Math.abs(tx.amount);
+    if (tx.is_receivable) {
+      const acc = state.accounts.find(a => a.id === tx.account_id);
+      const accCur = acc?.currency || settingsCur;
+      const absAmt = Math.abs(Number(tx.amount) || 0);
+      const converted = convertCurrency(absAmt, accCur, settingsCur);
+      balances.receivables += (converted !== null && converted !== undefined) ? converted : absAmt;
+    }
   });
   return balances;
 }

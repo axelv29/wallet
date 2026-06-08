@@ -281,9 +281,25 @@
   font-weight: 400;
   white-space: nowrap;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .acc-balance-sidebar.negative { color: var(--negative); }
+
+.acc-currency-code {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-lo);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+}
 
 /* ── Footer (Ajustes) ───────────────────────────────────── */
 .sidebar-footer {

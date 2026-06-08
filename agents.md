@@ -16,6 +16,7 @@
 - `css/dashboard.css` — Dashboard, charts, categorías, cobertura
 - `css/helpers.css` — Import modal, help, CSV, installment
 - `js/state.js` — Estado global y persistencia
+- `js/currency.js` — Cotizaciones en línea, conversión de monedas (open.er-api.com)
 - `js/utils.js` — formatCurrency, formatDate, calculateBalances, helpers
 - `js/modals.js` — Help modal, confirm modal
 - `js/sidebar.js` — Sidebar, filtros, métricas de cobertura
@@ -63,6 +64,7 @@
 - `sidebar-liquid-list` / `sidebar-credit-list` — Listas de cuentas en sidebar
 - `receivables-sum-val` — Suma de préstamos activos
 - `theme-icon` / `theme-icon-settings` — Íconos de tema
+- `set-currency` / `set-show-symbol` / `set-decimals` — Configuración de moneda
 
 ### Clases CSS
 - `app-container` — Grid principal (sidebar + main)
@@ -82,6 +84,9 @@
 - `settings-pane` — Paneles de settings (modificador `.active`)
 - `btn` — Botones (modificador `.btn-primary` / `.btn-ghost` / `.w-full`)
 - `theme-light` / `theme-dark` — Modo en body
+- `scheme-ocean` / `scheme-forest` / `scheme-lavender` / `scheme-midnight` / `scheme-ember` / `scheme-default-dark` — Esquemas de color en body
+- `scheme-grid` / `scheme-card` — Grid de esquemas de color (modificador `.active`)
+- `scheme-dots` / `scheme-dot` — Puntos de color en tarjetas de esquema
 - `form-row` / `form-row-3` — Filas de formulario
 - `form-group` — Grupo de formulario
 - `delete-btn` — Botón de eliminar genérico
@@ -109,6 +114,7 @@
   name: 'Itaú Débito',
   type: 'liquid',           // 'liquid' | 'credit_card'
   balance: 1047.40,
+  currency: 'ARS',          // 'ARS' | 'USD' | 'EUR' | 'UYU'
   card_closing_day: 20,     // solo credit_card
   card_due_day: 30          // solo credit_card
 }
@@ -135,15 +141,21 @@
 - `renderSidebar()` — Sidebar con cuentas y balances corrientes
 - `renderHeaderAndMetrics()` — Header y métricas de cobertura
 - `renderTransactions()` — Tabla filtrada
-- `calculateBalances()` — Devuelve `{ liquid, credit_card, receivables }`
+- `calculateBalances()` — Devuelve `{ liquid, credit_card, receivables }` (convertidos a moneda de settings)
 - `filterTransactions(viewId)` — Cambia vista (`'all'` | `'receivables'` | account id)
 - `showView(name)` — Cambia entre `'main'` y `'settings'`
-- `switchSettingsPane(name)` — Cambia entre `'general'` | `'accounts'` | `'payees'` | `'categories'` | `'tags'`
-- `toggleTheme()` — Alterna light/dark
+- `switchSettingsPane(name)` — Cambia entre `'general'` | `'accounts'` | `'payees'` | `'categories'` | `'tags'` | `'currency'`
+- `toggleTheme()` — Alterna light/dark (busca primer esquema del modo opuesto)
+- `setColorScheme(name)` — Establece esquema de color (auto-detecta modo light/dark)
+- `syncThemeUI()` — Sincroniza tarjetas del picker de temas
 - `setTxSign(sign)` — `-1` para gasto, `1` para ingreso
 - `saveData(type)` — Persiste a localStorage (`'accounts'` | `'transactions'` | `'predefined'`)
-- `formatCurrency(value)` — Formatea a ARS
+- `formatCurrency(value)` — Formatea a moneda global (settings)
+- `formatAccountCurrency(value, currency)` — Formatea a moneda de cuenta (siempre muestra símbolo nativo)
+- `getConvertedTooltip(value, currency)` — Devuelve string con valor convertido a moneda de settings para tooltips
 - `formatDate(dateString)` — Formatea a locale argentino
+- `fetchExchangeRates()` — Descarga cotizaciones de open.er-api.com (cache 24h en localStorage)
+- `convertCurrency(value, from, to)` — Convierte monto entre monedas usando cotizaciones cacheadas
 
 ### Predefinidos editables
 ```js
@@ -179,7 +191,8 @@ state.predefined = {
 - `wallet_accounts` — Array de cuentas
 - `wallet_transactions` — Array de transacciones
 - `wallet_predefined` — Objeto con payees, categories, tags
-- `wallet_settings` — Objeto con `geminiKey` y `theme`
+- `wallet_settings` — Objeto con `geminiKey`, `theme` y `colorScheme`
+- `wallet_exchange_rates` — Cache de cotizaciones (base USD, 24h TTL)
 
 ## Design System
 
@@ -212,11 +225,12 @@ state.predefined = {
 ### Paleta
 - Fondo: `--bg-root` (claro #f5f4f1, oscuro #111113)
 - Superficie: `--bg-surface`
-- Acento: `--accent` (#5b52f5 / #7c75f8)
+- Acento global: `--accent` (#5b52f5 / #7c75f8)
+- Acento dashboard: `--accent` (#e6b800 / #fbbf24) — amarillo/dorado
 - Texto: `--text-hi/mid/lo`
 - Bordes: `--border`
-- Danger: `#dc2626`
-- Success: `#16a34a`
+- Danger: `#dc2626` / `#ef4444` (dashboard)
+- Success: `#16a34a` / `#22c55e` (dashboard)
 
 ### Componentes clave
 - Botón primario: bg accent, text white, border-radius var(--r-sm), padding 8px 14px
@@ -224,6 +238,10 @@ state.predefined = {
 - Select: mismo estilo que input
 - Tabla: bordered, hover row, sticky header
 - Etiquetas: pills con 3 colores predefinidos (rosa, amarillo, azul)
+- Dashboard card (`.dash-card`): bg surface, border, radius var(--r-md), padding 16px 20px, head con `.dash-card-head` (uppercase, 10px, text-lo)
+- Section dropdown (`.dash-section-dropdown`): btn con ícono + menú de checkboxes, abierto con `.open`
+- Metric card (`.dash-metric-card`): icon box + label + value, grid 4 columnas
+- Progress circle (`.dash-progress-svg`): SVG circular con track y fill, percentage center text
 
 ### CSS / Diseño
 - **Layout**: Grid de 2 columnas (sidebar 228px + main 1fr)
@@ -270,12 +288,18 @@ state.predefined = {
 
 ### Dashboard
 - `view-dashboard` en HTML, `renderDashboard()` en JS
+- Secciones unificadas en una sola vista con toggle dropdown (`.dash-section-dropdown` con clase `.open`)
+- `dashToggleSection(name)` alterna visibilidad de cada sección via clase `.dash-hidden` en `.dash-section-block`
+- `dashToggleDropdown()` abre/cierra el menú de secciones
+- `dashCloseDropdown()` cierra el menú (usado en click-outside)
 - Muestra:
-  - **Resumen del mes**: ingresos totales, gastos totales, diferencia neta (mes calendario actual)
-  - **Gastos por categoría**: barras proporcionales de gasto por categoría
-  - **Cobertura**: cobertura líquida, proyectada y patrimonio neto
-  - **Actividad reciente**: últimas 5 transacciones
+  - **Resumen del mes**: metric cards (ingresos, gastos, diferencia, movimientos), line/area chart últimos 6 meses, progress circle tasa de ahorro, actividad reciente
+  - **Gastos por categoría**: donut y barras proporcionales de gasto
+  - **Ingresos**: donut y barras de ingresos por categoría
+  - **Cobertura**: cobertura líquida, proyectada y patrimonio neto, con detalles
 - Se renderiza automáticamente desde `renderAll()` y al navegar al dashboard
+- Los charts solo se dibujan si su sección está visible
+- **Style "nly"**: acento amarillo/dorado (#e6b800), fuente DM Sans, line charts suaves con área, progress circles SVG
 
 ### Modal de ayuda
 - `help-modal` en HTML, `openHelpModal()` / `closeHelpModal()` en JS
@@ -292,7 +316,7 @@ state.predefined = {
 - [x] Marcado de cobro de préstamos (crea tx inversa automática)
 - [x] Métricas de cobertura líquida y proyectada
 - [x] Cálculo de patrimonio neto
-- [x] Tema claro/oscuro
+- [x] Tema claro/oscuro con esquemas de color (default, ocean, forest, lavender, default-dark, midnight, ember)
 - [x] Selectores buscables (payee, categoría)
 - [x] Atajo de teclado: `+`/`-` en campo de monto
 - [x] Importación de extractos con Gemini AI

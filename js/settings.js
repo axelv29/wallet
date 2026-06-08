@@ -55,11 +55,12 @@ function openAccountCreator(type) {
 
 function createNewAccount(event) {
   event.preventDefault();
-  const name    = document.getElementById('acc-name').value.trim();
-  const type    = document.getElementById('acc-type').value;
-  const balance = parseFloat(document.getElementById('acc-balance').value) || 0;
+  const name     = document.getElementById('acc-name').value.trim();
+  const type     = document.getElementById('acc-type').value;
+  const balance  = parseFloat(document.getElementById('acc-balance').value) || 0;
+  const currency = document.getElementById('acc-currency').value || 'ARS';
 
-  const newAcc = { id: 'acc-' + Date.now(), name, type, balance };
+  const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
   if (type === 'credit_card') {
     newAcc.card_closing_day = parseInt(document.getElementById('acc-close-day').value) || 1;
     newAcc.card_due_day     = parseInt(document.getElementById('acc-due-day').value)   || 10;
@@ -67,6 +68,22 @@ function createNewAccount(event) {
 
   state.accounts.push(newAcc);
   saveData('accounts');
+
+  if (balance !== 0) {
+    state.transactions.unshift({
+      id: 'tx-init-' + Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      account_id: newAcc.id,
+      payee: 'Saldo inicial',
+      category_name: 'Saldo inicial',
+      amount: balance,
+      notes: '',
+      tags: [],
+      is_receivable: false,
+      due_date: ''
+    });
+    saveData('transactions');
+  }
 
   document.getElementById('acc-name').value    = '';
   document.getElementById('acc-balance').value = '0.00';
@@ -95,14 +112,17 @@ function renderSettingsAccountsList() {
   const container = document.getElementById('accounts-scroll-container');
   if (!container) return;
   container.innerHTML = '';
+  const settingsCur = state.settings.currency || 'ARS';
   state.accounts.forEach(acc => {
+    const accCur = acc.currency || settingsCur;
+    const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
     const item = document.createElement('div');
     item.className = 'account-list-item';
     item.style.cursor = 'pointer';
     item.innerHTML = `
       <div class="acc-list-info">
         <span class="acc-list-name">${acc.name}</span>
-        <span class="acc-list-type">${acc.type === 'credit_card' ? 'Tarjeta de crédito' : 'Cuenta líquida'}${acc.card_closing_day ? ' · cierra día ' + acc.card_closing_day : ''}</span>
+        <span class="acc-list-type">${acc.type === 'credit_card' ? 'Tarjeta de crédito' : 'Cuenta líquida'}${acc.card_closing_day ? ' · cierra día ' + acc.card_closing_day : ''}${curLabel}</span>
       </div>
       <button class="delete-btn" onclick="event.stopPropagation();removeAccount('${acc.id}')"><i data-lucide="trash-2"></i></button>
     `;
