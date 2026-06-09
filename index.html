@@ -63,7 +63,6 @@
       <div class="sidebar-scroll">
         <div class="sidebar-section-title" style="cursor:pointer;">
           <span onclick="filterTransactions('all')">Cuentas</span>
-          <button class="sidebar-add-btn" onclick="openAccountCreator(null)" title="Añadir cuenta"><i data-lucide="plus"></i></button>
         </div>
 
         <div class="sidebar-header-row" onclick="filterTransactions('all')" id="sidebar-all-row" style="cursor:pointer;">
@@ -73,7 +72,7 @@
         <div class="sidebar-section-group">
           <div class="sidebar-header-row">
             <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('liquid');}else{filterTransactions('type-liquid');}">Líquidas</span>
-            <button class="sidebar-add-btn" onclick="openAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
+            <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
           </div>
           <ul class="account-list" id="sidebar-liquid-list"></ul>
         </div>
@@ -81,9 +80,17 @@
         <div class="sidebar-section-group">
           <div class="sidebar-header-row">
             <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('credit_card');}else{filterTransactions('type-credit_card');}">Tarjetas de crédito</span>
-            <button class="sidebar-add-btn" onclick="openAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
+            <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
           </div>
           <ul class="account-list" id="sidebar-credit-list"></ul>
+        </div>
+
+        <div id="sidebar-custom-types-container"></div>
+
+        <div style="padding:6px 14px 2px;">
+          <button class="sidebar-add-account-btn" onclick="openFloatingAccountCreator()">
+            <i data-lucide="plus"></i> Nueva cuenta
+          </button>
         </div>
       </div>
 
@@ -111,7 +118,7 @@
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon"></i>
           </button>
-          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?">
+          <button class="theme-btn" onclick="openWelcomeModal()" title="¿Cómo funciona?">
             <i data-lucide="circle-help"></i>
           </button>
         </div>
@@ -145,9 +152,13 @@
           </div>
         </div>
         <div class="toolbar-right">
-          <div class="search-box">
-            <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" oninput="renderTransactions()">
-            <i data-lucide="search"></i>
+          <div class="search-box" id="search-box">
+            <button class="search-box-btn" onclick="toggleSearchBox()" title="Buscar movimientos">
+              <i data-lucide="search"></i>
+            </button>
+            <div class="search-input-wrap">
+              <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" oninput="renderTransactions()">
+            </div>
           </div>
         </div>
       </div>
@@ -169,14 +180,14 @@
             <thead>
               <tr>
                 <th class="c" style="width:36px; min-width:36px;"><input type="checkbox" class="tx-select-all" id="tx-select-all" onchange="toggleSelectAll()"></th>
-                <th class="col-resizable" style="min-width:95px; width:95px;">Fecha<span class="col-resize-handle"></span></th>
-                <th class="col-resizable col-account" style="min-width:115px; width:130px;">Cuenta<span class="col-resize-handle"></span></th>
-                <th class="col-resizable" style="min-width:150px; width:160px;">Beneficiario<span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-sortable" data-sort="date" onclick="toggleSort('date')" style="min-width:95px; width:95px;"><span class="col-sort-label">Fecha</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-account col-sortable" data-sort="account" onclick="toggleSort('account')" style="min-width:115px; width:130px;"><span class="col-sort-label">Cuenta</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-sortable" data-sort="payee" onclick="toggleSort('payee')" style="min-width:150px; width:160px;"><span class="col-sort-label">Beneficiario</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable c" style="width:80px; min-width:70px;">Cuota<span class="col-resize-handle"></span></th>
-                <th class="col-resizable" style="min-width:160px; width:100%;">Notas / Detalle<span class="col-resize-handle"></span></th>
-                <th class="col-resizable" style="min-width:120px; width:140px;">Etiquetas<span class="col-resize-handle"></span></th>
-                <th class="col-resizable" style="min-width:120px; width:140px;">Categoría<span class="col-resize-handle"></span></th>
-                <th class="col-resizable r" style="min-width:110px; width:120px;">Monto<span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-sortable" data-sort="notes" onclick="toggleSort('notes')" style="min-width:160px; width:100%;"><span class="col-sort-label">Notas / Detalle</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-sortable" data-sort="tags" onclick="toggleSort('tags')" style="min-width:120px; width:140px;"><span class="col-sort-label">Etiquetas</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
+                <th class="col-resizable col-sortable" data-sort="category" onclick="toggleSort('category')" style="min-width:120px; width:140px;"><span class="col-sort-label">Categoría</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
+                <th class="col-resizable r col-sortable" data-sort="amount" onclick="toggleSort('amount')" style="min-width:110px; width:120px;"><span class="col-sort-label">Monto</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="c" style="width:70px; min-width:55px;">—</th>
               </tr>
             </thead>
@@ -197,7 +208,7 @@
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon-dash"></i>
           </button>
-          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?">
+          <button class="theme-btn" onclick="openWelcomeModal()" title="¿Cómo funciona?">
             <i data-lucide="circle-help"></i>
           </button>
         </div>
@@ -426,47 +437,45 @@
     <div id="view-settings" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
       <header class="main-header">
         <div class="header-left">
-          <div class="header-title">Ajustes y cuentas</div>
-          <div class="header-sub">Gestión de cuentas, categorías y configuración general</div>
+          <div class="header-title">Ajustes</div>
+          <div class="header-sub">Configuración, cuentas y listas personalizadas</div>
         </div>
         <div class="header-right">
           <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
             <i data-lucide="sun" id="theme-icon-settings"></i>
           </button>
-          <button class="theme-btn" onclick="openHelpModal()" title="¿Cómo funciona?">
+          <button class="theme-btn" onclick="openWelcomeModal()" title="¿Cómo funciona?">
             <i data-lucide="circle-help"></i>
           </button>
         </div>
       </header>
 
-      <!-- Settings body: sidebar + pane -->
       <div class="settings-layout" style="flex:1; overflow:hidden;">
 
         <nav class="settings-nav">
           <button class="settings-nav-btn active" id="snav-general" onclick="switchSettingsPane('general')">
-            <i data-lucide="key-round"></i> General
+            <i data-lucide="settings"></i> General
+          </button>
+          <button class="settings-nav-btn" id="snav-apariencia" onclick="switchSettingsPane('apariencia')">
+            <i data-lucide="palette"></i> Apariencia
           </button>
           <button class="settings-nav-btn" id="snav-accounts" onclick="switchSettingsPane('accounts')">
             <i data-lucide="wallet"></i> Cuentas
           </button>
-          <button class="settings-nav-btn" id="snav-payees" onclick="switchSettingsPane('payees')">
-            <i data-lucide="users"></i> Beneficiarios
+          <button class="settings-nav-btn" id="snav-listas" onclick="switchSettingsPane('listas')">
+            <i data-lucide="list"></i> Listas
           </button>
-          <button class="settings-nav-btn" id="snav-categories" onclick="switchSettingsPane('categories')">
-            <i data-lucide="tag"></i> Categorías
-          </button>
-          <button class="settings-nav-btn" id="snav-tags" onclick="switchSettingsPane('tags')">
-            <i data-lucide="hash"></i> Etiquetas
+          <button class="settings-nav-btn" id="snav-sistema" onclick="switchSettingsPane('sistema')">
+            <i data-lucide="server"></i> Sistema
           </button>
         </nav>
 
         <div class="settings-pane-wrap">
 
-          <!-- General -->
+          <!-- ── General: Moneda + API ── -->
           <div class="settings-pane active" id="spane-general">
-            <div class="pane-section-title">Configuración general</div>
+            <div class="pane-section-title">General</div>
 
-            <!-- ── Moneda ── -->
             <div class="pane-subsection">
               <div class="pane-subsection-title">Moneda</div>
               <form onsubmit="saveCurrencySettings(event)">
@@ -480,7 +489,7 @@
                   </select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Símbolo de moneda</label>
+                  <label class="form-label">Símbolo</label>
                   <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="set-show-symbol" checked>
                     <span>Mostrar símbolo ($, €, etc.)</span>
@@ -496,14 +505,43 @@
                   </select>
                 </div>
                 <div style="margin-top:14px;">
-                  <button type="submit" class="btn btn-primary">Guardar</button>
+                  <button type="submit" class="btn btn-primary">Guardar moneda</button>
                 </div>
               </form>
             </div>
 
-            <!-- ── Tema ── -->
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">API</div>
+              <form onsubmit="saveGeneralSettings(event)">
+                <div class="form-group">
+                  <label class="form-label">Gemini API Key</label>
+                  <input type="password" id="set-gemini-key" placeholder="AIzaSy…" style="max-width:380px;">
+                  <span class="help-note">Se almacena solo en localStorage.</span>
+                </div>
+                <div style="margin-top:10px;">
+                  <button type="submit" class="btn btn-primary">Guardar clave</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- ── Apariencia: Tema + Esquemas ── -->
+          <div class="settings-pane" id="spane-apariencia">
+            <div class="pane-section-title">Apariencia</div>
+
             <div class="pane-subsection">
               <div class="pane-subsection-title">Tema</div>
+              <div class="theme-row">
+                <button class="btn" onclick="toggleTheme()" style="min-width:100px;">
+                  <i data-lucide="sun" id="theme-icon-settings-mini"></i>
+                  <span id="theme-label">Claro</span>
+                </button>
+                <span class="theme-btn-label">Alternar entre tema claro y oscuro</span>
+              </div>
+            </div>
+
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">Esquema de color</div>
               <div class="scheme-grid">
                 <button class="scheme-card active" data-scheme="default" onclick="setColorScheme('default')">
                   <div class="scheme-dots">
@@ -570,67 +608,26 @@
                 </button>
               </div>
             </div>
+          </div>
 
-            <!-- ── API ── -->
-            <div class="pane-subsection">
-              <div class="pane-subsection-title">API</div>
-              <form onsubmit="saveGeneralSettings(event)">
-                <div class="form-group">
-                  <label class="form-label">Gemini API Key</label>
-                  <input type="password" id="set-gemini-key" placeholder="AIzaSy…" style="max-width:380px;">
-                  <span class="help-note">La clave se almacena únicamente en el almacenamiento local de tu navegador.</span>
-                </div>
-                <div style="margin-top:14px;">
-                  <button type="submit" class="btn btn-primary">Guardar configuración</button>
-                </div>
-              </form>
-            </div>
+          <!-- ── Cuentas: Tipos + Crear + Listar ── -->
+          <div class="settings-pane" id="spane-accounts">
+            <div class="pane-section-title">Cuentas</div>
 
-            <!-- ── Backup ── -->
             <div class="pane-subsection">
-              <div class="pane-subsection-title">Backup de datos</div>
-              <p class="help-note" style="margin-bottom:12px;">Exportá tus transacciones y cuentas a un archivo JSON. Podés filtrar por fechas o exportar todo.</p>
-              <div class="backup-export-row">
-                <div class="form-row" style="align-items:end;">
-                  <div class="form-group">
-                    <label class="form-label">Desde</label>
-                    <input type="date" id="backup-date-from">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Hasta</label>
-                    <input type="date" id="backup-date-to">
-                  </div>
-                  <div class="form-group">
-                    <button class="btn" onclick="clearBackupDates()" type="button">Todos los tiempos</button>
-                  </div>
+              <div class="pane-subsection-title">Tipos de cuenta</div>
+              <div style="max-width:340px;">
+                <div class="predefined-add-row" style="margin-bottom:10px;">
+                  <input type="text" id="add-acc-type-val" placeholder="Nuevo tipo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addAccountType()}">
+                  <button class="btn btn-primary" onclick="addAccountType()"><i data-lucide="plus"></i></button>
                 </div>
-                <div class="backup-actions">
-                  <button class="btn btn-primary" onclick="exportBackup()">
-                    <i data-lucide="download"></i> Exportar backup
-                  </button>
-                  <button class="btn" onclick="openImportBackupModal()">
-                    <i data-lucide="upload"></i> Importar backup
-                  </button>
-                </div>
+                <ul class="predefined-scroll" id="predefined-account-types-list"></ul>
               </div>
             </div>
 
-            <!-- ── Zona de peligro ── -->
-            <div class="pane-subsection">
-              <div class="pane-subsection-title">Zona de peligro</div>
-              <p class="help-note" style="margin-bottom:12px;">Borrá todos tus datos: transacciones, cuentas y listas personalizadas. Las categorías, beneficiarios y etiquetas predeterminadas se mantienen.</p>
-              <button class="btn btn-danger" onclick="confirmDeleteAllData()">
-                <i data-lucide="trash-2"></i> Borrar todos los datos
-              </button>
-            </div>
-          </div>
-
-          <!-- Accounts -->
-          <div class="settings-pane" id="spane-accounts">
-            <div class="pane-section-title">Cuentas</div>
             <div class="accounts-split">
               <div>
-                <div style="font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:10px;">Nueva cuenta</div>
+                <div class="pane-subsection-title">Nueva cuenta</div>
                 <form onsubmit="createNewAccount(event)">
                   <div class="form-group">
                     <label class="form-label">Nombre</label>
@@ -639,10 +636,7 @@
                   <div class="form-row">
                     <div class="form-group">
                       <label class="form-label">Tipo</label>
-                      <select id="acc-type" onchange="toggleAccountClosingFields(this.value)" required>
-                        <option value="liquid">Líquida (Efectivo / Débito)</option>
-                        <option value="credit_card">Tarjeta de crédito</option>
-                      </select>
+                      <select id="acc-type" onchange="toggleAccountClosingFields(this.value)" required></select>
                     </div>
                     <div class="form-group">
                       <label class="form-label">Saldo inicial</label>
@@ -669,57 +663,96 @@
                         <input type="number" id="acc-due-day" min="1" max="31" placeholder="30">
                       </div>
                     </div>
-                    <div class="cc-note">Los días de cierre y vencimiento se usan para calcular la deuda del período activo.</div>
+                    <div class="cc-note">Se usan para calcular la deuda del período activo.</div>
                   </div>
                   <button type="submit" class="btn btn-primary w-full" style="margin-top:10px;">Crear cuenta</button>
                 </form>
               </div>
               <div>
-                <div style="font-size:11px; font-weight:600; color:var(--text-hi); margin-bottom:10px;">Cuentas registradas</div>
+                <div class="pane-subsection-title">Cuentas registradas</div>
                 <div class="accounts-list-scroll" id="accounts-scroll-container"></div>
               </div>
             </div>
           </div>
 
-          <!-- Payees -->
-          <div class="settings-pane" id="spane-payees">
-            <div class="pane-section-title">Beneficiarios</div>
-            <div style="max-width:340px;">
-              <div class="predefined-add-row" style="margin-bottom:10px;">
-                <input type="text" id="add-payee-val" placeholder="Nuevo beneficiario…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('payees')}">
-                <button class="btn btn-primary" onclick="addPredefined('payees')"><i data-lucide="plus"></i> Agregar</button>
+          <!-- ── Listas: Beneficiarios + Categorías + Etiquetas ── -->
+          <div class="settings-pane" id="spane-listas">
+            <div class="pane-section-title">Listas</div>
+
+            <div class="list-inline-wrap">
+              <div class="list-subsection">
+                <div class="list-subsection-title">Beneficiarios</div>
+                <div class="predefined-add-row" style="margin-bottom:6px;">
+                  <input type="text" id="add-payee-val" placeholder="Nuevo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('payees')}">
+                  <button class="btn btn-primary" onclick="addPredefined('payees')"><i data-lucide="plus"></i></button>
+                </div>
+                <ul class="predefined-scroll" id="predefined-payees-list"></ul>
               </div>
-              <ul class="predefined-scroll" id="predefined-payees-list"></ul>
+
+              <div class="list-subsection">
+                <div class="list-subsection-title">Categorías</div>
+                <div class="predefined-add-row" style="margin-bottom:6px;">
+                  <div class="cat-picker-wrap">
+                    <button class="cat-picker-btn" id="cat-picker-btn" onclick="toggleCatIconPicker()" type="button" title="Elegir ícono"><i data-lucide="tag"></i></button>
+                    <div class="cat-picker-popover" id="cat-picker-popover">
+                      <div class="cat-picker-grid" id="cat-picker-grid"></div>
+                    </div>
+                  </div>
+                  <input type="text" id="add-category-val" placeholder="Nueva…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
+                  <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i></button>
+                </div>
+                <ul class="predefined-scroll" id="predefined-categories-list"></ul>
+              </div>
+
+              <div class="list-subsection">
+                <div class="list-subsection-title">Etiquetas</div>
+                <div class="predefined-add-row" style="margin-bottom:6px;">
+                  <input type="text" id="add-tag-val" placeholder="Nueva…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('tags')}">
+                  <button class="btn btn-primary" onclick="addPredefined('tags')"><i data-lucide="plus"></i></button>
+                </div>
+                <ul class="predefined-scroll" id="predefined-tags-list"></ul>
+              </div>
             </div>
           </div>
 
-          <!-- Categories -->
-          <div class="settings-pane" id="spane-categories">
-            <div class="pane-section-title">Categorías</div>
-            <div style="max-width:340px;">
-              <div class="predefined-add-row cat-add-row" style="margin-bottom:10px;">
-                <div class="cat-picker-wrap">
-                  <button class="cat-picker-btn" id="cat-picker-btn" onclick="toggleCatIconPicker()" type="button" title="Elegir ícono"><i data-lucide="tag"></i></button>
-                  <div class="cat-picker-popover" id="cat-picker-popover">
-                    <div class="cat-picker-grid" id="cat-picker-grid"></div>
+          <!-- ── Sistema: Backup + Peligro ── -->
+          <div class="settings-pane" id="spane-sistema">
+            <div class="pane-section-title">Sistema</div>
+
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">Backup</div>
+              <p class="help-note" style="margin-bottom:10px;">Exportá tus datos a un archivo JSON. Podés filtrar por fechas.</p>
+              <div class="backup-export-row">
+                <div class="form-row" style="align-items:end;">
+                  <div class="form-group">
+                    <label class="form-label">Desde</label>
+                    <input type="date" id="backup-date-from">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Hasta</label>
+                    <input type="date" id="backup-date-to">
+                  </div>
+                  <div class="form-group">
+                    <button class="btn" onclick="clearBackupDates()" type="button">Limpiar</button>
                   </div>
                 </div>
-                <input type="text" id="add-category-val" placeholder="Nueva categoría…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
-                <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i> Agregar</button>
+                <div class="backup-actions">
+                  <button class="btn btn-primary" onclick="exportBackup()">
+                    <i data-lucide="download"></i> Exportar
+                  </button>
+                  <button class="btn" onclick="openImportBackupModal()">
+                    <i data-lucide="upload"></i> Importar
+                  </button>
+                </div>
               </div>
-              <ul class="predefined-scroll" id="predefined-categories-list"></ul>
             </div>
-          </div>
 
-          <!-- Tags -->
-          <div class="settings-pane" id="spane-tags">
-            <div class="pane-section-title">Etiquetas</div>
-            <div style="max-width:340px;">
-              <div class="predefined-add-row" style="margin-bottom:10px;">
-                <input type="text" id="add-tag-val" placeholder="Nueva etiqueta…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('tags')}">
-                <button class="btn btn-primary" onclick="addPredefined('tags')"><i data-lucide="plus"></i> Agregar</button>
-              </div>
-              <ul class="predefined-scroll" id="predefined-tags-list"></ul>
+            <div class="pane-subsection-danger">
+              <div class="pane-subsection-title">Peligro</div>
+              <p class="help-note" style="margin-bottom:10px;">Borrá todos tus datos: transacciones, cuentas y listas personalizadas.</p>
+              <button class="btn-danger" onclick="confirmDeleteAllData()">
+                <i data-lucide="trash-2"></i> Borrar todo
+              </button>
             </div>
           </div>
 
@@ -980,32 +1013,172 @@
   </div>
 </div>
 
-<!-- ══════════════ MODAL: Ayuda ══════════════ -->
-<div class="modal-overlay" id="help-modal">
-  <div class="modal-card" style="max-width:460px;">
-    <div class="modal-head">
-      <span class="modal-title">¿Cómo funciona Wallet?</span>
-      <button class="modal-close" onclick="closeHelpModal()"><i data-lucide="x"></i></button>
+<!-- ══════════════ MODAL: Bienvenida ══════════════ -->
+<div class="modal-overlay" id="welcome-modal">
+  <div class="modal-card" style="max-width:480px;">
+    <div class="modal-head welcome-head">
+      <div class="welcome-title-wrap">
+        <i data-lucide="sparkles" class="welcome-title-icon"></i>
+        <span class="modal-title welcome-title">¡Bienvenido a Wallet!</span>
+      </div>
+      <button class="modal-close" onclick="closeWelcomeModal()"><i data-lucide="x"></i></button>
     </div>
-    <div class="modal-body help-body">
-      <div class="help-section">
-        <div class="help-section-title">Cuentas</div>
-        <p><strong>Líquidas:</strong> efectivo o débito — es el dinero que tenés disponible. El balance se actualiza automáticamente al sumar tus transacciones.</p>
-        <p><strong>Tarjetas de crédito:</strong> registran deudas. Al agregar un gasto con tarjeta, el saldo se vuelve más negativo (debés más).</p>
+    <div class="modal-body welcome-body">
+      <div class="welcome-intro">
+        <p>Wallet te ayuda a llevar el control de tus finanzas personales de forma simple y visual.</p>
       </div>
-      <div class="help-section">
-        <div class="help-section-title">Cobertura</div>
-        <p><strong>Cobertura líquida</strong> = todo tu efectivo disponible + el saldo de tus tarjetas. Este número te dice si tenés suficiente dinero para pagar el total de las tarjetas. Si es positivo, cubrís toda la deuda. Si es negativo, estás en déficit.</p>
-        <p><strong>Cobertura proyectada</strong> = lo mismo + los préstamos que tenés a cobrar. Es una visión optimista de lo que tendrías si cobraras todas las deudas pendientes.</p>
+
+      <div class="welcome-step">
+        <div class="welcome-step-num">1</div>
+        <div class="welcome-step-content">
+          <div class="welcome-step-title">Creá una cuenta</div>
+          <p>Andá a <strong>Ajustes → Cuentas</strong> y agregá tu cuenta bancaria, billetera virtual o tarjeta de crédito. Definí el saldo inicial y el tipo.</p>
+        </div>
       </div>
-      <div class="help-section">
-        <div class="help-section-title">Transacciones</div>
-        <p>Usá <strong>Gasto</strong> / <strong>Ingreso</strong> para indicar si es dinero que sale o entra. Podés etiquetar con <strong>etiquetas</strong> y asignar una <strong>categoría</strong> para llevar un mejor control. También podés marcar un gasto como <strong>préstamo a cobrar</strong> si vos pagaste pero alguien te lo debe.</p>
+
+      <div class="welcome-step">
+        <div class="welcome-step-num">2</div>
+        <div class="welcome-step-content">
+          <div class="welcome-step-title">Registrá tus movimientos</div>
+          <p>Agregá gastos e ingresos con fecha, categoría y etiquetas. Podés importar extractos bancarios con IA o desde un archivo CSV.</p>
+        </div>
       </div>
-      <div class="help-section">
-        <div class="help-section-title">Dashboard</div>
-        <p>Mostra un resumen del mes actual: ingresos vs gastos, las categorías donde más gastás, la cobertura de tus deudas y la actividad más reciente.</p>
+
+      <div class="welcome-step">
+        <div class="welcome-step-num">3</div>
+        <div class="welcome-step-content">
+          <div class="welcome-step-title">Explorá el Dashboard</div>
+          <p>Visualizá ingresos vs gastos, las categorías donde más gastás, tu cobertura financiera y la evolución en el tiempo.</p>
+        </div>
       </div>
+
+      <div class="welcome-features">
+        <div class="welcome-feature">
+          <i data-lucide="wallet" style="width:16px;height:16px;"></i>
+          <span>Cuentas líquidas y tarjetas</span>
+        </div>
+        <div class="welcome-feature">
+          <i data-lucide="tags" style="width:16px;height:16px;"></i>
+          <span>Etiquetas y categorías</span>
+        </div>
+        <div class="welcome-feature">
+          <i data-lucide="bar-chart-3" style="width:16px;height:16px;"></i>
+          <span>Dashboard mensual</span>
+        </div>
+        <div class="welcome-feature">
+          <i data-lucide="download" style="width:16px;height:16px;"></i>
+          <span>Backup de datos</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary w-full" onclick="closeWelcomeModal();openFloatingAccountCreator('liquid')" style="margin-top:4px;">
+        <i data-lucide="rocket" style="width:15px;height:15px;"></i>
+        ¡Crear mi primera cuenta!
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Crear cuenta flotante ══════════════ -->
+<div class="modal-overlay" id="acc-floating-modal">
+  <div class="modal-card" style="max-width:340px;">
+    <div class="modal-head">
+      <span class="modal-title">Nueva cuenta</span>
+      <button class="modal-close" onclick="closeFloatingAccountCreator()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <form onsubmit="createAccountFromFloating(event)">
+        <div class="form-group">
+          <label class="form-label">Nombre</label>
+          <input type="text" id="acc-f-name" placeholder="Ej. Visa Santander, Efectivo" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select id="acc-f-type" onchange="toggleAccountClosingFieldsFloating(this.value)" required style="padding-right:28px;">
+              <option value="">Tipo de cuenta</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Saldo inicial</label>
+            <input type="number" step="0.01" id="acc-f-balance" value="0.00" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moneda</label>
+          <select id="acc-f-currency" required style="padding-right:28px;">
+            <option value="UYU">UYU Peso uruguayo</option>
+            <option value="ARS">ARS Peso argentino</option>
+            <option value="USD">USD Dólar</option>
+            <option value="EUR">EUR Euro</option>
+          </select>
+        </div>
+        <div class="closing-fields" id="cc-f-closing-fields" style="display:none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Día de cierre</label>
+              <input type="number" id="acc-f-close-day" min="1" max="31" placeholder="20">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Día de vencimiento</label>
+              <input type="number" id="acc-f-due-day" min="1" max="31" placeholder="30">
+            </div>
+          </div>
+          <div class="cc-note">Los días de cierre y vencimiento se usan para calcular la deuda del período activo.</div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" style="margin-top:10px;">Crear cuenta</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Editar cuenta ══════════════ -->
+<div class="modal-overlay" id="acc-edit-modal">
+  <div class="modal-card" style="max-width:340px;">
+    <div class="modal-head">
+      <span class="modal-title">Editar cuenta</span>
+      <button class="modal-close" onclick="closeEditAccountModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <form onsubmit="saveAccountEdit(event)">
+        <input type="hidden" id="acc-edit-id">
+        <div class="form-group">
+          <label class="form-label">Nombre</label>
+          <input type="text" id="acc-edit-name" placeholder="Nombre de la cuenta" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select id="acc-edit-type" onchange="toggleAccountClosingFieldsEdit(this.value)" required style="padding-right:28px;"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Moneda</label>
+            <select id="acc-edit-currency" required style="padding-right:28px;">
+              <option value="ARS">ARS Peso argentino</option>
+              <option value="USD">USD Dólar</option>
+              <option value="EUR">EUR Euro</option>
+              <option value="UYU">UYU Peso uruguayo</option>
+            </select>
+          </div>
+        </div>
+        <div class="closing-fields" id="cc-edit-closing-fields" style="display:none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Día de cierre</label>
+              <input type="number" id="acc-edit-close-day" min="1" max="31" placeholder="20">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Día de vencimiento</label>
+              <input type="number" id="acc-edit-due-day" min="1" max="31" placeholder="30">
+            </div>
+          </div>
+          <div class="cc-note">Los días de cierre y vencimiento se usan para calcular la deuda del período activo.</div>
+        </div>
+        <div class="modal-foot" style="padding:12px 0 0; border-top:1px solid var(--border); margin-top:8px;">
+          <button type="button" class="btn" onclick="closeEditAccountModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

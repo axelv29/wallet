@@ -8,7 +8,11 @@ let _importBackupData = null;
 
 // Predefinidos originales (para saber qué es default)
 const DEFAULT_PREDEFINED = {
-  payees: ['Leo', 'Escaramuza', 'Rocío', 'Nati', 'Tienda Inglesa', 'El Tío', 'Supermercado Coto'],
+  payees: [],
+  account_types: [
+    { id: 'liquid', label: 'Líquida (Efectivo / Débito)', isDefault: true },
+    { id: 'credit_card', label: 'Tarjeta de crédito', isDefault: true },
+  ],
   categories: [
     { name: 'Saldo inicial', icon: 'banknote' },
     { name: 'Supermercado', icon: 'shopping-cart' },
@@ -193,6 +197,13 @@ function confirmImportBackup() {
             if (!state.predefined.payees.includes(p)) state.predefined.payees.push(p);
           });
         }
+        if (d.predefined.account_types) {
+          d.predefined.account_types.forEach(t => {
+            if (!state.predefined.account_types.find(x => x.id === t.id)) {
+              state.predefined.account_types.push({ ...t });
+            }
+          });
+        }
         if (d.predefined.categories) {
           d.predefined.categories.forEach(c => {
             const name = typeof c === 'string' ? c : c.name;
@@ -233,6 +244,7 @@ function confirmDeleteAllData() {
   const txCount = state.transactions.length;
   const accCount = state.accounts.length;
   const extraPayees = state.predefined.payees.filter(p => !DEFAULT_PREDEFINED.payees.includes(p)).length;
+  const extraAccTypes = (state.predefined.account_types || []).filter(t => !t.isDefault).length;
   const extraCategories = state.predefined.categories.filter(c => {
     const name = typeof c === 'string' ? c : c.name;
     return !DEFAULT_PREDEFINED.categories.find(d => (typeof d === 'string' ? d : d.name) === name);
@@ -243,6 +255,7 @@ function confirmDeleteAllData() {
   if (txCount) parts.push(`${txCount} transacciones`);
   if (accCount) parts.push(`${accCount} cuentas`);
   if (extraPayees) parts.push(`${extraPayees} beneficiarios personalizados`);
+  if (extraAccTypes) parts.push(`${extraAccTypes} tipos de cuenta personalizados`);
   if (extraCategories) parts.push(`${extraCategories} categorías personalizadas`);
   if (extraTags) parts.push(`${extraTags} etiquetas personalizadas`);
 
@@ -260,6 +273,7 @@ function deleteAllData() {
   state.transactions = [];
   state.accounts = [];
   state.predefined.payees = [...DEFAULT_PREDEFINED.payees];
+  state.predefined.account_types = DEFAULT_PREDEFINED.account_types.map(t => ({ ...t }));
   state.predefined.categories = DEFAULT_PREDEFINED.categories.map(c => ({ ...c }));
   state.predefined.tags = [...DEFAULT_PREDEFINED.tags];
 

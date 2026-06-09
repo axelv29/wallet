@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initColumnResize();
   initCatIconPicker();
   initCsvDropzone();
+  showWelcomeOnFirstVisit();
 
   // Re-draw charts on resize
   let _resizeTimer;
@@ -401,6 +402,77 @@ function openAccountCreator(type) {
   }
   // Focus the name input
   setTimeout(() => document.getElementById('acc-name')?.focus(), 100);
+}
+
+// ── FLOATING ACCOUNT CREATOR ──────────────────────────────────
+function openFloatingAccountCreator(type) {
+  document.getElementById('acc-floating-modal').classList.add('open');
+  const typeEl = document.getElementById('acc-f-type');
+  if (type && typeEl) {
+    typeEl.value = type;
+    toggleAccountClosingFieldsFloating(type);
+  } else if (typeEl) {
+    typeEl.value = 'liquid';
+    toggleAccountClosingFieldsFloating('liquid');
+  }
+  lucide.createIcons();
+  setTimeout(() => document.getElementById('acc-f-name')?.focus(), 100);
+}
+
+function closeFloatingAccountCreator() {
+  document.getElementById('acc-floating-modal').classList.remove('open');
+}
+
+function toggleAccountClosingFieldsFloating(type) {
+  const el = document.getElementById('cc-f-closing-fields');
+  if (el) el.style.display = type === 'credit_card' ? 'block' : 'none';
+}
+
+function createAccountFromFloating(event) {
+  event.preventDefault();
+  const name     = document.getElementById('acc-f-name').value.trim();
+  const type     = document.getElementById('acc-f-type').value;
+  const balance  = parseFloat(document.getElementById('acc-f-balance').value) || 0;
+  const currency = document.getElementById('acc-f-currency').value || 'ARS';
+
+  const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
+  if (type === 'credit_card') {
+    newAcc.card_closing_day = parseInt(document.getElementById('acc-f-close-day').value) || 1;
+    newAcc.card_due_day     = parseInt(document.getElementById('acc-f-due-day').value)   || 10;
+  }
+
+  state.accounts.push(newAcc);
+  saveData('accounts');
+
+  if (balance !== 0) {
+    state.transactions.unshift({
+      id: 'tx-init-' + Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      account_id: newAcc.id,
+      payee: 'Saldo inicial',
+      category_name: 'Saldo inicial',
+      amount: balance,
+      notes: '',
+      tags: [],
+      is_receivable: false,
+      due_date: ''
+    });
+    saveData('transactions');
+  }
+
+  // Reset form
+  document.getElementById('acc-f-name').value    = '';
+  document.getElementById('acc-f-balance').value = '0.00';
+  document.getElementById('acc-f-type').value    = 'liquid';
+  toggleAccountClosingFieldsFloating('liquid');
+  const cd = document.getElementById('acc-f-close-day');
+  const dd = document.getElementById('acc-f-due-day');
+  if (cd) cd.value = '';
+  if (dd) dd.value = '';
+
+  closeFloatingAccountCreator();
+  renderSettingsAccountsList();
+  renderAll();
 }
 
 function createNewAccount(event) {
@@ -980,7 +1052,7 @@ function renderHeaderAndMetrics() {
       let accType = null;
       if (state.currentView === 'type-liquid') accType = 'liquid';
       else if (state.currentView === 'type-credit_card') accType = 'credit_card';
-      addBtn.onclick = () => openAccountCreator(accType);
+      addBtn.onclick = () => openFloatingAccountCreator(accType);
     } else {
       addBtn.style.display = 'none';
     }
@@ -1813,13 +1885,22 @@ function renderDashCharts() {
   }
 }
 
-// ── HELP MODAL ─────────────────────────────────────────────────
-function openHelpModal() {
-  document.getElementById('help-modal').classList.add('open');
+// ── WELCOME MODAL ─────────────────────────────────────────────
+function openWelcomeModal() {
+  document.getElementById('welcome-modal').classList.add('open');
+  lucide.createIcons();
 }
 
-function closeHelpModal() {
-  document.getElementById('help-modal').classList.remove('open');
+function closeWelcomeModal() {
+  document.getElementById('welcome-modal').classList.remove('open');
+}
+
+function showWelcomeOnFirstVisit() {
+  const seen = localStorage.getItem('wallet_welcome_seen');
+  if (!seen) {
+    localStorage.setItem('wallet_welcome_seen', 'true');
+    openWelcomeModal();
+  }
 }
 
 // ── CONFIRM MODAL ──────────────────────────────────────────────
@@ -3300,6 +3381,10 @@ window.deleteTransaction         = deleteTransaction;
 window.markAsCollected           = markAsCollected;
 window.filterTransactions        = filterTransactions;
 window.openAccountCreator        = openAccountCreator;
+window.openFloatingAccountCreator = openFloatingAccountCreator;
+window.closeFloatingAccountCreator = closeFloatingAccountCreator;
+window.toggleAccountClosingFieldsFloating = toggleAccountClosingFieldsFloating;
+window.createAccountFromFloating  = createAccountFromFloating;
 window.openImportModal           = openImportModal;
 window.closeImportModal          = closeImportModal;
 window.openGeminiImportModal     = openGeminiImportModal;
@@ -3309,8 +3394,9 @@ window.processImportWithGemini   = processImportWithGemini;
 window.confirmImportedTransactions = confirmImportedTransactions;
 window.updateImportedTx          = updateImportedTx;
 window.renderTransactions        = renderTransactions;
-window.openHelpModal             = openHelpModal;
-window.closeHelpModal            = closeHelpModal;
+window.openWelcomeModal          = openWelcomeModal;
+window.closeWelcomeModal         = closeWelcomeModal;
+window.showWelcomeOnFirstVisit   = showWelcomeOnFirstVisit;
 window.resolveConfirm            = resolveConfirm;
 window.toggleTxSelection         = toggleTxSelection;
 window.toggleSelectAll           = toggleSelectAll;

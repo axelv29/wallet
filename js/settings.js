@@ -7,7 +7,7 @@
 
 // ── SETTINGS PANE SWITCHING ───────────────────────────────────
 function switchSettingsPane(name) {
-  const panes = ['general', 'accounts', 'payees', 'categories', 'tags'];
+  const panes = ['general', 'apariencia', 'accounts', 'listas', 'sistema'];
   panes.forEach(p => {
     const pane = document.getElementById('spane-' + p);
     const btn  = document.getElementById('snav-' + p);
@@ -15,8 +15,12 @@ function switchSettingsPane(name) {
     if (btn)  btn.classList.toggle('active', p === name);
   });
 
-  if (name === 'accounts') renderSettingsAccountsList();
-  if (['payees', 'categories', 'tags'].includes(name)) renderPredefinedLists();
+  if (name === 'accounts') {
+    renderSettingsAccountsList();
+    renderAccountTypesList();
+    populateAccountTypeSelects();
+  }
+  if (name === 'listas') renderPredefinedLists();
 }
 
 // ── GENERAL SETTINGS ──────────────────────────────────────────
@@ -51,6 +55,77 @@ function openAccountCreator(type) {
   }
   // Focus the name input
   setTimeout(() => document.getElementById('acc-name')?.focus(), 100);
+}
+
+// ── FLOATING ACCOUNT CREATOR ──────────────────────────────────
+function openFloatingAccountCreator(type) {
+  document.getElementById('acc-floating-modal').classList.add('open');
+  const typeEl = document.getElementById('acc-f-type');
+  if (type && typeEl) {
+    typeEl.value = type;
+    toggleAccountClosingFieldsFloating(type);
+  } else if (typeEl) {
+    typeEl.value = '';
+    toggleAccountClosingFieldsFloating('');
+  }
+  lucide.createIcons();
+  setTimeout(() => document.getElementById('acc-f-name')?.focus(), 100);
+}
+
+function closeFloatingAccountCreator() {
+  document.getElementById('acc-floating-modal').classList.remove('open');
+}
+
+function toggleAccountClosingFieldsFloating(type) {
+  const el = document.getElementById('cc-f-closing-fields');
+  if (el) el.style.display = type === 'credit_card' ? 'block' : 'none';
+}
+
+function createAccountFromFloating(event) {
+  event.preventDefault();
+  const name     = document.getElementById('acc-f-name').value.trim();
+  const type     = document.getElementById('acc-f-type').value;
+  const balance  = parseFloat(document.getElementById('acc-f-balance').value) || 0;
+  const currency = document.getElementById('acc-f-currency').value || 'ARS';
+
+  const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
+  if (type === 'credit_card') {
+    newAcc.card_closing_day = parseInt(document.getElementById('acc-f-close-day').value) || 1;
+    newAcc.card_due_day     = parseInt(document.getElementById('acc-f-due-day').value)   || 10;
+  }
+
+  state.accounts.push(newAcc);
+  saveData('accounts');
+
+  if (balance !== 0) {
+    state.transactions.unshift({
+      id: 'tx-init-' + Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      account_id: newAcc.id,
+      payee: 'Saldo inicial',
+      category_name: 'Saldo inicial',
+      amount: balance,
+      notes: '',
+      tags: [],
+      is_receivable: false,
+      due_date: ''
+    });
+    saveData('transactions');
+  }
+
+  // Reset form
+  document.getElementById('acc-f-name').value    = '';
+  document.getElementById('acc-f-balance').value = '0.00';
+  document.getElementById('acc-f-type').value    = '';
+  toggleAccountClosingFieldsFloating('');
+  const cd = document.getElementById('acc-f-close-day');
+  const dd = document.getElementById('acc-f-due-day');
+  if (cd) cd.value = '';
+  if (dd) dd.value = '';
+
+  closeFloatingAccountCreator();
+  renderSettingsAccountsList();
+  renderAll();
 }
 
 function createNewAccount(event) {
@@ -116,15 +191,19 @@ function renderSettingsAccountsList() {
   state.accounts.forEach(acc => {
     const accCur = acc.currency || settingsCur;
     const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
+    const typeLabel = getAccountTypeLabel(acc.type);
     const item = document.createElement('div');
     item.className = 'account-list-item';
     item.style.cursor = 'pointer';
     item.innerHTML = `
       <div class="acc-list-info">
         <span class="acc-list-name">${acc.name}</span>
-        <span class="acc-list-type">${acc.type === 'credit_card' ? 'Tarjeta de crédito' : 'Cuenta líquida'}${acc.card_closing_day ? ' · cierra día ' + acc.card_closing_day : ''}${curLabel}</span>
+        <span class="acc-list-type">${typeLabel}${acc.card_closing_day ? ' · cierra día ' + acc.card_closing_day : ''}${curLabel}</span>
       </div>
-      <button class="delete-btn" onclick="event.stopPropagation();removeAccount('${acc.id}')"><i data-lucide="trash-2"></i></button>
+      <span class="acc-list-actions">
+        <button class="delete-btn" onclick="event.stopPropagation();openEditAccountModal('${acc.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        <button class="delete-btn" onclick="event.stopPropagation();removeAccount('${acc.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      </span>
     `;
     item.addEventListener('click', () => filterTransactions(acc.id));
     container.appendChild(item);
@@ -135,6 +214,62 @@ function renderSettingsAccountsList() {
 function toggleAccountClosingFields(type) {
   const el = document.getElementById('cc-closing-fields');
   if (el) el.style.display = type === 'credit_card' ? 'block' : 'none';
+}
+
+// ── EDIT ACCOUNT MODAL ──────────────────────────────────────
+function openEditAccountModal(accId) {
+  const acc = state.accounts.find(a => a.id === accId);
+  if (!acc) return;
+  document.getElementById('acc-edit-id').value = acc.id;
+  document.getElementById('acc-edit-name').value = acc.name;
+  document.getElementById('acc-edit-currency').value = acc.currency || state.settings.currency || 'ARS';
+  document.getElementById('acc-edit-close-day').value = acc.card_closing_day || '';
+  document.getElementById('acc-edit-due-day').value = acc.card_due_day || '';
+  // Populate type select
+  const typeEl = document.getElementById('acc-edit-type');
+  const types = state.predefined.account_types || [];
+  typeEl.innerHTML = '';
+  types.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.label;
+    typeEl.appendChild(opt);
+  });
+  typeEl.value = acc.type;
+  toggleAccountClosingFieldsEdit(acc.type);
+  document.getElementById('acc-edit-modal').classList.add('open');
+  lucide.createIcons();
+  setTimeout(() => document.getElementById('acc-edit-name')?.focus(), 100);
+}
+
+function closeEditAccountModal() {
+  document.getElementById('acc-edit-modal').classList.remove('open');
+}
+
+function toggleAccountClosingFieldsEdit(type) {
+  const el = document.getElementById('cc-edit-closing-fields');
+  if (el) el.style.display = type === 'credit_card' ? 'block' : 'none';
+}
+
+function saveAccountEdit(event) {
+  event.preventDefault();
+  const id = document.getElementById('acc-edit-id').value;
+  const acc = state.accounts.find(a => a.id === id);
+  if (!acc) return;
+  acc.name = document.getElementById('acc-edit-name').value.trim();
+  acc.type = document.getElementById('acc-edit-type').value;
+  acc.currency = document.getElementById('acc-edit-currency').value;
+  if (acc.type === 'credit_card') {
+    acc.card_closing_day = parseInt(document.getElementById('acc-edit-close-day').value) || null;
+    acc.card_due_day = parseInt(document.getElementById('acc-edit-due-day').value) || null;
+  } else {
+    delete acc.card_closing_day;
+    delete acc.card_due_day;
+  }
+  saveData('accounts');
+  closeEditAccountModal();
+  renderSettingsAccountsList();
+  renderAll();
 }
 
 // ── CATEGORY ICON PICKER ─────────────────────────────────
@@ -299,4 +434,98 @@ function removePredefined(type, item) {
   state.predefined[type] = state.predefined[type].filter(i => i !== item);
   saveData('predefined');
   renderPredefinedLists();
+}
+
+// ── ACCOUNT TYPES MANAGEMENT ────────────────────────────────
+function renderAccountTypesList() {
+  const ul = document.getElementById('predefined-account-types-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+  const types = state.predefined.account_types || [];
+  types.forEach(t => {
+    const li = document.createElement('li');
+    const accountsUsing = state.accounts.filter(a => a.type === t.id).length;
+    const usageLabel = accountsUsing > 0 ? ` · ${accountsUsing} cuenta${accountsUsing > 1 ? 's' : ''}` : '';
+    li.innerHTML = `
+      <span>
+        <span class="acc-type-label">${t.label}</span>
+        ${t.isDefault ? '<span class="acc-type-badge">Por defecto</span>' : '<span class="acc-type-usage">' + usageLabel + '</span>'}
+      </span>
+      <span class="acc-type-actions">
+        ${!t.isDefault ? `<button class="delete-btn" onclick="event.stopPropagation();editAccountType('${t.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        <button class="delete-btn" onclick="event.stopPropagation();removeAccountType('${t.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>` : ''}
+      </span>
+    `;
+    ul.appendChild(li);
+  });
+  lucide.createIcons();
+}
+
+function addAccountType() {
+  const input = document.getElementById('add-acc-type-val');
+  const val = input.value.trim();
+  if (!val) return;
+  const types = state.predefined.account_types || [];
+  if (types.some(t => t.label.toLowerCase() === val.toLowerCase())) return;
+  const id = 'custom_' + Date.now();
+  types.push({ id, label: val, isDefault: false });
+  state.predefined.account_types = types;
+  saveData('predefined');
+  input.value = '';
+  renderAccountTypesList();
+  populateAccountTypeSelects();
+}
+
+function removeAccountType(typeId) {
+  const types = state.predefined.account_types || [];
+  const t = types.find(t => t.id === typeId);
+  if (!t || t.isDefault) return;
+  const accountsUsing = state.accounts.filter(a => a.type === typeId);
+  if (accountsUsing.length > 0) {
+    showConfirm(
+      `El tipo "${t.label}" está siendo usado en ${accountsUsing.length} cuenta${accountsUsing.length > 1 ? 's' : ''}. No se puede eliminar mientras haya cuentas de este tipo.`,
+      { title: 'Eliminar tipo de cuenta', confirmText: 'Entendido', danger: false }
+    );
+    return;
+  }
+  state.predefined.account_types = types.filter(t => t.id !== typeId);
+  saveData('predefined');
+  renderAccountTypesList();
+  populateAccountTypeSelects();
+}
+
+function editAccountType(typeId) {
+  const types = state.predefined.account_types || [];
+  const t = types.find(t => t.id === typeId);
+  if (!t || t.isDefault) return;
+  const newName = prompt('Editar nombre del tipo de cuenta:', t.label);
+  if (newName === null) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  if (types.some(x => x.id !== typeId && x.label.toLowerCase() === trimmed.toLowerCase())) return;
+  t.label = trimmed;
+  saveData('predefined');
+  renderAccountTypesList();
+  populateAccountTypeSelects();
+  renderSettingsAccountsList();
+}
+
+function populateAccountTypeSelects() {
+  const selects = [document.getElementById('acc-type'), document.getElementById('acc-f-type')];
+  const types = state.predefined.account_types || [];
+  selects.forEach(sel => {
+    if (!sel) return;
+    const currentVal = sel.value;
+    const isFloating = sel.id === 'acc-f-type';
+    sel.innerHTML = isFloating ? '<option value="">Tipo de cuenta</option>' : '';
+    types.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.label;
+      sel.appendChild(opt);
+    });
+    if (currentVal && types.some(t => t.id === currentVal)) {
+      sel.value = currentVal;
+    }
+  });
 }

@@ -87,6 +87,31 @@ function renderSidebar() {
   if (listLiquid) state.accounts.filter(a => a.type === 'liquid').forEach(acc => listLiquid.appendChild(makeItem(acc)));
   if (listCredit) state.accounts.filter(a => a.type === 'credit_card').forEach(acc => listCredit.appendChild(makeItem(acc)));
 
+  // Render custom type sections
+  const customContainer = document.getElementById('sidebar-custom-types-container');
+  if (customContainer) {
+    customContainer.innerHTML = '';
+    const defaultTypes = ['liquid', 'credit_card'];
+    const customTypes = (state.predefined.account_types || []).filter(t => !defaultTypes.includes(t.id));
+    customTypes.forEach(t => {
+      const accounts = state.accounts.filter(a => a.type === t.id);
+      const group = document.createElement('div');
+      group.className = 'sidebar-section-group';
+      const typeId = t.id;
+      group.innerHTML = `
+        <div class="sidebar-header-row">
+          <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('${typeId}');}else{filterTransactions('type-${typeId}');}">${t.label}</span>
+          <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('${typeId}')" title="Añadir cuenta"><i data-lucide="plus"></i></button>
+        </div>
+        <ul class="account-list" id="sidebar-${typeId}-list"></ul>
+      `;
+      customContainer.appendChild(group);
+      const list = group.querySelector('.account-list');
+      accounts.forEach(acc => list.appendChild(makeItem(acc)));
+    });
+    lucide.createIcons();
+  }
+
   // Net worth
   const balances  = calculateBalances();
   const netWorth  = balances.liquid + balances.receivables + balances.credit_card;
@@ -107,6 +132,17 @@ function renderSidebar() {
     isMulti ? liquidIds.every(id => selSet.has(id)) && liquidIds.length > 0 : state.currentView === 'type-liquid');
   document.getElementById('sidebar-credit-list')?.closest('.sidebar-section-group')?.querySelector('.section-filter-label')?.classList.toggle('active',
     isMulti ? creditIds.every(id => selSet.has(id)) && creditIds.length > 0 : state.currentView === 'type-credit_card');
+
+  // Active states for custom types
+  const defaultTypes = ['liquid', 'credit_card'];
+  (state.predefined.account_types || []).filter(t => !defaultTypes.includes(t.id)).forEach(t => {
+    const typeIds = state.accounts.filter(a => a.type === t.id).map(a => a.id);
+    const section = document.getElementById('sidebar-' + t.id + '-list')?.closest('.sidebar-section-group');
+    if (section) {
+      section.querySelector('.section-filter-label')?.classList.toggle('active',
+        isMulti ? typeIds.every(id => selSet.has(id)) && typeIds.length > 0 : state.currentView === 'type-' + t.id);
+    }
+  });
 }
 
 function filterTransactions(viewId) {
@@ -192,6 +228,10 @@ function renderHeaderAndMetrics() {
     } else if (type === 'credit_card') {
       title = 'Tarjetas de crédito';
       subtitle = 'Deuda y consumo · ' + formatCurrency(bal.credit_card);
+    } else {
+      const typeLabel = getAccountTypeLabel(type);
+      title = typeLabel;
+      subtitle = 'Cuentas de este tipo · ' + formatCurrency(bal[type] || 0);
     }
   } else if (state.currentView === 'all') {
     const bal = calculateBalances();
@@ -215,7 +255,7 @@ function renderHeaderAndMetrics() {
       title    = acc.name;
       subtitle = acc.type === 'credit_card'
         ? `Tarjeta · cierre día ${acc.card_closing_day || '—'} · vencimiento día ${acc.card_due_day || '—'}${curLabel}`
-        : 'Cuenta líquida' + curLabel;
+        : getAccountTypeLabel(acc.type) + curLabel;
     }
   }
 
@@ -229,9 +269,8 @@ function renderHeaderAndMetrics() {
     if (state.currentView === 'all' || state.currentView.startsWith('type-')) {
       addBtn.style.display = '';
       let accType = null;
-      if (state.currentView === 'type-liquid') accType = 'liquid';
-      else if (state.currentView === 'type-credit_card') accType = 'credit_card';
-      addBtn.onclick = () => openAccountCreator(accType);
+      if (state.currentView.startsWith('type-')) accType = state.currentView.replace('type-', '');
+      addBtn.onclick = () => openFloatingAccountCreator(accType);
     } else {
       addBtn.style.display = 'none';
     }

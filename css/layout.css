@@ -187,6 +187,41 @@
   margin-left: auto;
 }
 
+.sidebar-add-account-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--text-lo);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.sidebar-add-account-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sidebar-add-account-btn:hover {
+  color: var(--accent);
+}
+
+.sidebar-add-account-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+.sidebar-add-account-btn:hover {
+  color: var(--accent);
+}
+
 /* ── Section headers (consistent) ────────────────────────── */
 .section-filter-label {
   cursor: pointer;
@@ -465,29 +500,63 @@
 .search-box {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: var(--text-lo);
+  position: relative;
 }
 
-.search-box svg {
+.search-box-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--text-lo);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.search-box-btn:hover {
+  background: var(--bg-raised);
+  color: var(--text-hi);
+  border-color: var(--text-lo);
+}
+
+.search-box-btn svg {
   width: 14px;
   height: 14px;
-  flex-shrink: 0;
 }
 
-.search-box input {
-  border: none;
-  background: none;
+.search-box .search-input-wrap {
+  display: none;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.search-box.expanded .search-input-wrap {
+  display: flex;
+}
+
+.search-box .search-input-wrap input {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-root);
   outline: none;
-  padding: 0;
-  width: 150px;
+  padding: 0 10px;
+  height: 28px;
+  width: 200px;
   font-size: 12.5px;
   color: var(--text-hi);
   font-family: var(--font-ui);
 }
 
-.search-box input::placeholder {
+.search-box .search-input-wrap input::placeholder {
   color: var(--text-lo);
+}
+
+.search-box .search-input-wrap input:focus {
+  border-color: var(--accent);
 }
 
 /* ── FILTER COUNT BADGE ─────────────────────────────────── */

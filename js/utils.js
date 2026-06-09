@@ -5,6 +5,19 @@
 //  isTxInPeriod(), _tagColor(), getEditOptions().
 // ═══════════════════════════════════════════════════════════════════════
 
+// ── ACCOUNT TYPE HELPERS ──────────────────────────────────
+function getAccountTypeLabel(typeId) {
+  const types = state.predefined?.account_types || [];
+  const found = types.find(t => t.id === typeId);
+  return found ? found.label : typeId;
+}
+
+function isDefaultType(typeId) {
+  const types = state.predefined?.account_types || [];
+  const found = types.find(t => t.id === typeId);
+  return found ? !!found.isDefault : false;
+}
+
 // ── UTILITIES ─────────────────────────────────────────────────
 function formatCurrency(value) {
   const cur = state.settings.currency || 'ARS';
@@ -77,7 +90,11 @@ function calculateBalances(accountIds) {
       const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
       const val = (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
       if (acc.type === 'liquid')      balances.liquid      += val;
-      if (acc.type === 'credit_card') balances.credit_card += val;
+      else if (acc.type === 'credit_card') balances.credit_card += val;
+      else {
+        if (!balances[acc.type]) balances[acc.type] = 0;
+        balances[acc.type] += val;
+      }
     }
     if (tx.is_receivable) {
       const acc = state.accounts.find(a => a.id === tx.account_id);

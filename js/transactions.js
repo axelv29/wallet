@@ -1147,6 +1147,75 @@ function startInlineEdit(cell, txId, field, type, options) {
   }
 }
 
+// ── SORT ────────────────────────────────────────────────────
+function toggleSort(column) {
+  if (state.sortColumn === column) {
+    state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.sortColumn = column;
+    state.sortDirection = column === 'date' ? 'desc' : 'asc';
+  }
+  renderTransactions();
+}
+
+function sortTransactions(arr) {
+  const col = state.sortColumn;
+  const dir = state.sortDirection === 'asc' ? 1 : -1;
+
+  return arr.sort((a, b) => {
+    let va, vb;
+    switch (col) {
+      case 'date':
+        va = a.date || '';
+        vb = b.date || '';
+        return dir * va.localeCompare(vb);
+      case 'account': {
+        const accA = state.accounts.find(ac => ac.id === a.account_id);
+        const accB = state.accounts.find(ac => ac.id === b.account_id);
+        va = accA ? accA.name : '';
+        vb = accB ? accB.name : '';
+        break;
+      }
+      case 'payee':
+        va = a.payee || '';
+        vb = b.payee || '';
+        break;
+      case 'notes':
+        va = a.notes || '';
+        vb = b.notes || '';
+        break;
+      case 'tags':
+        va = (a.tags || []).join(', ');
+        vb = (b.tags || []).join(', ');
+        break;
+      case 'category':
+        va = a.category_name || '';
+        vb = b.category_name || '';
+        break;
+      case 'amount':
+        return dir * ((Math.abs(a.amount) || 0) - (Math.abs(b.amount) || 0));
+      default:
+        return 0;
+    }
+    return dir * va.localeCompare(vb);
+  });
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('.col-sortable').forEach(th => {
+    const col = th.dataset.sort;
+    const arrow = th.querySelector('.sort-arrow');
+    if (col === state.sortColumn) {
+      th.classList.add('sort-active');
+      th.classList.toggle('sort-desc', state.sortDirection === 'desc');
+      if (arrow) arrow.textContent = state.sortDirection === 'asc' ? '↑' : '↓';
+    } else {
+      th.classList.remove('sort-active', 'sort-desc');
+      if (arrow) arrow.textContent = '';
+    }
+  });
+}
+
 // ── RENDER TABLE ─────────────────────────────────────────────
 function renderTransactions() {
   const tbody  = document.getElementById('tx-table-body');
@@ -1250,6 +1319,8 @@ function renderTransactions() {
           || (tx.category_name || '').toLowerCase().includes(search);
     });
   }
+
+  sortTransactions(filtered);
 
   // Separate present/future
   const today   = new Date().toISOString().split('T')[0];
@@ -1423,6 +1494,7 @@ function renderTransactions() {
 
   updateSelectAllCheckbox();
   updateSelectionBar();
+  updateSortIndicators();
   lucide.createIcons();
 }
 

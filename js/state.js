@@ -9,7 +9,11 @@ let state = {
   accounts: [],
   transactions: [],
   predefined: {
-    payees: ['Leo', 'Escaramuza', 'Rocío', 'Nati', 'Tienda Inglesa', 'El Tío', 'Supermercado Coto'],
+    payees: [],
+    account_types: [
+      { id: 'liquid', label: 'Líquida (Efectivo / Débito)', isDefault: true },
+      { id: 'credit_card', label: 'Tarjeta de crédito', isDefault: true },
+    ],
     categories: [
       { name: 'Saldo inicial', icon: 'banknote' },
       { name: 'Supermercado', icon: 'shopping-cart' },
@@ -40,6 +44,8 @@ let state = {
   editingTxId: null,
   selectedTxIds: new Set(),
   tableFilters: [],
+  sortColumn: 'date',
+  sortDirection: 'desc',
 
 };
 
@@ -101,6 +107,14 @@ function loadData() {
     const hasSinAsignar = state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === 'Sin asignar');
     if (!hasSinAsignar) {
       state.predefined.categories.push({ name: 'Sin asignar', icon: 'circle-dashed' });
+      saveData('predefined');
+    }
+    // Ensure account_types exists (migration for older presets)
+    if (!state.predefined.account_types) {
+      state.predefined.account_types = [
+        { id: 'liquid', label: 'Líquida (Efectivo / Débito)', isDefault: true },
+        { id: 'credit_card', label: 'Tarjeta de crédito', isDefault: true },
+      ];
       saveData('predefined');
     }
   } else {

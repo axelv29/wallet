@@ -88,37 +88,105 @@
 .compact-table table.ledger td select { height: 26px; font-size: 11.5px; padding: 3px 6px; }
 
 /* ═══════════════════════════════════════════════════════════
-   HELP MODAL
+   WELCOME / ONBOARDING MODAL
    ═══════════════════════════════════════════════════════════ */
-.help-body {
+.welcome-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-.help-section { }
-
-.help-section-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-  margin-bottom: 6px;
-}
-
-.help-section p {
-  font-size: 12px;
+.welcome-intro p {
+  font-size: 13px;
   line-height: 1.6;
   color: var(--text-mid);
-  margin-bottom: 6px;
+  text-align: center;
+  margin: 0;
 }
 
-.help-section p:last-child { margin-bottom: 0; }
+.welcome-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
 
-.help-section strong {
-  color: var(--text-hi);
+.welcome-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.welcome-step-content {
+  flex: 1;
+}
+
+.welcome-step-title {
+  font-size: 12.5px;
   font-weight: 600;
+  color: var(--text-hi);
+  margin-bottom: 2px;
+}
+
+.welcome-step-content p {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-mid);
+  margin: 0;
+}
+
+.welcome-step-content strong {
+  color: var(--text-hi);
+}
+
+.welcome-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px 0 2px;
+}
+
+.welcome-feature {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-mid);
+}
+
+.welcome-feature svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.welcome-head {
+  padding-bottom: 8px !important;
+}
+
+.welcome-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.welcome-title-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.welcome-title {
+  font-size: 17px !important;
+  font-weight: 700 !important;
 }
 
 

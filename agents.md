@@ -36,7 +36,7 @@
 - Prefijo `tx-` para elementos del modal de transacciones
 - Prefijo `acc-` para elementos de creación de cuentas
 - Prefijo `set-` para elementos de settings
-- Prefijo `spane-` / `snav-` para settings panes / navegación
+- Prefijo `spane-` / `snav-` para settings panes / navegación (panes: `general`, `apariencia`, `accounts`, `listas`, `sistema`)
 - Prefijo `metric-` para indicadores de cobertura
 - Prefijo `sidebar-` para elementos del sidebar
 
@@ -152,7 +152,7 @@
 - `calculateBalances()` — Devuelve `{ liquid, credit_card, receivables }` (convertidos a moneda de settings)
 - `filterTransactions(viewId)` — Cambia vista (`'all'` | `'receivables'` | account id)
 - `showView(name)` — Cambia entre `'main'` y `'settings'`
-- `switchSettingsPane(name)` — Cambia entre `'general'` | `'accounts'` | `'payees'` | `'categories'` | `'tags'` | `'currency'`
+- `switchSettingsPane(name)` — Cambia entre `'general'` | `'apariencia'` | `'accounts'` | `'listas'` | `'sistema'` | `'currency'`
 - `toggleTheme()` — Alterna light/dark (busca primer esquema del modo opuesto)
 - `setColorScheme(name)` — Establece esquema de color (auto-detecta modo light/dark)
 - `syncThemeUI()` — Sincroniza tarjetas del picker de temas

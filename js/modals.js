@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  modals.js — Modales de ayuda y confirmación
-//  Contiene: openHelpModal(), closeHelpModal(), showConfirm(),
+//  Contiene: openWelcomeModal(), closeWelcomeModal(), showConfirm(),
 //  resolveConfirm(), y la variable _confirmResolve.
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -25,11 +25,20 @@ function resolveConfirm(val) {
   if (_confirmResolve) { _confirmResolve(val); _confirmResolve = null; }
 }
 
-// ── HELP MODAL ─────────────────────────────────────────────────
-function openHelpModal() {
-  document.getElementById('help-modal').classList.add('open');
+// ── WELCOME MODAL ─────────────────────────────────────────────
+function openWelcomeModal() {
+  document.getElementById('welcome-modal').classList.add('open');
+  lucide.createIcons();
 }
 
-function closeHelpModal() {
-  document.getElementById('help-modal').classList.remove('open');
+function closeWelcomeModal() {
+  document.getElementById('welcome-modal').classList.remove('open');
+}
+
+function showWelcomeOnFirstVisit() {
+  const seen = localStorage.getItem('wallet_welcome_seen');
+  if (!seen) {
+    localStorage.setItem('wallet_welcome_seen', 'true');
+    openWelcomeModal();
+  }
 }

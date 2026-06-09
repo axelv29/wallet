@@ -111,6 +111,40 @@ table.ledger thead th {
 table.ledger thead th.r { text-align: right; }
 table.ledger thead th.c { text-align: center; }
 
+/* Sortable headers */
+.col-sortable {
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.col-sortable:hover {
+  color: var(--text-hi);
+}
+
+.sort-arrow {
+  display: inline-block;
+  margin-left: 1.5px;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.15s;
+  vertical-align: middle;
+  line-height: 1;
+  color: var(--text-lo);
+}
+
+.col-sortable:hover .sort-arrow {
+  opacity: 0.5;
+}
+
+.col-sortable.sort-active .sort-arrow {
+  opacity: 1;
+}
+
+.col-sort-label {
+  pointer-events: none;
+}
+
 table.ledger tbody tr {
   border-bottom: 1px solid var(--border);
   transition: background 0.08s;

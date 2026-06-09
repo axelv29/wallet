@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initCatIconPicker();
     initCsvDropzone();
     initTagsTrash();
+    showWelcomeOnFirstVisit();
+    populateAccountTypeSelects();
   });
 
   // Re-draw charts on resize
@@ -67,6 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const pcal = document.getElementById('period-calendar-popup');
     if (pcal && pcal.classList.contains('open') && !e.target.closest('.modal-card') && !e.target.closest('.period-option-custom')) {
       closePeriodCalendar();
+    }
+    const searchBox = document.getElementById('search-box');
+    if (searchBox && searchBox.classList.contains('expanded') && !searchBox.contains(e.target)) {
+      collapseSearchBox();
     }
   });
 });
@@ -163,7 +169,7 @@ function applyTheme() {
   }
 
   const icon = isDark ? 'moon' : 'sun';
-  ['theme-icon', 'theme-icon-settings', 'theme-icon-dash'].forEach(id => {
+  ['theme-icon', 'theme-icon-settings', 'theme-icon-dash', 'theme-icon-settings-mini'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.setAttribute('data-lucide', icon);
   });
@@ -175,13 +181,46 @@ function syncThemeUI() {
   document.querySelectorAll('.scheme-card').forEach(card => {
     card.classList.toggle('active', card.dataset.scheme === scheme);
   });
+  const themeLabel = document.getElementById('theme-label');
+  if (themeLabel) themeLabel.textContent = state.settings.theme === 'dark' ? 'Oscuro' : 'Claro';
 }
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────
+function toggleSearchBox() {
+  const box = document.getElementById('search-box');
+  const input = document.getElementById('tx-search-input');
+  if (!box || !input) return;
+
+  if (box.classList.contains('expanded')) {
+    box.classList.remove('expanded');
+    input.value = '';
+    renderTransactions();
+  } else {
+    box.classList.add('expanded');
+    input.focus();
+  }
+}
+
+function collapseSearchBox() {
+  const box = document.getElementById('search-box');
+  const input = document.getElementById('tx-search-input');
+  if (!box || !input) return;
+  box.classList.remove('expanded');
+}
+
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.getElementById('confirm-modal').classList.contains('open')) {
       resolveConfirm(false);
+      return;
+    }
+    if (e.key === 'Escape' && document.getElementById('search-box')?.classList.contains('expanded')) {
+      collapseSearchBox();
+      return;
+    }
+    if (e.ctrlKey && e.key === 'k') {
+      e.preventDefault();
+      toggleSearchBox();
       return;
     }
     if (document.activeElement.id === 'tx-amount') {
@@ -268,8 +307,21 @@ window.saveCurrencySettings      = saveCurrencySettings;
 window.toggleAccountClosingFields = toggleAccountClosingFields;
 window.createNewAccount          = createNewAccount;
 window.removeAccount             = removeAccount;
+window.openFloatingAccountCreator = openFloatingAccountCreator;
+window.closeFloatingAccountCreator = closeFloatingAccountCreator;
+window.toggleAccountClosingFieldsFloating = toggleAccountClosingFieldsFloating;
+window.createAccountFromFloating  = createAccountFromFloating;
+window.openEditAccountModal       = openEditAccountModal;
+window.closeEditAccountModal      = closeEditAccountModal;
+window.toggleAccountClosingFieldsEdit = toggleAccountClosingFieldsEdit;
+window.saveAccountEdit            = saveAccountEdit;
 window.addPredefined             = addPredefined;
 window.removePredefined          = removePredefined;
+window.addAccountType           = addAccountType;
+window.removeAccountType        = removeAccountType;
+window.editAccountType          = editAccountType;
+window.populateAccountTypeSelects = populateAccountTypeSelects;
+window.renderAccountTypesList   = renderAccountTypesList;
 window.initColumnResize          = initColumnResize;
 window.toggleCatIconPicker       = toggleCatIconPicker;
 window.selectCatIcon             = selectCatIcon;
@@ -292,8 +344,9 @@ window.openImportModal           = openImportModal;
 window.closeImportModal          = closeImportModal;
 window.onAiFileSelected          = onAiFileSelected;
 window.renderTransactions        = renderTransactions;
-window.openHelpModal             = openHelpModal;
-window.closeHelpModal            = closeHelpModal;
+window.openWelcomeModal          = openWelcomeModal;
+window.closeWelcomeModal         = closeWelcomeModal;
+window.showWelcomeOnFirstVisit   = showWelcomeOnFirstVisit;
 window.resolveConfirm            = resolveConfirm;
 window.toggleTxSelection         = toggleTxSelection;
 window.toggleSelectAll           = toggleSelectAll;
@@ -339,3 +392,6 @@ window.onImportBackupFile       = onImportBackupFile;
 window.confirmImportBackup      = confirmImportBackup;
 window.confirmDeleteAllData     = confirmDeleteAllData;
 window.clearBackupDates         = clearBackupDates;
+window.toggleSearchBox          = toggleSearchBox;
+window.collapseSearchBox        = collapseSearchBox;
+window.toggleSort               = toggleSort;
