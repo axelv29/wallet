@@ -288,3 +288,94 @@ function deleteAllData() {
   saveData('predefined');
   renderAll();
 }
+
+// ── DELETE SELECTED ──────────────────────────────────────────
+function renderDeleteCounts() {
+  const txCount = state.transactions.length;
+  const accCount = state.accounts.length;
+  const extraPayees = state.predefined.payees.filter(p => !DEFAULT_PREDEFINED.payees.includes(p)).length;
+  const extraAccTypes = (state.predefined.account_types || []).filter(t => !t.isDefault).length;
+  const extraCategories = state.predefined.categories.filter(c => {
+    const name = typeof c === 'string' ? c : c.name;
+    return !DEFAULT_PREDEFINED.categories.find(d => (typeof d === 'string' ? d : d.name) === name);
+  }).length;
+  const extraTags = state.predefined.tags.filter(t => {
+    const name = typeof t === 'string' ? t : t.name;
+    return !DEFAULT_PREDEFINED.tags.includes(name);
+  }).length;
+
+  const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n ? `(${n})` : ''; };
+  setCount('del-count-tx', txCount);
+  setCount('del-count-acc', accCount);
+  setCount('del-count-pay', extraPayees);
+  setCount('del-count-cat', extraCategories);
+  setCount('del-count-tag', extraTags);
+  setCount('del-count-act', extraAccTypes);
+}
+
+function toggleDeleteAll() {
+  const all = document.getElementById('del-all');
+  document.querySelectorAll('.del-item').forEach(cb => { cb.checked = all.checked; });
+}
+
+function syncDeleteCheckboxes() {
+  const items = document.querySelectorAll('.del-item');
+  const all = document.getElementById('del-all');
+  all.checked = [...items].every(cb => cb.checked);
+  all.indeterminate = [...items].some(cb => cb.checked) && !all.checked;
+}
+
+function confirmDeleteSelected() {
+  const checked = [...document.querySelectorAll('.del-item:checked')].map(cb => cb.value);
+  if (!checked.length) return;
+
+  const labels = {
+    transactions: 'transacciones',
+    accounts: 'cuentas',
+    payees: 'beneficiarios personalizados',
+    categories: 'categorías personalizadas',
+    tags: 'etiquetas personalizadas',
+    account_types: 'tipos de cuenta personalizados',
+  };
+
+  const parts = checked.map(k => labels[k] || k);
+  const text = parts.length === 1 ? parts[0] : parts.slice(0, -1).join(', ') + ' y ' + parts[parts.length - 1];
+
+  showConfirm(
+    `Esto eliminará permanentemente: ${text}. Las listas predeterminadas se mantendrán intactas. Esta acción no se puede deshacer.`,
+    { title: 'Borrar datos', confirmText: 'Borrar', danger: true }
+  ).then(ok => {
+    if (ok) deleteSelectedData(checked);
+  });
+}
+
+function deleteSelectedData(items) {
+  if (items.includes('transactions')) state.transactions = [];
+  if (items.includes('accounts')) state.accounts = [];
+  if (items.includes('payees')) {
+    state.predefined.payees = [...DEFAULT_PREDEFINED.payees];
+    state.transactions.forEach(t => {
+      if (!DEFAULT_PREDEFINED.payees.includes(t.payee) && t.payee !== 'Sin asignar') t.payee = 'Sin asignar';
+    });
+  }
+  if (items.includes('categories')) {
+    state.predefined.categories = DEFAULT_PREDEFINED.categories.map(c => ({ ...c }));
+    state.transactions.forEach(t => {
+      const isDefault = DEFAULT_PREDEFINED.categories.some(d => (typeof d === 'string' ? d : d.name) === t.category_name);
+      if (!isDefault && t.category_name !== 'Sin asignar') t.category_name = 'Sin asignar';
+    });
+  }
+  if (items.includes('tags')) {
+    state.predefined.tags = [...DEFAULT_PREDEFINED.tags];
+    state.transactions.forEach(t => { if (t.tags) t.tags = []; });
+  }
+  if (items.includes('account_types')) {
+    state.predefined.account_types = DEFAULT_PREDEFINED.account_types.map(t => ({ ...t }));
+  }
+
+  saveData('accounts');
+  saveData('transactions');
+  saveData('predefined');
+  renderDeleteCounts();
+  renderAll();
+}

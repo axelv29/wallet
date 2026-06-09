@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData();
   setupSearchableSelects();
   setupKeyboardShortcuts();
+  initCustomThemeUI();
   const lastView = localStorage.getItem('wallet_last_view') || 'dashboard';
   const lastFilter = localStorage.getItem('wallet_last_filter');
 
@@ -134,16 +135,253 @@ const SCHEMES = {
   'ocean':        { mode: 'light' },
   'forest':       { mode: 'light' },
   'lavender':     { mode: 'light' },
+  'slate':        { mode: 'light' },
   'default-dark': { mode: 'dark' },
   'midnight':     { mode: 'dark' },
   'ember':        { mode: 'dark' },
 };
 
+// ── CUSTOM THEME ──────────────────────────────────────────────
+function hexToHsl(hex) {
+  hex = hex.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r, g, b;
+  if (h < 60)       { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else              { r = c; g = 0; b = x; }
+  const toHex = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+
+function hslString(h, s, l) { return `hsl(${h} ${s}% ${l}%)`; }
+
+function luminance(hex) {
+  hex = hex.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+  const toLinear = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+function contrastRatio(hex1, hex2) {
+  const l1 = luminance(hex1), l2 = luminance(hex2);
+  const lighter = Math.max(l1, l2), darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function mixWithBlack(hex, t) {
+  hex = hex.replace('#', '');
+  const r = Math.round(parseInt(hex.substring(0, 2), 16) * (1 - t));
+  const g = Math.round(parseInt(hex.substring(2, 4), 16) * (1 - t));
+  const b = Math.round(parseInt(hex.substring(4, 6), 16) * (1 - t));
+  return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
+}
+
+function buildCustomPalette(tableBase, sidebarBase, accentBase) {
+  const tb = hexToHsl(tableBase), sb = hexToHsl(sidebarBase), ab = hexToHsl(accentBase);
+  const css = {};
+  const set = (name, val) => { css[name] = val; };
+
+  // Root background: user's exact table color
+  set('--bg-root', `#${tableBase.replace('#','')}`);
+  // Surface: user's exact sidebar color
+  set('--bg-surface', `#${sidebarBase.replace('#','')}`);
+  // Raised: slightly darker than root (table headers, hover)
+  set('--bg-raised', hslToHex(tb.h, tb.s, Math.max(tb.l - 5, 10)));
+  // Sunken: slightly darker than surface
+  set('--bg-sunken', hslToHex(sb.h, sb.s, Math.max(sb.l - 5, 10)));
+
+  // Borders: slightly darker than sidebar
+  set('--border', hslToHex(sb.h, sb.s, Math.max(sb.l - 8, 15)));
+
+  // Accent: user's exact button color, derive hover/soft
+  set('--accent', `#${accentBase.replace('#','')}`);
+  set('--accent-soft', hslToHex(ab.h, Math.min(ab.s, 50), 95));
+  set('--accent-hover', hslToHex(ab.h, ab.s, Math.max(ab.l - 12, 20)));
+  set('--border-focus', `#${accentBase.replace('#','')}`);
+
+  // Text: fixed dark grays (subtle, not black)
+  set('--text-hi',  '#1a1a1f');
+  set('--text-mid', '#52525b');
+  set('--text-lo',  '#7c7c87');
+  set('--text-inv', '#ffffff');
+
+  // Semantic colors from accent hue
+  set('--positive', hslToHex(145, 60, 35));
+  set('--positive-bg', hslToHex(145, 65, 93));
+  set('--negative', hslToHex(0, 70, 45));
+  set('--negative-bg', hslToHex(0, 75, 95));
+  set('--warn', hslToHex(40, 80, 40));
+  set('--warn-bg', hslToHex(40, 80, 94));
+
+  // Tags: derive from accent hue
+  set('--tag-a-bg', hslToHex((ab.h + 330) % 360, 60, 95));
+  set('--tag-a-tx', hslToHex((ab.h + 330) % 360, 55, 30));
+  set('--tag-b-bg', hslToHex((ab.h + 50) % 360, 70, 94));
+  set('--tag-b-tx', hslToHex((ab.h + 50) % 360, 60, 28));
+  set('--tag-c-bg', hslToHex((ab.h + 200) % 360, 55, 94));
+  set('--tag-c-tx', hslToHex((ab.h + 200) % 360, 50, 30));
+
+  // Shadows
+  set('--shadow-card', '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)');
+  set('--shadow-pop', '0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)');
+
+  return css;
+}
+
+let _customStyleEl = null;
+
+function applyCustomTheme() {
+  const cc = state.settings.customColors;
+  if (!cc) return;
+  const css = buildCustomPalette(cc.table, cc.sidebar, cc.button);
+  if (!_customStyleEl) {
+    _customStyleEl = document.createElement('style');
+    _customStyleEl.id = 'custom-theme-vars';
+    document.head.appendChild(_customStyleEl);
+  }
+  const vars = Object.entries(css).map(([k, v]) => `  ${k}: ${v};`).join('\n');
+  _customStyleEl.textContent = `body {\n${vars}\n}`;
+}
+
+function saveCustomThemeColors() {
+  const tableI = document.getElementById('custom-color-table');
+  const sidebarI = document.getElementById('custom-color-sidebar');
+  const buttonI = document.getElementById('custom-color-button');
+  if (!tableI || !sidebarI || !buttonI) return;
+  state.settings.customColors = {
+    table: tableI.value,
+    sidebar: sidebarI.value,
+    button: buttonI.value,
+  };
+  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
+  applyCustomTheme();
+}
+
+function initCustomThemeUI() {
+  const grid = document.querySelector('.scheme-grid');
+  if (!grid) return;
+
+  // Add custom scheme card
+  const card = document.createElement('button');
+  card.className = 'scheme-card';
+  card.dataset.scheme = 'custom';
+  card.onclick = () => setColorScheme('custom');
+  card.innerHTML = `
+    <div class="scheme-dots scheme-card-custom">
+      <span class="scheme-dot-custom" id="custom-dot-table" style="background:#ffffff"></span>
+      <span class="scheme-dot-custom" id="custom-dot-sidebar" style="background:#f0eeeb"></span>
+      <span class="scheme-dot-custom" id="custom-dot-button" style="background:#5b52f5"></span>
+    </div>
+    <span class="scheme-name">Personalizado</span>`;
+  grid.appendChild(card);
+
+  // Add custom theme section below the grid
+  const subsection = grid.closest('.pane-subsection');
+  if (!subsection) return;
+  const section = document.createElement('div');
+  section.className = 'custom-theme-section';
+  section.id = 'custom-theme-section';
+  section.innerHTML = `
+    <div class="pane-subsection-title" style="border-left-color:var(--accent);">Colores personalizados</div>
+    <div class="custom-theme-colors">
+      <div class="custom-color-item">
+        <div class="custom-color-top">
+          <input type="color" class="custom-color-input" id="custom-color-table" value="#ffffff">
+          <div>
+            <div class="custom-color-label">Tabla / Fondo</div>
+            <div class="custom-color-hex" id="custom-hex-table">#ffffff</div>
+          </div>
+        </div>
+        <div class="custom-color-desc">Color base del área de contenido y la tabla de transacciones</div>
+      </div>
+      <div class="custom-color-item">
+        <div class="custom-color-top">
+          <input type="color" class="custom-color-input" id="custom-color-sidebar" value="#f0eeeb">
+          <div>
+            <div class="custom-color-label">Barra lateral</div>
+            <div class="custom-color-hex" id="custom-hex-sidebar">#f0eeeb</div>
+          </div>
+        </div>
+        <div class="custom-color-desc">Color base de la barra lateral, headers y toolbar</div>
+      </div>
+      <div class="custom-color-item">
+        <div class="custom-color-top">
+          <input type="color" class="custom-color-input" id="custom-color-button" value="#5b52f5">
+          <div>
+            <div class="custom-color-label">Botones / Acento</div>
+            <div class="custom-color-hex" id="custom-hex-button">#5b52f5</div>
+          </div>
+        </div>
+        <div class="custom-color-desc">Color de botones, links e interacciones</div>
+      </div>
+    </div>
+    <div class="custom-theme-actions">
+      <button class="btn btn-primary" onclick="saveCustomThemeColors()">Aplicar colores</button>
+      <span class="custom-theme-note">Los demás colores se generan automáticamente a partir de estos tres</span>
+    </div>`;
+  subsection.appendChild(section);
+
+  // Load saved colors
+  const cc = state.settings.customColors;
+  if (cc) {
+    const t = document.getElementById('custom-color-table');
+    const s = document.getElementById('custom-color-sidebar');
+    const b = document.getElementById('custom-color-button');
+    if (t) t.value = cc.table || '#ffffff';
+    if (s) s.value = cc.sidebar || '#f0eeeb';
+    if (b) b.value = cc.button || '#5b52f5';
+  }
+
+  // Live hex display + live preview
+  ['table', 'sidebar', 'button'].forEach(key => {
+    const input = document.getElementById('custom-color-' + key);
+    const hex = document.getElementById('custom-hex-' + key);
+    const dot = document.getElementById('custom-dot-' + key);
+    if (input) {
+      input.addEventListener('input', () => {
+        if (hex) hex.textContent = input.value;
+        if (dot) dot.style.background = input.value;
+      });
+    }
+  });
+}
+
 function toggleTheme() {
   const current = state.settings.colorScheme || 'default';
+  if (current === 'custom') {
+    // Custom is light; toggle to first dark scheme
+    const target = Object.entries(SCHEMES).find(([, v]) => v.mode === 'dark');
+    if (target) setColorScheme(target[0]);
+    return;
+  }
   const currentMode = SCHEMES[current]?.mode || 'light';
   const newMode = currentMode === 'light' ? 'dark' : 'light';
-  // Find first scheme with the target mode
   const target = Object.entries(SCHEMES).find(([, v]) => v.mode === newMode);
   if (target) setColorScheme(target[0]);
 }
@@ -163,10 +401,19 @@ function applyTheme() {
 
   // Remove all scheme classes, then apply current
   Object.keys(SCHEMES).forEach(s => document.body.classList.remove('scheme-' + s));
+  document.body.classList.remove('scheme-custom');
   const scheme = state.settings.colorScheme || 'default';
   if (scheme !== 'default') {
     document.body.classList.add('scheme-' + scheme);
   }
+
+  // Apply custom theme CSS variables
+  if (scheme === 'custom') applyCustomTheme();
+  else if (_customStyleEl) _customStyleEl.textContent = '';
+
+  // Show/hide custom theme section
+  const cs = document.getElementById('custom-theme-section');
+  if (cs) cs.classList.toggle('visible', scheme === 'custom');
 
   const icon = isDark ? 'moon' : 'sun';
   ['theme-icon', 'theme-icon-settings', 'theme-icon-dash', 'theme-icon-settings-mini'].forEach(id => {
@@ -251,9 +498,34 @@ function initColumnResize() {
   const table = document.querySelector('.ledger');
   if (!table) return;
 
+  const COL_WIDTHS_KEY = 'wallet_col_widths';
+
+  // Restore saved widths
+  try {
+    const saved = JSON.parse(localStorage.getItem(COL_WIDTHS_KEY));
+    if (saved) {
+      table.querySelectorAll('thead th.col-resizable').forEach((th, i) => {
+        const key = th.dataset.sort || 'col-' + i;
+        if (saved[key]) {
+          th.style.width = saved[key];
+          th.style.maxWidth = 'none';
+        }
+      });
+    }
+  } catch (_) {}
+
   const handles = table.querySelectorAll('.col-resize-handle');
   let startX = 0, startW = 0, th = null, handle = null;
   let didDrag = false;
+
+  function saveWidths() {
+    const widths = {};
+    table.querySelectorAll('thead th.col-resizable').forEach((th, i) => {
+      const key = th.dataset.sort || 'col-' + i;
+      widths[key] = th.style.width;
+    });
+    localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(widths));
+  }
 
   function onMouseDown(e) {
     handle = e.currentTarget;
@@ -292,6 +564,7 @@ function initColumnResize() {
     if (didDrag) {
       state._justResized = true;
       setTimeout(() => { state._justResized = false; }, 0);
+      saveWidths();
     }
 
     startX = 0; startW = 0; th = null; handle = null; didDrag = false;
@@ -341,8 +614,8 @@ window.toggleReceivableFields     = toggleReceivableFields;
 window.toggleInstallmentFields    = toggleInstallmentFields;
 window.onInstallmentCheck          = onInstallmentCheck;
 window.onAccountChangeInModal      = onAccountChangeInModal;
-window.stepInstallment             = stepInstallment;
 window.updateInstallmentPreview    = updateInstallmentPreview;
+window.getInstallmentMonthOffset   = getInstallmentMonthOffset;
 window.handleTransactionSubmit   = handleTransactionSubmit;
 window.deleteTransaction         = deleteTransaction;
 window.markAsCollected           = markAsCollected;
@@ -382,6 +655,7 @@ window.onCsvFileSelected         = onCsvFileSelected;
 window.reparseCsv                = reparseCsv;
 window.onCsvMappingChange        = onCsvMappingChange;
 window.confirmCsvImport          = confirmCsvImport;
+window.downloadCsvFromAi        = downloadCsvFromAi;
 window.loadSampleCsv             = loadSampleCsv;
 window.resetCsvImport            = resetCsvImport;
 window.togglePeriodDropdown      = togglePeriodDropdown;
@@ -401,7 +675,11 @@ window.closeImportBackupModal   = closeImportBackupModal;
 window.onImportBackupFile       = onImportBackupFile;
 window.confirmImportBackup      = confirmImportBackup;
 window.confirmDeleteAllData     = confirmDeleteAllData;
+window.toggleDeleteAll          = toggleDeleteAll;
+window.syncDeleteCheckboxes     = syncDeleteCheckboxes;
+window.confirmDeleteSelected    = confirmDeleteSelected;
 window.clearBackupDates         = clearBackupDates;
 window.toggleSearchBox          = toggleSearchBox;
 window.collapseSearchBox        = collapseSearchBox;
 window.toggleSort               = toggleSort;
+window.saveCustomThemeColors    = saveCustomThemeColors;

@@ -95,6 +95,7 @@
 - `scheme-ocean` / `scheme-forest` / `scheme-lavender` / `scheme-midnight` / `scheme-ember` / `scheme-default-dark` — Esquemas de color en body
 - `scheme-grid` / `scheme-card` — Grid de esquemas de color (modificador `.active`)
 - `scheme-dots` / `scheme-dot` — Puntos de color en tarjetas de esquema
+- `scheme-card-custom` / `scheme-dot-custom` — Tarjeta y puntos del esquema personalizado
 - `form-row` / `form-row-3` — Filas de formulario
 - `form-group` — Grupo de formulario
 - `delete-btn` — Botón de eliminar genérico
@@ -175,6 +176,10 @@
 - `confirmImportBackup()` — Confirma e ejecuta la importación (reemplazar o agregar)
 - `confirmDeleteAllData()` — Abre modal de confirmación para borrar todos los datos
 - `deleteAllData()` — Ejecuta el borrado: transacciones, cuentas y listas personalizadas
+- `initCustomThemeUI()` — Inicializa la UI del selector de colores personalizado (scheme-card + color pickers)
+- `buildCustomPalette(tableBase, sidebarBase, accentBase)` — Genera toda la paleta CSS desde 3 colores hex
+- `applyCustomTheme()` — Aplica las variables CSS del tema personalizado al body via style tag
+- `saveCustomThemeColors()` — Guarda los colores personalizados en localStorage y aplica el tema
 
 ### Predefinidos editables
 ```js
@@ -339,6 +344,7 @@ state.predefined = {
 - [x] Métricas de cobertura líquida y proyectada
 - [x] Cálculo de patrimonio neto
 - [x] Tema claro/oscuro con esquemas de color (default, ocean, forest, lavender, default-dark, midnight, ember)
+- [x] Tema personalizado: generador de paleta completa desde 3 colores base (tabla, sidebar, botones)
 - [x] Selectores buscables (payee, categoría)
 - [x] Atajo de teclado: `+`/`-` en campo de monto
 - [x] Importación de extractos con Gemini AI

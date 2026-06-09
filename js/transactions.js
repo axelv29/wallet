@@ -148,9 +148,7 @@ function createTagInput() {
     const name = input.value.trim();
     const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
     if (name && !tagNames.includes(name)) {
-      const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
-      const defaultColor = TAG_COLORS ? TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db' : '#d1d5db';
-      state.predefined.tags.push({ name, color: defaultColor });
+      state.predefined.tags.push({ name, color: getRandomTagColor() });
       saveData('predefined');
     }
     const checked = getCheckedTags();
@@ -200,6 +198,8 @@ function openTransactionModal(txId) {
     toggleReceivableFields(!!tx.is_receivable);
     document.getElementById('tx-due-date').value = tx.due_date || '';
 
+    document.getElementById('tx-is-excluded').checked = !!tx.excluded;
+
     // Installment fields when editing
     const isInst = !!(tx.installment_group && tx.installment_total);
     const instChk = document.getElementById('tx-is-installment');
@@ -231,6 +231,8 @@ function openTransactionModal(txId) {
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = false;
     toggleReceivableFields(false);
+
+    document.getElementById('tx-is-excluded').checked = false;
 
     // Reset installment fields
     document.getElementById('tx-is-installment').checked = false;
@@ -287,18 +289,19 @@ function onAccountChangeInModal() {
 
 function onInstallmentCheck(checked) {
   const editor = document.getElementById('tx-installment-editor');
-  editor.style.display = checked ? 'flex' : 'none';
+  editor.style.display = checked ? 'block' : 'none';
   if (checked) {
     document.getElementById('tx-installment-count').value = '3';
     updateInstallmentPreview();
   }
 }
 
-function stepInstallment(delta) {
-  const input = document.getElementById('tx-installment-count');
-  const val = Math.min(48, Math.max(2, (parseInt(input.value) || 2) + delta));
-  input.value = val;
-  updateInstallmentPreview();
+function getInstallmentMonthOffset(dateVal, accountId) {
+  if (!dateVal || !accountId) return 0;
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc || acc.type !== 'credit_card' || !acc.card_closing_day) return 0;
+  const txDay = new Date(dateVal + 'T12:00:00').getDate();
+  return acc.card_closing_day < txDay ? 1 : 0;
 }
 
 function updateInstallmentPreview() {
@@ -310,6 +313,7 @@ function updateInstallmentPreview() {
   const accId      = document.getElementById('tx-account')?.value;
   const acc        = state.accounts.find(a => a.id === accId);
   const accCur     = acc?.currency || state.settings.currency || 'ARS';
+  const offset     = getInstallmentMonthOffset(dateVal, accId);
 
   if (total >= 2 && rawAmt > 0) {
     const perCuota = rawAmt / total;
@@ -320,47 +324,27 @@ function updateInstallmentPreview() {
 
   // Build timeline dots
   timeline.innerHTML = '';
-  const maxDots = Math.min(total, 10);
-  for (let i = 0; i < maxDots; i++) {
-    if (i > 0) {
-      const conn = document.createElement('div');
-      conn.className = 'inst-connector';
-      timeline.appendChild(conn);
-    }
-    const wrap  = document.createElement('div');
-    wrap.className = 'inst-dot-wrap';
+  for (let i = 0; i < total; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'inst-cell';
     const dot   = document.createElement('div');
     dot.className = 'inst-dot ' + (i === 0 ? 'now' : 'future');
     dot.textContent = i + 1;
     const lbl   = document.createElement('div');
     lbl.className = 'inst-dot-label ' + (i === 0 ? 'now' : '');
-    if (dateVal && i < 6) {
+    if (dateVal) {
       const d = new Date(dateVal + 'T12:00:00');
-      d.setMonth(d.getMonth() + i);
+      d.setMonth(d.getMonth() + i + offset);
       lbl.textContent = d.toLocaleDateString('es-AR', { month: 'short', timeZone: 'UTC' });
     } else if (i === 0) {
       lbl.textContent = 'ahora';
     } else {
       lbl.textContent = '+' + i + 'm';
     }
-    wrap.appendChild(dot);
-    wrap.appendChild(lbl);
-    timeline.appendChild(wrap);
+    cell.appendChild(dot);
+    cell.appendChild(lbl);
+    timeline.appendChild(cell);
   }
-  if (total > 10) {
-    const conn = document.createElement('div');
-    conn.className = 'inst-connector';
-    timeline.appendChild(conn);
-    const more = document.createElement('div');
-    more.className = 'inst-dot-wrap';
-    more.innerHTML = `<div class="inst-dot future" style="font-size:11px;">…</div><div class="inst-dot-label">+${total - 10}</div>`;
-    timeline.appendChild(more);
-  }
-}
-
-function toggleInstallmentFields(checked) {
-  // Legacy stub — kept for backward compat, delegates to new fn
-  onAccountChangeInModal();
 }
 
 function handleTransactionSubmit(event) {
@@ -374,6 +358,7 @@ function handleTransactionSubmit(event) {
   const notes       = document.getElementById('tx-notes').value.trim();
   const isReceivable = document.getElementById('tx-is-receivable').checked;
   const dueDate     = document.getElementById('tx-due-date').value;
+  const isExcluded  = document.getElementById('tx-is-excluded').checked;
 
   if (state._batchEditIds) {
     const activeTags = [];
@@ -428,6 +413,7 @@ function handleTransactionSubmit(event) {
       tx.tags = activeTags;
       tx.is_receivable = isReceivable;
       tx.due_date = isReceivable ? dueDate : '';
+      tx.excluded = isExcluded;
     }
   } else {
     const isInst = document.getElementById('tx-is-installment').checked;
@@ -437,10 +423,11 @@ function handleTransactionSubmit(event) {
       const groupId   = 'ig-' + Date.now();
       const perCuota  = amount / totalCuotas;  // negative amount / N = negative per cuota
       const today     = new Date().toISOString().split('T')[0];
+      const instOffset = getInstallmentMonthOffset(dateVal, accountId);
 
       for (let i = 0; i < totalCuotas; i++) {
         const d = new Date(dateVal + 'T12:00:00');
-        d.setMonth(d.getMonth() + i);
+        d.setMonth(d.getMonth() + i + instOffset);
         const instDate = d.toISOString().split('T')[0];
         const isFuture = instDate > today;
 
@@ -455,6 +442,7 @@ function handleTransactionSubmit(event) {
           tags: activeTags,
           is_receivable: false,
           due_date: '',
+          excluded: isExcluded,
           is_future: isFuture,
           installment_group: groupId,
           installment_total: totalCuotas,
@@ -473,7 +461,8 @@ function handleTransactionSubmit(event) {
         notes,
         tags: activeTags,
         is_receivable: isReceivable,
-        due_date: isReceivable ? dueDate : ''
+        due_date: isReceivable ? dueDate : '',
+        excluded: isExcluded
       });
     }
   }
@@ -967,7 +956,11 @@ function closeInlineEditor(commit) {
 
   if (commit) {
     const rawVal = getValue();
-    const parsed = parser ? parser(rawVal) : rawVal;
+    let parsed = parser ? parser(rawVal) : rawVal;
+    // Si el campo de texto queda vacío, asignar "Sin asignar"
+    if ((field === 'payee' || field === 'category_name') && (!parsed || !parsed.trim())) {
+      parsed = 'Sin asignar';
+    }
     // Comparación flexible para arrays (tags)
     const unchanged = Array.isArray(parsed)
       ? JSON.stringify(parsed) === JSON.stringify(originalValue)
@@ -978,6 +971,15 @@ function closeInlineEditor(commit) {
       if (tx && parsed !== null && parsed !== undefined) {
         tx[field] = parsed;
         saveData('transactions');
+        // Auto-agregar a predefinidos si es nuevo
+        if (field === 'payee' && parsed !== 'Sin asignar' && !state.predefined.payees.includes(parsed)) {
+          state.predefined.payees.push(parsed);
+          saveData('predefined');
+        }
+        if (field === 'category_name' && parsed !== 'Sin asignar' && !state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === parsed)) {
+          state.predefined.categories.push({ name: parsed, icon: 'tag' });
+          saveData('predefined');
+        }
       }
     }
   }
@@ -1037,11 +1039,15 @@ function startInlineEdit(cell, txId, field, type, options) {
     });
 
     if (type === 'text' && options.suggestions) {
+      let _lastSuggestKey = '';
       const openSuggestDD = (filter) => {
         const all = options.suggestions();
         const filtered = filter
           ? all.filter(s => s.toLowerCase().includes(filter.toLowerCase()))
           : all;
+        const key = filtered.join('|');
+        if (key === _lastSuggestKey) return;
+        _lastSuggestKey = key;
         if (!filtered.length) { _closeDD(); return; }
         const dd = _makeListDD(filtered, originalValue, (item) => {
           input.value = item;
@@ -1053,7 +1059,11 @@ function startInlineEdit(cell, txId, field, type, options) {
         _ie.dd = dd;
       };
       input.addEventListener('focus', () => openSuggestDD(input.value));
-      input.addEventListener('input', () => openSuggestDD(input.value));
+      let _suggestTimer = null;
+      input.addEventListener('input', () => {
+        clearTimeout(_suggestTimer);
+        _suggestTimer = setTimeout(() => openSuggestDD(input.value), 280);
+      });
     }
 
     setTimeout(() => { input.focus(); input.select(); }, 0);
@@ -1189,9 +1199,7 @@ function startInlineEdit(cell, txId, field, type, options) {
             if (!current.has(name)) {
               const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
               if (!tagNames.includes(name)) {
-                const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
-                const defaultColor = TAG_COLORS ? TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db' : '#d1d5db';
-                state.predefined.tags.push({ name, color: defaultColor });
+                state.predefined.tags.push({ name, color: getRandomTagColor() });
                 saveData('predefined');
               }
               current.add(name);
@@ -1224,9 +1232,7 @@ function startInlineEdit(cell, txId, field, type, options) {
           if (name && !current.has(name)) {
             const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
             if (!tagNames.includes(name)) {
-              const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
-              const defaultColor = TAG_COLORS ? TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db' : '#d1d5db';
-              state.predefined.tags.push({ name, color: defaultColor });
+              state.predefined.tags.push({ name, color: getRandomTagColor() });
               saveData('predefined');
             }
             current.add(name);
@@ -1504,7 +1510,9 @@ function renderTransactions() {
     const amountClass = isExpense ? 'expense' : 'income';
     const amountTooltip = getConvertedTooltip(tx.amount, accCurrency);
 
-    let payeeCellHtml = `<span class="payee-name">${tx.payee}</span>`;
+    let payeeCellHtml = tx.payee === 'Sin asignar'
+      ? `<span class="payee-name" style="color:var(--text-lo);font-style:italic;">Sin asignar</span>`
+      : `<span class="payee-name">${tx.payee}</span>`;
     let cuotaCellHtml = '<span style="color:var(--text-lo)">—</span>';
     if (tx.installment_total) {
       cuotaCellHtml = `<span class="cuota-badge" title="Total: ${formatAccountCurrency(tx.installment_full_amount, accCurrency)}">${tx.installment_index}/${tx.installment_total}</span>`;
@@ -1534,9 +1542,9 @@ function renderTransactions() {
       <td class="col-account account-cell editable-cell" data-field="account_id" title="Click para editar">${acc ? acc.name : '—'}</td>
       <td class="payee-cell editable-cell" data-field="payee" title="Click para editar">${payeeCellHtml}</td>
       <td class="cuota-cell">${cuotaCellHtml}</td>
-      <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">${notesHtml || '<span style="color:var(--text-lo)">—</span>'}</td>
+      <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">${notesHtml ? notesHtml + (tx.excluded ? ' <i data-lucide="eye-off" class="tx-excluded-icon" title="Excluido del total"></i>' : '') : (tx.excluded ? '<i data-lucide="eye-off" class="tx-excluded-icon" title="Excluido del total"></i>' : '<span style="color:var(--text-lo)">—</span>')}</td>
       <td class="tags-cell editable-cell" data-field="tags" title="Click para editar"><div class="tags-wrap">${tagsHtml}</div></td>
-      <td class="category-cell editable-cell" data-field="category_name" title="Click para editar">${getCategoryIcon(tx.category_name)} ${tx.category_name || 'Otros'}</td>
+      <td class="category-cell editable-cell" data-field="category_name" title="Click para editar">${tx.category_name === 'Sin asignar' ? '<span style="color:var(--text-lo);font-style:italic;">Sin asignar</span>' : getCategoryIcon(tx.category_name) + ' ' + (tx.category_name || 'Otros')}</td>
       <td class="amount-cell ${amountClass} editable-cell" data-field="amount" title="${amountTooltip ? amountTooltip + ' — Click para editar' : 'Click para editar'}">${amountVal}</td>
       <td class="actions-cell">${actionsHtml}</td>
     `;

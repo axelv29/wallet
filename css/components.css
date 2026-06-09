@@ -218,6 +218,24 @@ td.actions-cell {
   white-space: nowrap;
 }
 
+/* ── Transaction excluded indicator ─────────────────────── */
+.tx-excluded-icon {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  color: var(--text-lo);
+  opacity: 0.45;
+  margin-right: 3px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.tx-excluded-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
 /* ── Category icon ─────────────────────────────────────── */
 .cat-icon {
   display: inline-flex;

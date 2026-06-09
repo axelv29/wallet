@@ -204,27 +204,25 @@
 
 /* ── Modal: sección cuotas ─────────────────────────────── */
 .tx-installment-fields {
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-  margin-top: 2px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  gap: 8px;
 }
 
 .installment-toggle-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
 .installment-toggle-label {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12.5px;
-  font-weight: 500;
+  gap: 8px;
+  font-size: 12px;
   color: var(--text-mid);
   cursor: pointer;
   user-select: none;
@@ -242,51 +240,46 @@
 .installment-editor-body {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
 }
 
-.installment-count-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.installment-editor-body .form-group {
+  flex: 1;
 }
 
-.inst-step-btn {
-  width: 28px;
-  height: 32px;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  color: var(--text-mid);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s, color 0.1s;
-  flex-shrink: 0;
-}
-
-.inst-step-btn:hover { background: var(--bg-sunken); color: var(--text-hi); }
-
-.installment-count-row input {
-  width: 64px;
+.installment-editor-body .form-group input[type="number"] {
+  box-sizing: border-box;
+  flex: none;
   text-align: center;
   font-size: 15px;
   font-weight: 600;
+  height: 32px;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.installment-timeline-wrap {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .installment-preview {
+  box-sizing: border-box;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-  padding: 6px 12px;
-  background: var(--bg-raised);
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--bg-root);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  min-width: 120px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  text-align: center;
 }
 
 .inst-preview-label {
@@ -308,21 +301,18 @@
 /* Installment timeline dots */
 .installment-timeline {
   display: flex;
-  align-items: center;
-  gap: 0;
-  overflow-x: auto;
-  padding: 4px 0 2px;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 10px 0 2px;
+  justify-content: center;
 }
 
-.installment-timeline::-webkit-scrollbar { display: none; }
-
-.inst-dot-wrap {
+.inst-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  flex-shrink: 0;
+  min-width: 30px;
 }
 
 .inst-dot {
@@ -335,6 +325,7 @@
   font-size: 9px;
   font-weight: 700;
   flex-shrink: 0;
+  transition: all 0.15s;
 }
 
 .inst-dot.now {
@@ -352,17 +343,10 @@
   font-size: 9px;
   color: var(--text-lo);
   white-space: nowrap;
+  line-height: 1;
 }
 
 .inst-dot-label.now { color: var(--accent); font-weight: 600; }
-
-.inst-connector {
-  height: 1.5px;
-  width: 14px;
-  background: var(--border);
-  flex-shrink: 0;
-  margin-bottom: 14px; /* align with dot center */
-}
 
 /* ── Tabla: columna de cuota ──────────────────────────── */
 .payee-cell .payee-name { display: block; }
@@ -531,6 +515,12 @@ tr.tx-future:hover { opacity: 0.75; }
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text-hi);
+}
+
+.csv-file-info-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .csv-file-info-left svg {

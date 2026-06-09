@@ -39,11 +39,11 @@ function dashGetTxForPeriod() {
   const period = dashGetPeriod();
   let txs;
   if (period.range && (period.range.start || period.range.end)) {
-    txs = state.transactions.filter(tx => isTxInPeriod(tx));
+    txs = state.transactions.filter(tx => !tx.excluded && isTxInPeriod(tx));
   } else {
     txs = state.transactions.filter(tx => {
       const d = new Date(tx.date + 'T00:00:00');
-      return d.getMonth() === period.month && d.getFullYear() === period.year;
+      return !tx.excluded && d.getMonth() === period.month && d.getFullYear() === period.year;
     });
   }
   if (dashState.accounts !== null) {
@@ -607,7 +607,7 @@ function renderDashboard() {
   const recentList = document.getElementById('dash-recent-list');
   if (recentList) {
     recentList.innerHTML = '';
-    let recent = [...state.transactions].filter(tx => !tx.is_future && isTxInPeriod(tx));
+    let recent = [...state.transactions].filter(tx => !tx.is_future && !tx.excluded && isTxInPeriod(tx));
     if (dashState.accounts !== null) {
       const accSet = new Set(dashState.accounts);
       recent = recent.filter(tx => accSet.has(tx.account_id));
@@ -671,7 +671,7 @@ function renderDashCharts() {
         const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
         state.transactions.forEach(tx => {
           const td = new Date(tx.date + 'T00:00:00');
-          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future) {
+          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded) {
             if (accFilter && !accFilter.has(tx.account_id)) return;
             if (tx.amount > 0) inc += tx.amount;
             else exp += Math.abs(tx.amount);
@@ -694,7 +694,7 @@ function renderDashCharts() {
         const accFilter2 = dashState.accounts !== null ? new Set(dashState.accounts) : null;
         state.transactions.forEach(tx => {
           const td = new Date(tx.date + 'T00:00:00');
-          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future) {
+          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded) {
             if (accFilter2 && !accFilter2.has(tx.account_id)) return;
             if (tx.amount > 0) inc += tx.amount;
             else exp += Math.abs(tx.amount);

@@ -579,6 +579,15 @@
                   </div>
                   <span class="scheme-name">Lavender</span>
                 </button>
+                <button class="scheme-card" data-scheme="slate" onclick="setColorScheme('slate')">
+                  <div class="scheme-dots">
+                    <span class="scheme-dot" style="background:#5b52f5"></span>
+                    <span class="scheme-dot" style="background:#ffffff"></span>
+                    <span class="scheme-dot" style="background:#16a34a"></span>
+                    <span class="scheme-dot" style="background:#dc2626"></span>
+                  </div>
+                  <span class="scheme-name">Slate</span>
+                </button>
                 <button class="scheme-card" data-scheme="default-dark" onclick="setColorScheme('default-dark')">
                   <div class="scheme-dots">
                     <span class="scheme-dot" style="background:#7c75f8"></span>
@@ -749,9 +758,46 @@
 
             <div class="pane-subsection-danger">
               <div class="pane-subsection-title">Peligro</div>
-              <p class="help-note" style="margin-bottom:10px;">Borrá todos tus datos: transacciones, cuentas y listas personalizadas.</p>
-              <button class="btn-danger" onclick="confirmDeleteAllData()">
-                <i data-lucide="trash-2"></i> Borrar todo
+              <p class="help-note" style="margin-bottom:10px;">Seleccioná qué querés borrar. Esta acción no se puede deshacer.</p>
+              <div class="delete-options" id="delete-options">
+                <label class="delete-opt">
+                  <input type="checkbox" id="del-all" onchange="toggleDeleteAll()">
+                  <span class="delete-opt-label"><strong>Todo</strong></span>
+                </label>
+                <div class="delete-sep"></div>
+                <label class="delete-opt">
+                  <input type="checkbox" class="del-item" value="transactions" onchange="syncDeleteCheckboxes()">
+                  <span class="delete-opt-label">Transacciones</span>
+                  <span class="delete-opt-count" id="del-count-tx"></span>
+                </label>
+                <label class="delete-opt">
+                  <input type="checkbox" class="del-item" value="accounts" onchange="syncDeleteCheckboxes()">
+                  <span class="delete-opt-label">Cuentas</span>
+                  <span class="delete-opt-count" id="del-count-acc"></span>
+                </label>
+                <label class="delete-opt">
+                  <input type="checkbox" class="del-item" value="payees" onchange="syncDeleteCheckboxes()">
+                  <span class="delete-opt-label">Beneficiarios personalizados</span>
+                  <span class="delete-opt-count" id="del-count-pay"></span>
+                </label>
+                <label class="delete-opt">
+                  <input type="checkbox" class="del-item" value="categories" onchange="syncDeleteCheckboxes()">
+                  <span class="delete-opt-label">Categorías personalizadas</span>
+                  <span class="delete-opt-count" id="del-count-cat"></span>
+                </label>
+                <label class="delete-opt">
+                  <input type="checkbox" class="del-item" value="tags" onchange="syncDeleteCheckboxes()">
+                  <span class="delete-opt-label">Etiquetas personalizadas</span>
+                  <span class="delete-opt-count" id="del-count-tag"></span>
+                </label>
+                <label class="delete-opt">
+                  <input type="checkbox" class="del-item" value="account_types" onchange="syncDeleteCheckboxes()">
+                  <span class="delete-opt-label">Tipos de cuenta personalizados</span>
+                  <span class="delete-opt-count" id="del-count-act"></span>
+                </label>
+              </div>
+              <button class="btn-danger" onclick="confirmDeleteSelected()" style="margin-top:10px;">
+                <i data-lucide="trash-2"></i> Borrar seleccionado
               </button>
             </div>
           </div>
@@ -822,20 +868,20 @@
 
           <div id="tx-installment-editor" style="display:none;">
             <div class="installment-editor-body">
-              <div class="form-group" style="flex:1;">
+              <div class="form-group" style="flex:1; margin-bottom:0;">
                 <label class="form-label">Número de cuotas</label>
-                <div class="installment-count-row">
-                  <button type="button" class="inst-step-btn" onclick="stepInstallment(-1)">−</button>
-                  <input type="number" id="tx-installment-count" min="2" max="48" value="3" oninput="updateInstallmentPreview()">
-                  <button type="button" class="inst-step-btn" onclick="stepInstallment(1)">+</button>
+                <input type="number" id="tx-installment-count" min="2" max="48" value="3" oninput="updateInstallmentPreview()">
+              </div>
+              <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label class="form-label">Por cuota</label>
+                <div class="installment-preview" id="installment-preview">
+                  <span class="inst-preview-val" id="inst-preview-val">—</span>
                 </div>
               </div>
-              <div class="installment-preview" id="installment-preview">
-                <span class="inst-preview-label">Por cuota</span>
-                <span class="inst-preview-val" id="inst-preview-val">—</span>
-              </div>
             </div>
-            <div class="installment-timeline" id="installment-timeline"></div>
+            <div class="installment-timeline-wrap">
+              <div class="installment-timeline" id="installment-timeline"></div>
+            </div>
           </div>
         </div>
 
@@ -857,6 +903,11 @@
         <div class="form-group" style="flex-direction:row; align-items:center; gap:8px; margin-top:4px;">
           <input type="checkbox" id="tx-is-receivable" onchange="toggleReceivableFields(this.checked)" style="width:auto; height:auto;">
           <label for="tx-is-receivable" style="font-size:12px; color:var(--text-mid); cursor:pointer;">Marcar como préstamo a cobrar</label>
+        </div>
+
+        <div class="form-group" style="flex-direction:row; align-items:center; gap:8px; margin-top:2px;">
+          <input type="checkbox" id="tx-is-excluded" style="width:auto; height:auto;">
+          <label for="tx-is-excluded" style="font-size:12px; color:var(--text-mid); cursor:pointer;">Excluir del total</label>
         </div>
 
         <div id="tx-receivable-details" class="receivable-section" style="display:none;">
@@ -923,7 +974,10 @@
             <span id="csv-file-name"></span>
             <span class="csv-file-dims" id="csv-file-dims"></span>
           </div>
-          <button class="btn btn-ghost" onclick="resetCsvImport()"><i data-lucide="refresh-cw"></i> Cambiar archivo</button>
+          <div class="csv-file-info-right">
+            <button class="btn btn-ghost" id="csv-download-ai-btn" style="display:none;" onclick="downloadCsvFromAi()"><i data-lucide="download"></i> Descargar CSV</button>
+            <button class="btn btn-ghost" onclick="resetCsvImport()"><i data-lucide="refresh-cw"></i> Cambiar archivo</button>
+          </div>
         </div>
 
         <!-- Settings row -->

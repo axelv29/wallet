@@ -19,6 +19,7 @@ const CSV_FIELD_OPTIONS = [
   { value: 'category', label: 'Categoría' },
   { value: 'notes', label: 'Notas' },
   { value: 'tags', label: 'Etiquetas' },
+  { value: 'installment', label: 'Cuotas' },
 ];
 
 let csvImportState = {
@@ -64,7 +65,7 @@ function closeImportModal() {
 }
 
 function resetCsvImport() {
-  csvImportState = { rawData: [], rawText: '', isExcel: false, headers: [], mapping: {}, fileName: '', fileDims: '', previewEdits: null };
+  csvImportState = { rawData: [], rawText: '', isExcel: false, headers: [], mapping: {}, fileName: '', fileDims: '', previewEdits: null, fromAi: false };
   document.getElementById('csv-step-upload').style.display = '';
   document.getElementById('csv-step-mapping').style.display = 'none';
   document.getElementById('csv-file-input').value = '';
@@ -73,6 +74,8 @@ function resetCsvImport() {
   if (dropzone) dropzone.style.display = '';
   const aiInput = document.getElementById('csv-ai-file-input');
   if (aiInput) aiInput.value = '';
+  const dlBtn = document.getElementById('csv-download-ai-btn');
+  if (dlBtn) dlBtn.style.display = 'none';
   const aiBtn = document.querySelector('.csv-ai-btn');
   if (aiBtn) { aiBtn.disabled = false; aiBtn.innerHTML = '<i data-lucide="sparkles"></i> Importar con IA'; lucide.createIcons(); }
 }
@@ -198,6 +201,9 @@ function afterParse() {
   document.getElementById('csv-step-mapping').style.display = '';
   document.getElementById('csv-dropzone').style.display = 'none';
 
+  const dlBtn = document.getElementById('csv-download-ai-btn');
+  if (dlBtn) dlBtn.style.display = 'none';
+
   document.getElementById('csv-file-name').textContent = csvImportState.fileName;
   document.getElementById('csv-file-dims').textContent = '· ' + csvImportState.fileDims;
 
@@ -230,6 +236,7 @@ function autoMapColumns() {
     else if (/categoria|category|categ/i.test(header)) map[i] = 'category';
     else if (/nota|note|obs|observacion|comentario/i.test(header)) map[i] = 'notes';
     else if (/etiqueta|tag|tags/i.test(header)) map[i] = 'tags';
+    else if (/cuota|installment|parcela/i.test(header)) map[i] = 'installment';
     else if (/saldo|balance/i.test(header)) map[i] = 'ignore';
     else map[i] = 'ignore';
   });
@@ -366,6 +373,8 @@ function onCsvMappingChange() {
 
   parsed.forEach((tx, idx) => {
     const tr = document.createElement('tr');
+    const isDefaultPayee = tx.payee === 'Sin asignar';
+    const isDefaultCat = tx.category_name === 'Sin asignar';
 
     const tdDate = document.createElement('td');
     const inpDate = document.createElement('input');
@@ -376,25 +385,101 @@ function onCsvMappingChange() {
     tdDate.appendChild(inpDate);
 
     const tdPayee = document.createElement('td');
-    const inpPayee = document.createElement('input');
-    inpPayee.type = 'text';
-    inpPayee.value = tx.payee;
-    inpPayee.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
-    inpPayee.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].payee = inpPayee.value; };
-    tdPayee.appendChild(inpPayee);
+    if (isDefaultPayee) {
+      const span = document.createElement('span');
+      span.textContent = 'Sin asignar';
+      span.style.cssText = 'color:var(--text-lo);font-style:italic;font-size:11.5px;cursor:pointer;';
+      span.onclick = () => {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = '';
+        inp.placeholder = 'Beneficiario…';
+        inp.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+        inp.onchange = () => {
+          const val = inp.value.trim();
+          csvImportState.previewEdits = csvImportState.previewEdits || {};
+          csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {};
+          csvImportState.previewEdits[idx].payee = val || 'Sin asignar';
+          tx.payee = val || 'Sin asignar';
+          tdPayee.innerHTML = '';
+          if (val) {
+            const newInp = document.createElement('input');
+            newInp.type = 'text';
+            newInp.value = val;
+            newInp.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+            newInp.onchange = () => { csvImportState.previewEdits[idx].payee = newInp.value; };
+            tdPayee.appendChild(newInp);
+          } else {
+            const newSpan = document.createElement('span');
+            newSpan.textContent = 'Sin asignar';
+            newSpan.style.cssText = 'color:var(--text-lo);font-style:italic;font-size:11.5px;cursor:pointer;';
+            newSpan.onclick = span.onclick;
+            tdPayee.appendChild(newSpan);
+          }
+        };
+        tdPayee.innerHTML = '';
+        tdPayee.appendChild(inp);
+        inp.focus();
+      };
+      tdPayee.appendChild(span);
+    } else {
+      const inpPayee = document.createElement('input');
+      inpPayee.type = 'text';
+      inpPayee.value = tx.payee;
+      inpPayee.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+      inpPayee.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].payee = inpPayee.value; };
+      tdPayee.appendChild(inpPayee);
+    }
 
     const tdCat = document.createElement('td');
-    const selCat = document.createElement('select');
-    selCat.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
-    cats.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      if (c.toLowerCase() === (tx.category_name || '').toLowerCase()) opt.selected = true;
-      selCat.appendChild(opt);
-    });
-    selCat.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].category_name = selCat.value; };
-    tdCat.appendChild(selCat);
+    if (isDefaultCat) {
+      const span = document.createElement('span');
+      span.textContent = 'Sin asignar';
+      span.style.cssText = 'color:var(--text-lo);font-style:italic;font-size:11.5px;cursor:pointer;';
+      span.onclick = () => {
+        const sel = document.createElement('select');
+        sel.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+        cats.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          sel.appendChild(opt);
+        });
+        sel.onchange = () => {
+          const val = sel.value;
+          csvImportState.previewEdits = csvImportState.previewEdits || {};
+          csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {};
+          csvImportState.previewEdits[idx].category_name = val === 'Sin asignar' ? 'Sin asignar' : val;
+          tx.category_name = val;
+          tdCat.innerHTML = '';
+          if (val !== 'Sin asignar') {
+            const newInp = document.createElement('input');
+            newInp.type = 'text';
+            newInp.readOnly = true;
+            newInp.value = val;
+            newInp.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+            tdCat.appendChild(newInp);
+          } else {
+            const newSpan = document.createElement('span');
+            newSpan.textContent = 'Sin asignar';
+            newSpan.style.cssText = 'color:var(--text-lo);font-style:italic;font-size:11.5px;cursor:pointer;';
+            newSpan.onclick = span.onclick;
+            tdCat.appendChild(newSpan);
+          }
+        };
+        tdCat.innerHTML = '';
+        tdCat.appendChild(sel);
+        sel.focus();
+      };
+      tdCat.appendChild(span);
+    } else {
+      const inpCat = document.createElement('input');
+      inpCat.type = 'text';
+      inpCat.readOnly = true;
+      inpCat.value = tx.category_name;
+      inpCat.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+      tdCat.appendChild(inpCat);
+    }
 
     const tdAmt = document.createElement('td');
     tdAmt.className = 'r ' + (tx.amount < 0 ? 'expense' : 'income');
@@ -434,6 +519,7 @@ function buildTransactionsFromMapping() {
       notes: '',
       tags: [],
       account_id: accountId,
+      installment_info: null,
     };
 
     let hasDate = false, hasPayee = false, hasAmount = false;
@@ -481,12 +567,22 @@ function buildTransactionsFromMapping() {
           tx.tags = val.split(/[,;|]/).map(t => t.trim()).filter(Boolean);
           break;
         }
+        case 'installment': {
+          const inst = parseInstallment(val);
+          if (inst) tx.installment_info = inst;
+          break;
+        }
       }
     });
 
-    if (hasDate && hasPayee && hasAmount && tx.amount !== 0) {
-      tx.payee = toTitleCase(tx.payee);
-      tx.category_name = toTitleCase(tx.category_name);
+    if (hasDate && hasAmount && tx.amount !== 0) {
+      tx.payee = (hasPayee && tx.payee) ? toTitleCase(tx.payee) : 'Sin asignar';
+      tx.category_name = tx.category_name ? toTitleCase(tx.category_name) : 'Sin asignar';
+
+      if (!tx.installment_info) {
+        tx.installment_info = parseInstallment(tx.notes) || parseInstallment(tx.payee);
+      }
+
       results.push(tx);
     }
   });
@@ -518,26 +614,33 @@ function parseDate(val, format) {
     else if (/^\d{2}\/\d{2}\/\d{2}$/.test(val)) parts = val.split('/');
     else if (/^\d{2}-\d{2}-\d{4}$/.test(val)) parts = val.split('-');
     else if (/^\d{2}-\d{2}-\d{2}$/.test(val)) parts = val.split('-');
+    else if (/^\d{2}\.\d{2}\.\d{4}$/.test(val)) parts = val.split('.');
+    else if (/^\d{2}\.\d{2}\.\d{2}$/.test(val)) parts = val.split('.');
     else if (/^\d{4}\/\d{2}\/\d{2}$/.test(val)) parts = val.split('/');
+    else if (/^\d{4}\.\d{2}\.\d{2}$/.test(val)) parts = val.split('.');
     else if (/^\d{8}$/.test(val)) {
       if (val.substring(0, 4) > '1900' && val.substring(0, 4) < '2100') {
         return val.substring(0, 4) + '-' + val.substring(4, 6) + '-' + val.substring(6, 8);
       }
       return val.substring(4, 6) + '-' + val.substring(6, 8) + '-' + val.substring(0, 4);
     }
-    else return val;
+    else {
+      const textMonth = parseTextMonth(val);
+      if (textMonth) return textMonth;
+      return val;
+    }
 
-    if (parts && parts[2].length === 4 && parseInt(parts[2]) > 1900) {
+    if (parts && parts[2] && parts[2].length === 4 && parseInt(parts[2]) > 1900) {
       return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
     }
-    if (parts && parts[2].length === 2) {
+    if (parts && parts[2] && parts[2].length === 2) {
       const y = parseInt(parts[2]) + 2000;
       return y + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
     }
     return val;
   }
 
-  if (format === 'dd/mm/yyyy') {
+  if (format === 'dd/mm/yyyy' || format === 'dd-mm-yyyy' || format === 'dd.mm.yyyy') {
     parts = val.split(/[\/\-\.]/);
     if (parts.length === 3) return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
   }
@@ -560,6 +663,63 @@ function parseDate(val, format) {
   }
 
   return val;
+}
+
+function parseTextMonth(val) {
+  const months = { ene: '01', feb: '02', mar: '03', abr: '04', may: '05', jun: '06', jul: '07', ago: '08', sep: '09', oct: '10', nov: '11', dic: '12',
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
+  const cleaned = val.replace(/\//g, '-').replace(/\./g, '-');
+  const match = cleaned.match(/^(\d{1,2})[\s\-]+([a-zA-Z]{3,})[\s\-]+(\d{2,4})$/);
+  if (match) {
+    const day = match[1].padStart(2, '0');
+    const m = months[match[2].toLowerCase().substring(0, 3)];
+    let year = match[3];
+    if (year.length === 2) year = String(parseInt(year) + 2000);
+    if (m && year.length === 4) return year + '-' + m + '-' + day;
+  }
+  const match2 = cleaned.match(/^([a-zA-Z]{3,})[\s\-]+(\d{1,2})[\s\-]+(\d{2,4})$/);
+  if (match2) {
+    const m = months[match2[1].toLowerCase().substring(0, 3)];
+    const day = match2[2].padStart(2, '0');
+    let year = match2[3];
+    if (year.length === 2) year = String(parseInt(year) + 2000);
+    if (m && year.length === 4) return year + '-' + m + '-' + day;
+  }
+  return null;
+}
+
+function parseInstallment(str) {
+  if (!str) return null;
+  const s = str.trim();
+
+  let m = s.match(/(\d+)\s*\/\s*(\d+)/);
+  if (m) {
+    const idx = parseInt(m[1]);
+    const total = parseInt(m[2]);
+    if (total >= 2 && total <= 48 && idx >= 1 && idx <= total) {
+      return { index: idx, total: total };
+    }
+  }
+
+  m = s.match(/[Cc]uota\s+(\d+)\s+[dD]e\s+(\d+)/);
+  if (m) {
+    const idx = parseInt(m[1]);
+    const total = parseInt(m[2]);
+    if (total >= 2 && total <= 48 && idx >= 1 && idx <= total) {
+      return { index: idx, total: total };
+    }
+  }
+
+  m = s.match(/(\d+)\s+[dD]e\s+(\d+)\s+cuotas?/);
+  if (m) {
+    const idx = parseInt(m[1]);
+    const total = parseInt(m[2]);
+    if (total >= 2 && total <= 48 && idx >= 1 && idx <= total) {
+      return { index: idx, total: total };
+    }
+  }
+
+  return null;
 }
 
 function parseNumber(val, format) {
@@ -618,30 +778,71 @@ function confirmCsvImport() {
   const importedIds = [];
 
   parsed.forEach(tx => {
-    let id = 'tx-' + Date.now() + '-' + (++idCounter);
-    while (existingIds.has(id)) id = 'tx-' + Date.now() + '-' + (++idCounter);
-    existingIds.add(id);
-    importedIds.push(id);
-    state.transactions.push({
-      id,
-      date: tx.date,
-      account_id: tx.account_id,
-      payee: toTitleCase(tx.payee),
-      category_name: toTitleCase(tx.category_name) || 'Otros',
-      amount: tx.amount,
-      notes: tx.notes || '',
-      tags: tx.tags || [],
-      is_receivable: false,
-      due_date: '',
-      is_future: false,
-      installment_id: null,
-      installment_total: null,
-      installment_index: null,
-    });
-    if (tx.payee && !state.predefined.payees.includes(toTitleCase(tx.payee))) {
+    const inst = tx.installment_info;
+
+    if (inst && inst.total >= 2) {
+      const groupId = 'ig-' + Date.now() + '-' + (++idCounter);
+      const perCuota = tx.amount / inst.total;
+      const today = new Date().toISOString().split('T')[0];
+
+      for (let i = 0; i < inst.total; i++) {
+        const d = new Date(tx.date + 'T12:00:00');
+        d.setMonth(d.getMonth() + i);
+        const instDate = d.toISOString().split('T')[0];
+        const isFuture = instDate > today;
+
+        let id = 'tx-' + Date.now() + '-' + (++idCounter);
+        while (existingIds.has(id)) id = 'tx-' + Date.now() + '-' + (++idCounter);
+        existingIds.add(id);
+        importedIds.push(id);
+
+        state.transactions.push({
+          id,
+          date: instDate,
+          account_id: tx.account_id,
+          payee: toTitleCase(tx.payee),
+          category_name: toTitleCase(tx.category_name) || 'Otros',
+          amount: perCuota,
+          notes: tx.notes || '',
+          tags: tx.tags || [],
+          is_receivable: false,
+          due_date: '',
+          is_future: isFuture,
+          installment_group: groupId,
+          installment_total: inst.total,
+          installment_index: i + 1,
+          installment_full_amount: Math.abs(tx.amount),
+        });
+      }
+    } else {
+      let id = 'tx-' + Date.now() + '-' + (++idCounter);
+      while (existingIds.has(id)) id = 'tx-' + Date.now() + '-' + (++idCounter);
+      existingIds.add(id);
+      importedIds.push(id);
+
+      state.transactions.push({
+        id,
+        date: tx.date,
+        account_id: tx.account_id,
+        payee: toTitleCase(tx.payee),
+        category_name: toTitleCase(tx.category_name) || 'Otros',
+        amount: tx.amount,
+        notes: tx.notes || '',
+        tags: tx.tags || [],
+        is_receivable: false,
+        due_date: '',
+        is_future: false,
+        installment_group: null,
+        installment_total: null,
+        installment_index: null,
+        installment_full_amount: null,
+      });
+    }
+
+    if (tx.payee && tx.payee !== 'Sin asignar' && !state.predefined.payees.includes(toTitleCase(tx.payee))) {
       state.predefined.payees.push(toTitleCase(tx.payee));
     }
-    if (tx.category_name) {
+    if (tx.category_name && tx.category_name !== 'Sin asignar') {
       const exists = state.predefined.categories.some(c =>
         (typeof c === 'string' ? c : c.name) === tx.category_name
       );
@@ -915,10 +1116,14 @@ function loadGeminiDataAsCsv(aiResult, fileName) {
   csvImportState.isExcel = false;
   csvImportState.fileName = fileName;
   csvImportState.fileDims = `${csvImportState.headers.length} columnas · ${csvImportState.rawData.length} filas`;
+  csvImportState.fromAi = true;
 
   document.getElementById('csv-step-upload').style.display = 'none';
   document.getElementById('csv-step-mapping').style.display = '';
   document.getElementById('csv-dropzone').style.display = 'none';
+
+  const dlBtn = document.getElementById('csv-download-ai-btn');
+  if (dlBtn) dlBtn.style.display = '';
 
   document.getElementById('csv-file-name').textContent = csvImportState.fileName;
   document.getElementById('csv-file-dims').textContent = '· ' + csvImportState.fileDims;
@@ -937,4 +1142,33 @@ function loadGeminiDataAsCsv(aiResult, fileName) {
 
   autoMapColumns();
   renderCsvMapping();
+}
+
+function downloadCsvFromAi() {
+  const headers = csvImportState.headers;
+  const data = csvImportState.rawData;
+  if (!headers || !headers.length) return;
+
+  const escape = v => {
+    const s = String(v ?? '');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+
+  let csv = headers.map(escape).join(',') + '\n';
+  data.forEach(row => {
+    csv += row.map(escape).join(',') + '\n';
+  });
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = csvImportState.fileName.replace(/\.[^.]+$/, '') + '_extraido.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

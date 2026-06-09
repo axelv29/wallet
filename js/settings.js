@@ -21,6 +21,7 @@ function switchSettingsPane(name) {
     populateAccountTypeSelects();
   }
   if (name === 'listas') renderPredefinedLists();
+  if (name === 'sistema') renderDeleteCounts();
 }
 
 // ── GENERAL SETTINGS ──────────────────────────────────────────
@@ -351,8 +352,17 @@ const TAG_COLORS = [
   '#e5e7eb', '#d1d5db',
 ];
 
+function getRandomTagColor() {
+  const usedColors = (state.predefined.tags || []).map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
+  const available = TAG_COLORS.filter(c => !usedColors.includes(c));
+  const pool = available.length > 0 ? available : TAG_COLORS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function renderPredefinedLists() {
-  renderListItems('payees',     state.predefined.payees);
+  const txPayees = [...new Set(state.transactions.map(t => t.payee).filter(p => p && p !== 'Sin asignar'))];
+  const allPayees = [...new Set([...state.predefined.payees, ...txPayees])];
+  renderListItems('payees',     allPayees);
   renderListItems('categories', state.predefined.categories);
   renderListItems('tags',       state.predefined.tags);
 }
@@ -361,7 +371,8 @@ function renderListItems(type, list) {
   const ul = document.getElementById('predefined-' + type + '-list');
   if (!ul) return;
   ul.innerHTML = '';
-  list.forEach(item => {
+  const filtered = (type === 'categories' || type === 'payees') ? list.filter(item => (typeof item === 'string' ? item : item.name) !== 'Sin asignar') : list;
+  filtered.forEach(item => {
     const name = typeof item === 'string' ? item : item.name;
     const icon = typeof item === 'string' ? null : item.icon;
     const isProtected = type === 'categories' && name === 'Sin asignar';
@@ -593,9 +604,7 @@ function addPredefined(type) {
   if (type === 'tags') {
     const exists = state.predefined.tags.some(t => (typeof t === 'string' ? t : t.name) === val);
     if (exists) return;
-    const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
-    const defaultColor = TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db';
-    state.predefined.tags.push({ name: val, color: defaultColor });
+    state.predefined.tags.push({ name: val, color: getRandomTagColor() });
   } else {
     if (state.predefined[type].includes(val)) return;
     state.predefined[type].push(val);
@@ -649,6 +658,29 @@ function removePredefined(type, item) {
       });
     } else {
       state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== item);
+      saveData('predefined');
+      renderPredefinedLists();
+    }
+    return;
+  }
+  if (type === 'payees') {
+    const usedCount = state.transactions.filter(t => t.payee === item).length;
+    if (usedCount > 0) {
+      showConfirm(
+        `El beneficiario "${item}" está siendo usado en ${usedCount} transacciones. Se moverán a "Sin asignar". ¿Continuar?`,
+        { title: 'Eliminar beneficiario', confirmText: 'Eliminar', danger: true }
+      ).then(ok => {
+        if (!ok) return;
+        state.transactions.forEach(t => {
+          if (t.payee === item) t.payee = 'Sin asignar';
+        });
+        state.predefined.payees = state.predefined.payees.filter(p => p !== item);
+        saveData('predefined');
+        saveData('transactions');
+        renderPredefinedLists();
+      });
+    } else {
+      state.predefined.payees = state.predefined.payees.filter(p => p !== item);
       saveData('predefined');
       renderPredefinedLists();
     }

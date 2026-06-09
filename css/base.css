@@ -156,6 +156,30 @@
   --shadow-pop:   0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
 }
 
+.scheme-slate {
+  --bg-root:      #ffffff;
+  --bg-surface:   #f0eeeb;
+  --bg-raised:    #e6e4e0;
+  --bg-sunken:    #e3e0dc;
+  --border:       #d8d5d0;
+  --border-focus: #5b52f5;
+  --text-lo:      #8a8784;
+  --accent:       #5b52f5;
+  --accent-soft:  #eceafd;
+  --accent-hover: #4740e8;
+  --positive:     #16a34a;
+  --positive-bg:  #dcfce7;
+  --negative:     #dc2626;
+  --negative-bg:  #fee2e2;
+  --warn:         #d97706;
+  --warn-bg:      #fef3c7;
+  --tag-a-bg:     #fce7f3;  --tag-a-tx: #9d174d;
+  --tag-b-bg:     #fef9c3;  --tag-b-tx: #854d0e;
+  --tag-c-bg:     #dbeafe;  --tag-c-tx: #1e40af;
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-pop:   0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+}
+
 /* ── COLOR SCHEMES — DARK ───────────────────────────────── */
 
 .scheme-default-dark {

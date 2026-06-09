@@ -82,6 +82,7 @@ function calculateBalances(accountIds) {
   const accFilter = accountIds ? new Set(accountIds) : null;
   state.transactions.forEach(tx => {
     if (tx.is_future) return;
+    if (tx.excluded) return;
     if (!isTxInPeriod(tx)) return;
     if (accFilter && !accFilter.has(tx.account_id)) return;
     const acc = state.accounts.find(a => a.id === tx.account_id);
@@ -210,7 +211,7 @@ function getEditOptions(field, tx) {
           const fromTxs = [...new Set(state.transactions.map(t => t.payee).filter(Boolean))];
           return [...new Set([...state.predefined.payees, ...fromTxs])];
         },
-        parser: v => v.trim() || tx.payee
+        parser: v => v.trim() || 'Sin asignar'
       };
     case 'category_name':
       return {
@@ -220,7 +221,7 @@ function getEditOptions(field, tx) {
           const catNames = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name);
           return [...new Set([...catNames, ...fromTxs])];
         },
-        parser: v => v.trim() || 'Otros'
+        parser: v => v.trim() || 'Sin asignar'
       };
     case 'notes':
       return {
