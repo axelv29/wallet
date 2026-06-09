@@ -43,6 +43,14 @@
   color: var(--text-lo);
   font-style: italic;
   padding: 2px 4px;
+  cursor: pointer;
+  border-radius: var(--r-xs);
+  transition: background 0.1s, color 0.1s;
+}
+
+.inline-tag-add:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* ═══════════════════════════════════════════════════════════

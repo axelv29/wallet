@@ -185,12 +185,16 @@ td.category-cell {
 }
 
 td.tags-cell {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.tags-wrap {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   align-items: center;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  min-width: 0;
 }
 
 .no-tags {
@@ -406,7 +410,6 @@ th.col-resizable {
   font-size: 12px;
   padding: 1px 7px;
   border-radius: 20px;
-  margin-left: 4px;
   font-weight: 500;
   line-height: 1.3;
   vertical-align: middle;
@@ -570,6 +573,7 @@ td.editing {
   border-radius: var(--r-xs);
   background: var(--bg-surface);
   min-height: 38px;
+  min-width: 0;
   cursor: pointer;
 }
 
@@ -1056,6 +1060,34 @@ textarea { height: auto; resize: vertical; }
   color: var(--text-lo);
 }
 
+.comfy-dropdown-input-row {
+  padding: 4px 5px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.comfy-dropdown-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  color: var(--text-hi);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.comfy-dropdown-input:focus {
+  border-color: var(--accent);
+}
+
+.comfy-dropdown-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 @keyframes comfyDropdownIn {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -1125,6 +1157,14 @@ textarea { height: auto; resize: vertical; }
 }
 
 .tag-check-label input { display: none; }
+
+.tag-check-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 .tag-check-label:has(input:checked) {
   background: var(--accent-soft);

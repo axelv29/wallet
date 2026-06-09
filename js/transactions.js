@@ -55,15 +55,18 @@ function renderTagsChecklist(selectedTags) {
   const checked = selectedTags || [];
   checklist.innerHTML = '';
   state.predefined.tags.forEach(tag => {
-    const isChecked = checked.includes(tag);
+    const tagName = typeof tag === 'string' ? tag : tag.name;
+    const tagColor = typeof tag === 'string' ? null : (tag.color || null);
+    const isChecked = checked.includes(tagName);
     const label = document.createElement('label');
     label.className = 'tag-check-label';
     label.draggable = true;
-    label.dataset.tag = tag;
-    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}" ${isChecked ? 'checked' : ''}><span>#${tag}</span>`;
+    label.dataset.tag = tagName;
+    const dotHtml = tagColor ? `<span class="tag-check-dot" style="background:${tagColor}"></span>` : '';
+    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tagName}" ${isChecked ? 'checked' : ''}>${dotHtml}<span>#${tagName}</span>`;
     label.addEventListener('dragstart', e => {
-      _draggedTag = tag;
-      e.dataTransfer.setData('text/plain', tag);
+      _draggedTag = tagName;
+      e.dataTransfer.setData('text/plain', tagName);
       e.dataTransfer.effectAllowed = 'move';
       label.classList.add('dragging');
       document.getElementById('tx-tags-trash').classList.add('visible');
@@ -91,7 +94,7 @@ function renderTagsChecklist(selectedTags) {
 }
 
 function removeTag(tag) {
-  state.predefined.tags = state.predefined.tags.filter(t => t !== tag);
+  state.predefined.tags = state.predefined.tags.filter(t => (typeof t === 'string' ? t : t.name) !== tag);
   saveData('predefined');
   const checked = getCheckedTags().filter(t => t !== tag);
   renderTagsChecklist(checked);
@@ -143,8 +146,11 @@ function createTagInput() {
 
   const commit = () => {
     const name = input.value.trim();
-    if (name && !state.predefined.tags.includes(name)) {
-      state.predefined.tags.push(name);
+    const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+    if (name && !tagNames.includes(name)) {
+      const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
+      const defaultColor = TAG_COLORS ? TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db' : '#d1d5db';
+      state.predefined.tags.push({ name, color: defaultColor });
       saveData('predefined');
     }
     const checked = getCheckedTags();
@@ -888,7 +894,9 @@ let _ie = null;   // estado global del editor activo
 
 // ── posicionar dropdown fijo bajo una celda ───────────────────
 function _positionDD(dd, anchorEl) {
+  if (!anchorEl || !anchorEl.isConnected) return;
   const r = anchorEl.getBoundingClientRect();
+  if (!r.width && !r.height) return;
   const viewH = window.innerHeight;
   const ddH = Math.min(240, dd.scrollHeight || 200);
   const spaceBelow = viewH - r.bottom - 8;
@@ -1085,6 +1093,9 @@ function startInlineEdit(cell, txId, field, type, options) {
   else if (type === 'tags') {
     const current = new Set(Array.isArray(originalValue) ? originalValue : []);
 
+    const tagsWrap = cell.querySelector('.tags-wrap');
+    if (tagsWrap) tagsWrap.style.display = 'none';
+
     const wrap = document.createElement('div');
     wrap.className = 'inline-editor-tags';
     cell.appendChild(wrap);
@@ -1111,25 +1122,136 @@ function startInlineEdit(cell, txId, field, type, options) {
     renderPills();
 
     const openTagsDD = () => {
+      if (!cell.isConnected) { closeInlineEditor(false); return; }
+
       const available = (options.suggestions ? options.suggestions() : [])
         .filter(t => !current.has(t));
 
-      const dd = _makeListDD(available, [], (tag) => {
-        current.add(tag);
-        renderPills();
-        _closeDD();
-        // reabrir para seguir agregando
-        setTimeout(openTagsDD, 80);
+      _closeDD();
+      const dd = document.createElement('div');
+      dd.className = 'comfy-dropdown open';
+      dd.style.position = 'fixed';
+      dd.style.zIndex = '9999';
+
+      const inputRow = document.createElement('div');
+      inputRow.className = 'comfy-dropdown-input-row';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'comfy-dropdown-input';
+      input.placeholder = 'nueva etiqueta…';
+      inputRow.appendChild(input);
+      dd.appendChild(inputRow);
+
+      const listWrap = document.createElement('div');
+      listWrap.className = 'comfy-dropdown-list';
+      dd.appendChild(listWrap);
+
+      const renderList = () => {
+        listWrap.innerHTML = '';
+        const filtered = available.filter(t => !current.has(t));
+        if (!filtered.length && !input.value.trim()) {
+          const empty = document.createElement('div');
+          empty.className = 'comfy-dropdown-empty';
+          empty.textContent = 'Sin sugerencias';
+          listWrap.appendChild(empty);
+        } else {
+          filtered.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'comfy-dropdown-item';
+            row.innerHTML = `<span>${item}</span><span class="check">✓</span>`;
+            row.addEventListener('mousedown', e => {
+              e.preventDefault();
+              current.add(item);
+              renderPills();
+              _closeDD();
+              setTimeout(openTagsDD, 80);
+            });
+            listWrap.appendChild(row);
+          });
+        }
+      };
+      renderList();
+
+      input.addEventListener('input', () => {
+        const val = input.value.trim().toLowerCase();
+        const filtered = available.filter(t =>
+          !current.has(t) && t.toLowerCase().includes(val)
+        );
+        listWrap.innerHTML = '';
+        if (val) {
+          const exact = available.find(t => t.toLowerCase() === val);
+          const createRow = document.createElement('div');
+          createRow.className = 'comfy-dropdown-item';
+          createRow.innerHTML = `<span>+ "${exact || input.value.trim()}"</span><span class="check">↵</span>`;
+          createRow.addEventListener('mousedown', e => {
+            e.preventDefault();
+            const name = input.value.trim();
+            if (!current.has(name)) {
+              const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+              if (!tagNames.includes(name)) {
+                const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
+                const defaultColor = TAG_COLORS ? TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db' : '#d1d5db';
+                state.predefined.tags.push({ name, color: defaultColor });
+                saveData('predefined');
+              }
+              current.add(name);
+              renderPills();
+              _closeDD();
+              setTimeout(openTagsDD, 80);
+            }
+          });
+          listWrap.appendChild(createRow);
+        }
+        filtered.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'comfy-dropdown-item';
+          row.innerHTML = `<span>${item}</span><span class="check">✓</span>`;
+          row.addEventListener('mousedown', e => {
+            e.preventDefault();
+            current.add(item);
+            renderPills();
+            _closeDD();
+            setTimeout(openTagsDD, 80);
+          });
+          listWrap.appendChild(row);
+        });
       });
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const name = input.value.trim();
+          if (name && !current.has(name)) {
+            const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+            if (!tagNames.includes(name)) {
+              const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
+              const defaultColor = TAG_COLORS ? TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db' : '#d1d5db';
+              state.predefined.tags.push({ name, color: defaultColor });
+              saveData('predefined');
+            }
+            current.add(name);
+            renderPills();
+            _closeDD();
+            setTimeout(openTagsDD, 80);
+          }
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          _closeDD();
+        }
+      });
+
+      document.body.appendChild(dd);
       dd.id = 'wallet-dd';
-      _positionDD(dd, cell);
       _ie.dd = dd;
+      _positionDD(dd, cell);
+      input.focus();
     };
 
     wrap.addEventListener('click', e => {
+      e.stopPropagation();
       const remove = e.target.closest('.remove-tag');
       if (remove) {
-        e.stopPropagation();
         current.delete(remove.dataset.tag);
         renderPills();
         _closeDD();
@@ -1149,16 +1271,24 @@ function startInlineEdit(cell, txId, field, type, options) {
 
 // ── SORT ────────────────────────────────────────────────────
 function toggleSort(column) {
+  if (state._justResized) return;
   if (state.sortColumn === column) {
-    state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+    if (state.sortDirection === 'asc') {
+      state.sortDirection = 'desc';
+    } else {
+      state.sortColumn = null;
+      state.sortDirection = 'asc';
+    }
   } else {
     state.sortColumn = column;
-    state.sortDirection = column === 'date' ? 'desc' : 'asc';
+    state.sortDirection = 'asc';
   }
   renderTransactions();
 }
 
 function sortTransactions(arr) {
+  if (!state.sortColumn) return;
+
   const col = state.sortColumn;
   const dir = state.sortDirection === 'asc' ? 1 : -1;
 
@@ -1205,13 +1335,12 @@ function updateSortIndicators() {
   document.querySelectorAll('.col-sortable').forEach(th => {
     const col = th.dataset.sort;
     const arrow = th.querySelector('.sort-arrow');
-    if (col === state.sortColumn) {
+    if (arrow) arrow.textContent = '';
+    th.classList.remove('sort-active', 'sort-desc');
+    if (col === state.sortColumn && state.sortColumn) {
       th.classList.add('sort-active');
       th.classList.toggle('sort-desc', state.sortDirection === 'desc');
       if (arrow) arrow.textContent = state.sortDirection === 'asc' ? '↑' : '↓';
-    } else {
-      th.classList.remove('sort-active', 'sort-desc');
-      if (arrow) arrow.textContent = '';
     }
   });
 }
@@ -1406,7 +1535,7 @@ function renderTransactions() {
       <td class="payee-cell editable-cell" data-field="payee" title="Click para editar">${payeeCellHtml}</td>
       <td class="cuota-cell">${cuotaCellHtml}</td>
       <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">${notesHtml || '<span style="color:var(--text-lo)">—</span>'}</td>
-      <td class="tags-cell editable-cell" data-field="tags" title="Click para editar">${tagsHtml}</td>
+      <td class="tags-cell editable-cell" data-field="tags" title="Click para editar"><div class="tags-wrap">${tagsHtml}</div></td>
       <td class="category-cell editable-cell" data-field="category_name" title="Click para editar">${getCategoryIcon(tx.category_name)} ${tx.category_name || 'Otros'}</td>
       <td class="amount-cell ${amountClass} editable-cell" data-field="amount" title="${amountTooltip ? amountTooltip + ' — Click para editar' : 'Click para editar'}">${amountVal}</td>
       <td class="actions-cell">${actionsHtml}</td>

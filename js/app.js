@@ -253,6 +253,7 @@ function initColumnResize() {
 
   const handles = table.querySelectorAll('.col-resize-handle');
   let startX = 0, startW = 0, th = null, handle = null;
+  let didDrag = false;
 
   function onMouseDown(e) {
     handle = e.currentTarget;
@@ -262,16 +263,19 @@ function initColumnResize() {
     const rect = th.getBoundingClientRect();
     startX = e.clientX;
     startW = rect.width;
+    didDrag = false;
 
     table.classList.add('col-resizing');
     handle.classList.add('resizing');
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
   }
 
   function onMouseMove(e) {
     if (!th) return;
+    if (Math.abs(e.clientX - startX) > 2) didDrag = true;
     const minW = parseInt(th.style.minWidth) || 40;
     let newW = startW + (e.clientX - startX);
     if (newW < minW) newW = minW;
@@ -284,7 +288,13 @@ function initColumnResize() {
     document.removeEventListener('mouseup', onMouseUp);
     table.classList.remove('col-resizing');
     if (handle) handle.classList.remove('resizing');
-    startX = 0; startW = 0; th = null; handle = null;
+
+    if (didDrag) {
+      state._justResized = true;
+      setTimeout(() => { state._justResized = false; }, 0);
+    }
+
+    startX = 0; startW = 0; th = null; handle = null; didDrag = false;
   }
 
   handles.forEach(h => {

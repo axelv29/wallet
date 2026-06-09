@@ -243,6 +243,68 @@
   font-size: 12px;
   color: var(--text-mid);
   border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.predefined-item-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+
+.predefined-name {
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: var(--r-xs);
+  transition: background 0.1s;
+}
+
+.predefined-name:hover {
+  background: var(--bg-raised);
+}
+
+.predefined-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-mid);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-xs);
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.predefined-icon-btn:hover {
+  background: var(--bg-raised);
+  color: var(--accent);
+}
+
+.predefined-icon-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.predefined-rename-input {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-hi);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xs);
+  padding: 1px 4px;
+  height: 22px;
+  outline: none;
+  width: 120px;
+}
+
+.cat-picker-popover.inline {
+  z-index: 999;
 }
 
 .predefined-scroll li:last-child { border-bottom: none; }
@@ -460,4 +522,68 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 14px;
+}
+
+/* Tag color dot in settings list */
+.tag-color-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  padding: 0;
+  transition: transform 0.1s;
+}
+
+.tag-color-btn:hover {
+  transform: scale(1.2);
+}
+
+.tag-color-dot {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+}
+
+.tag-color-btn:hover .tag-color-dot {
+  border-color: var(--accent);
+}
+
+/* Tag color picker popover */
+.tag-color-popover {
+  z-index: 999;
+  margin-top: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  padding: 8px;
+}
+
+.tag-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.tag-color-opt {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.1s, transform 0.1s;
+}
+
+.tag-color-opt:hover {
+  border-color: var(--accent);
+  transform: scale(1.2);
 }

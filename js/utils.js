@@ -176,6 +176,10 @@ function getPeriodLabel() {
 
 // ── helpers de color de tag ───────────────────────────────────
 function _tagColor(tag) {
+  const predefined = state.predefined.tags.find(t => (typeof t === 'string' ? t : t.name) === tag);
+  if (predefined && typeof predefined !== 'string' && predefined.color) {
+    return { bg: predefined.color, text: '#555' };
+  }
   let hash = 0;
   const str = (tag || '').toLowerCase();
   for (let i = 0; i < str.length; i++) {
@@ -228,7 +232,8 @@ function getEditOptions(field, tx) {
         type: 'tags',
         suggestions: () => {
           const fromTxs = [...new Set(state.transactions.flatMap(t => t.tags || []))];
-          return [...new Set([...state.predefined.tags, ...fromTxs])];
+          const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+          return [...new Set([...tagNames, ...fromTxs])];
         },
         parser: v => v   // ya es array
       };

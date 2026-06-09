@@ -610,20 +610,9 @@
             </div>
           </div>
 
-          <!-- ── Cuentas: Tipos + Crear + Listar ── -->
+          <!-- ── Cuentas: Crear + Listar + Tipos ── -->
           <div class="settings-pane" id="spane-accounts">
             <div class="pane-section-title">Cuentas</div>
-
-            <div class="pane-subsection">
-              <div class="pane-subsection-title">Tipos de cuenta</div>
-              <div style="max-width:340px;">
-                <div class="predefined-add-row" style="margin-bottom:10px;">
-                  <input type="text" id="add-acc-type-val" placeholder="Nuevo tipo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addAccountType()}">
-                  <button class="btn btn-primary" onclick="addAccountType()"><i data-lucide="plus"></i></button>
-                </div>
-                <ul class="predefined-scroll" id="predefined-account-types-list"></ul>
-              </div>
-            </div>
 
             <div class="accounts-split">
               <div>
@@ -671,6 +660,17 @@
               <div>
                 <div class="pane-subsection-title">Cuentas registradas</div>
                 <div class="accounts-list-scroll" id="accounts-scroll-container"></div>
+              </div>
+            </div>
+
+            <div class="pane-subsection" style="margin-top:20px;">
+              <div class="pane-subsection-title">Tipos de cuenta</div>
+              <div style="max-width:340px;">
+                <div class="predefined-add-row" style="margin-bottom:10px;">
+                  <input type="text" id="add-acc-type-val" placeholder="Nuevo tipo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addAccountType()}">
+                  <button class="btn btn-primary" onclick="addAccountType()"><i data-lucide="plus"></i></button>
+                </div>
+                <ul class="predefined-scroll" id="predefined-account-types-list"></ul>
               </div>
             </div>
           </div>

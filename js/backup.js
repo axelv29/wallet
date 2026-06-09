@@ -214,7 +214,10 @@ function confirmImportBackup() {
         }
         if (d.predefined.tags) {
           d.predefined.tags.forEach(t => {
-            if (!state.predefined.tags.includes(t)) state.predefined.tags.push(t);
+            const name = typeof t === 'string' ? t : t.name;
+            if (!state.predefined.tags.find(x => (typeof x === 'string' ? x : x.name) === name)) {
+              state.predefined.tags.push(typeof t === 'string' ? { name: t, color: '#d1d5db' } : { ...t });
+            }
           });
         }
       }
@@ -249,7 +252,10 @@ function confirmDeleteAllData() {
     const name = typeof c === 'string' ? c : c.name;
     return !DEFAULT_PREDEFINED.categories.find(d => (typeof d === 'string' ? d : d.name) === name);
   }).length;
-  const extraTags = state.predefined.tags.filter(t => !DEFAULT_PREDEFINED.tags.includes(t)).length;
+  const extraTags = state.predefined.tags.filter(t => {
+    const name = typeof t === 'string' ? t : t.name;
+    return !DEFAULT_PREDEFINED.tags.includes(name);
+  }).length;
 
   const parts = [];
   if (txCount) parts.push(`${txCount} transacciones`);

@@ -44,8 +44,8 @@ let state = {
   editingTxId: null,
   selectedTxIds: new Set(),
   tableFilters: [],
-  sortColumn: 'date',
-  sortDirection: 'desc',
+  sortColumn: null,
+  sortDirection: 'asc',
 
 };
 
@@ -101,6 +101,12 @@ function loadData() {
         name: c,
         icon: ['shopping-cart','utensils-crossed','package','car','zap','gamepad-2','heart-pulse','book-open','briefcase','laptop','gift','home','shirt','smartphone','more-horizontal','circle-dashed'][i] || 'tag'
       }));
+      saveData('predefined');
+    }
+    // Migrate string tags → { name, color }
+    if (state.predefined.tags.length && typeof state.predefined.tags[0] === 'string') {
+      const colors = ['#fca5a5','#fdba74','#fcd34d','#fde047','#bef264','#86efac','#6ee7b7','#5eead4','#67e8f9','#7dd3fc','#93c5fd','#a5b4fc','#c4b5fd','#d8b4fe','#f0abfc','#f9a8d4','#fda4af','#d1d5db'];
+      state.predefined.tags = state.predefined.tags.map((t, i) => ({ name: t, color: colors[i % colors.length] }));
       saveData('predefined');
     }
     // Ensure 'Sin asignar' category exists

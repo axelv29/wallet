@@ -330,6 +330,27 @@ function selectCatIcon(icon) {
 }
 
 // ── PREDEFINED LISTS ──────────────────────────────────────────
+const TAG_COLORS = [
+  '#fecaca', '#fca5a5',
+  '#fed7aa', '#fdba74',
+  '#fef08a', '#fcd34d',
+  '#fef9c3', '#fde047',
+  '#d9f99d', '#bef264',
+  '#bbf7d0', '#86efac',
+  '#a7f3d0', '#6ee7b7',
+  '#99f6e4', '#5eead4',
+  '#a5f3fc', '#67e8f9',
+  '#bae6fd', '#7dd3fc',
+  '#bfdbfe', '#93c5fd',
+  '#c7d2fe', '#a5b4fc',
+  '#ddd6fe', '#c4b5fd',
+  '#e9d5ff', '#d8b4fe',
+  '#f5d0fe', '#f0abfc',
+  '#fbcfe8', '#f9a8d4',
+  '#ffe4e6', '#fecdd3',
+  '#e5e7eb', '#d1d5db',
+];
+
 function renderPredefinedLists() {
   renderListItems('payees',     state.predefined.payees);
   renderListItems('categories', state.predefined.categories);
@@ -341,18 +362,211 @@ function renderListItems(type, list) {
   if (!ul) return;
   ul.innerHTML = '';
   list.forEach(item => {
-    const li = document.createElement('li');
     const name = typeof item === 'string' ? item : item.name;
     const icon = typeof item === 'string' ? null : item.icon;
-    const iconHtml = type === 'categories' && icon ? `<i data-lucide="${icon}" style="width:14px;height:14px;"></i>` : '';
     const isProtected = type === 'categories' && name === 'Sin asignar';
-    li.innerHTML = `
-      <span>${iconHtml} ${type === 'tags' ? '#' : ''}${name}</span>
-      ${isProtected ? '' : `<button class="delete-btn" onclick="removePredefined('${type}', '${name}')"><i data-lucide="x"></i></button>`}
-    `;
+
+    const li = document.createElement('li');
+
+    const leftSpan = document.createElement('span');
+    leftSpan.className = 'predefined-item-left';
+
+    if (type === 'categories' && icon) {
+      const iconBtn = document.createElement('button');
+      iconBtn.className = 'predefined-icon-btn';
+      iconBtn.type = 'button';
+      iconBtn.innerHTML = `<i data-lucide="${icon}"></i>`;
+      iconBtn.title = 'Cambiar ícono';
+      iconBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openCategoryIconPicker(iconBtn, name);
+      });
+      leftSpan.appendChild(iconBtn);
+    }
+
+    if (type === 'tags') {
+      const tagColor = typeof item === 'string' ? '#d1d5db' : (item.color || '#d1d5db');
+      const colorBtn = document.createElement('button');
+      colorBtn.className = 'tag-color-btn';
+      colorBtn.type = 'button';
+      colorBtn.title = 'Cambiar color';
+      const dot = document.createElement('span');
+      dot.className = 'tag-color-dot';
+      dot.style.background = tagColor;
+      colorBtn.appendChild(dot);
+      colorBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openTagColorPicker(colorBtn, name);
+      });
+      leftSpan.appendChild(colorBtn);
+    }
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'predefined-name';
+    nameSpan.textContent = type === 'tags' ? '#' + name : name;
+    if (!isProtected) {
+      nameSpan.addEventListener('click', () => startRename(type, item, nameSpan));
+    }
+    leftSpan.appendChild(nameSpan);
+
+    li.appendChild(leftSpan);
+
+    if (!isProtected) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delete-btn';
+      delBtn.innerHTML = `<i data-lucide="x"></i>`;
+      delBtn.addEventListener('click', () => removePredefined(type, name));
+      li.appendChild(delBtn);
+    }
+
     ul.appendChild(li);
   });
   lucide.createIcons();
+}
+
+function startRename(type, item, targetEl) {
+  const name = typeof item === 'string' ? item : item.name;
+  if (type === 'categories' && name === 'Sin asignar') return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'predefined-rename-input';
+  input.value = name;
+  input.setAttribute('autocomplete', 'off');
+
+  const finish = save => {
+    const val = input.value.trim().replace(/#/g, '');
+    if (save && val && val !== name) {
+      if (type === 'payees') {
+        const idx = state.predefined.payees.indexOf(name);
+        if (idx !== -1) state.predefined.payees[idx] = val;
+        state.transactions.forEach(t => { if (t.payee === name) t.payee = val; });
+      } else if (type === 'categories') {
+        const cat = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === name);
+        if (cat) cat.name = val;
+        state.transactions.forEach(t => { if (t.category_name === name) t.category_name = val; });
+      } else if (type === 'tags') {
+        const tag = state.predefined.tags.find(t => (typeof t === 'string' ? t : t.name) === name);
+        if (tag && typeof tag !== 'string') tag.name = val;
+        state.transactions.forEach(t => {
+          if (t.tags) {
+            const ti = t.tags.indexOf(name);
+            if (ti !== -1) t.tags[ti] = val;
+          }
+        });
+      }
+      saveData('predefined');
+      saveData('transactions');
+    }
+    renderPredefinedLists();
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+
+  targetEl.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function openCategoryIconPicker(btn, catName) {
+  const existingPopover = document.querySelector('.cat-picker-popover.inline');
+  if (existingPopover) {
+    existingPopover.remove();
+    return;
+  }
+
+  const popover = document.createElement('div');
+  popover.className = 'cat-picker-popover open inline';
+  const grid = document.createElement('div');
+  grid.className = 'cat-picker-grid';
+
+  CATEGORY_ICONS.forEach(icon => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<i data-lucide="${icon}"></i>`;
+    b.dataset.icon = icon;
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const cat = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === catName);
+      if (cat && typeof cat !== 'string') cat.icon = icon;
+      saveData('predefined');
+      popover.remove();
+      renderPredefinedLists();
+    });
+    grid.appendChild(b);
+  });
+
+  popover.appendChild(grid);
+  document.body.appendChild(popover);
+
+  const rect = btn.getBoundingClientRect();
+  const popH = popover.offsetHeight || 200;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  popover.style.position = 'fixed';
+  popover.style.left = rect.left + 'px';
+  popover.style.top = (spaceBelow >= popH ? rect.bottom + 4 : rect.top - popH - 4) + 'px';
+
+  lucide.createIcons();
+
+  const close = e => {
+    if (!e.target.closest('.cat-picker-popover.inline') && !e.target.closest('.predefined-icon-btn')) {
+      popover.remove();
+      document.removeEventListener('click', close);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', close), 0);
+  window.addEventListener('scroll', () => { popover.remove(); document.removeEventListener('click', close); }, { once: true });
+}
+
+function openTagColorPicker(btn, tagName) {
+  const existingPopover = document.querySelector('.tag-color-popover');
+  if (existingPopover) {
+    existingPopover.remove();
+    return;
+  }
+
+  const popover = document.createElement('div');
+  popover.className = 'tag-color-popover open';
+  popover.innerHTML = '<div class="tag-color-grid"></div>';
+  const grid = popover.querySelector('.tag-color-grid');
+
+  TAG_COLORS.forEach(color => {
+    const dot = document.createElement('button');
+    dot.className = 'tag-color-opt';
+    dot.style.background = color;
+    dot.addEventListener('click', e => {
+      e.stopPropagation();
+      const tag = state.predefined.tags.find(t => (typeof t === 'string' ? t : t.name) === tagName);
+      if (tag && typeof tag !== 'string') tag.color = color;
+      saveData('predefined');
+      popover.remove();
+      renderPredefinedLists();
+    });
+    grid.appendChild(dot);
+  });
+
+  popover.appendChild(grid);
+  document.body.appendChild(popover);
+
+  const rect = btn.getBoundingClientRect();
+  const popH = popover.offsetHeight || 200;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  popover.style.position = 'fixed';
+  popover.style.left = rect.left + 'px';
+  popover.style.top = (spaceBelow >= popH ? rect.bottom + 4 : rect.top - popH - 4) + 'px';
+
+  const close = e => {
+    if (!e.target.closest('.tag-color-popover') && !e.target.closest('.tag-color-btn')) {
+      popover.remove();
+      document.removeEventListener('click', close);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', close), 0);
+  window.addEventListener('scroll', () => { popover.remove(); document.removeEventListener('click', close); }, { once: true });
 }
 
 function addPredefined(type) {
@@ -375,8 +589,17 @@ function addPredefined(type) {
   const ids = { payees: 'add-payee-val', tags: 'add-tag-val' };
   const input = document.getElementById(ids[type]);
   const val = input.value.trim().replace(/#/g, '');
-  if (!val || state.predefined[type].includes(val)) return;
-  state.predefined[type].push(val);
+  if (!val) return;
+  if (type === 'tags') {
+    const exists = state.predefined.tags.some(t => (typeof t === 'string' ? t : t.name) === val);
+    if (exists) return;
+    const usedColors = state.predefined.tags.map(t => (typeof t === 'string' ? null : t.color)).filter(Boolean);
+    const defaultColor = TAG_COLORS.find(c => !usedColors.includes(c)) || '#d1d5db';
+    state.predefined.tags.push({ name: val, color: defaultColor });
+  } else {
+    if (state.predefined[type].includes(val)) return;
+    state.predefined[type].push(val);
+  }
   saveData('predefined');
   input.value = '';
   renderPredefinedLists();
@@ -419,13 +642,13 @@ function removePredefined(type, item) {
         state.transactions.forEach(t => {
           if (t.tags && t.tags.includes(item)) t.tags = t.tags.filter(tag => tag !== item);
         });
-        state.predefined[type] = state.predefined[type].filter(i => i !== item);
+        state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== item);
         saveData('predefined');
         saveData('transactions');
         renderPredefinedLists();
       });
     } else {
-      state.predefined[type] = state.predefined[type].filter(i => i !== item);
+      state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== item);
       saveData('predefined');
       renderPredefinedLists();
     }

@@ -109,6 +109,10 @@
 - `cc-note` — Nota informativa de tarjeta
 - `compact-table` — Tabla compacta en import review
 - `empty-row` — Fila vacía de tabla
+- `col-sortable` / `sort-arrow` / `sort-active` / `sort-desc` — Headers sortables con flecha
+- `predefined-item-left` / `predefined-name` / `predefined-icon-btn` / `predefined-rename-input` — Items editables en listas de settings
+- `tag-color-btn` / `tag-color-dot` / `tag-color-popover` / `tag-color-grid` / `tag-color-opt` — Color picker de etiquetas
+- `tag-check-dot` — Bola de color en checklist de etiquetas
 
 ### Tipos de cuenta (`acc.type`)
 - `'liquid'` — Cuenta líquida (efectivo/débito)
@@ -176,10 +180,12 @@
 ```js
 state.predefined = {
   payees: ['Leo', 'Escaramuza', ...],
-  categories: ['Fuera del presupuesto', 'Entretenimiento', ...],  // + 'Sin asignar' (protegida, no se puede borrar)
-  tags: ['Rocio', 'NyL', 'pan', 'viaje', 'compras']
+  categories: [{ name: 'Fuera del presupuesto', icon: 'banknote' }, ...],  // 'Sin asignar' (protegida)
+  tags: [{ name: 'Rocio', color: '#f9a8d4' }, ...]
 }
 ```
+- En settings se edita el nombre tocándolo, y para categorías el ícono tocando el icono.
+- Cada etiqueta tiene un color asignado (bola de color). Se cambia tocando la bola, abre un picker con 18 pares de colores base+pastel.
 
 ### Reglas de renderizado
 - **Sidebar**: Los balances se calculan como `balance inicial + suma de amounts de transacciones` para cada cuenta
@@ -188,6 +194,7 @@ state.predefined = {
   - Las transacciones con `amount < 0` muestran el monto en columna "Pago"
   - Las transacciones con `amount > 0` muestran el monto en columna "Ingreso"
   - Si `is_receivable` muestra botón "marcar como cobrado" que crea una tx inversa
+  - **Sort**: Hacer click en header de columna ordena asc → desc → sin orden. Estado en `state.sortColumn` y `state.sortDirection`. Columnas sortables: fecha, cuenta, beneficiario, notas, etiquetas, categoría, monto. Función `toggleSort(column)`.
 - **Modal de transacción**: Formulario con fecha, cuenta, beneficiario (buscable), categoría (buscable), monto con toggle gasto/ingreso, etiquetas (checklist), notas y opción de préstamo a cobrar
 - **Etiquetas en tabla**: Se muestran como pills de colores: `#Rocio` → rosa, `#NyL` → amarillo, otras → azul
 

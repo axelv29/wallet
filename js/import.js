@@ -31,6 +31,13 @@ let csvImportState = {
   fileDims: '',
 };
 
+function toTitleCase(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/\S+/g, word => {
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
 function initCsvDropzone() {
   const dz = document.getElementById('csv-dropzone');
   if (!dz) return;
@@ -57,7 +64,7 @@ function closeImportModal() {
 }
 
 function resetCsvImport() {
-  csvImportState = { rawData: [], rawText: '', isExcel: false, headers: [], mapping: {}, fileName: '', fileDims: '' };
+  csvImportState = { rawData: [], rawText: '', isExcel: false, headers: [], mapping: {}, fileName: '', fileDims: '', previewEdits: null };
   document.getElementById('csv-step-upload').style.display = '';
   document.getElementById('csv-step-mapping').style.display = 'none';
   document.getElementById('csv-file-input').value = '';
@@ -355,14 +362,54 @@ function onCsvMappingChange() {
   const importAccId = document.getElementById('csv-target-account')?.value;
   const importAcc = state.accounts.find(a => a.id === importAccId);
   const importCur = importAcc?.currency || state.settings.currency || 'ARS';
-  parsed.forEach(tx => {
+  const cats = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name);
+
+  parsed.forEach((tx, idx) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${tx.date || '—'}</td>
-      <td>${tx.payee || '—'}</td>
-      <td>${tx.category_name || '—'}</td>
-      <td class="r ${tx.amount < 0 ? 'expense' : 'income'}">${formatAccountCurrency(tx.amount, importCur)}</td>
-    `;
+
+    const tdDate = document.createElement('td');
+    const inpDate = document.createElement('input');
+    inpDate.type = 'date';
+    inpDate.value = tx.date;
+    inpDate.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+    inpDate.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].date = inpDate.value; };
+    tdDate.appendChild(inpDate);
+
+    const tdPayee = document.createElement('td');
+    const inpPayee = document.createElement('input');
+    inpPayee.type = 'text';
+    inpPayee.value = tx.payee;
+    inpPayee.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+    inpPayee.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].payee = inpPayee.value; };
+    tdPayee.appendChild(inpPayee);
+
+    const tdCat = document.createElement('td');
+    const selCat = document.createElement('select');
+    selCat.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
+    cats.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      if (c.toLowerCase() === (tx.category_name || '').toLowerCase()) opt.selected = true;
+      selCat.appendChild(opt);
+    });
+    selCat.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].category_name = selCat.value; };
+    tdCat.appendChild(selCat);
+
+    const tdAmt = document.createElement('td');
+    tdAmt.className = 'r ' + (tx.amount < 0 ? 'expense' : 'income');
+    const inpAmt = document.createElement('input');
+    inpAmt.type = 'number';
+    inpAmt.step = '0.01';
+    inpAmt.value = tx.amount;
+    inpAmt.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;text-align:right;';
+    inpAmt.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].amount = parseFloat(inpAmt.value); };
+    tdAmt.appendChild(inpAmt);
+
+    tr.appendChild(tdDate);
+    tr.appendChild(tdPayee);
+    tr.appendChild(tdCat);
+    tr.appendChild(tdAmt);
     tbody.appendChild(tr);
   });
 }
@@ -403,7 +450,7 @@ function buildTransactionsFromMapping() {
           break;
         }
         case 'payee': {
-          tx.payee = val;
+          tx.payee = toTitleCase(val);
           hasPayee = true;
           break;
         }
@@ -438,9 +485,23 @@ function buildTransactionsFromMapping() {
     });
 
     if (hasDate && hasPayee && hasAmount && tx.amount !== 0) {
+      tx.payee = toTitleCase(tx.payee);
+      tx.category_name = toTitleCase(tx.category_name);
       results.push(tx);
     }
   });
+
+  const edits = csvImportState.previewEdits;
+  if (edits) {
+    results.forEach((tx, i) => {
+      if (edits[i]) {
+        if (edits[i].date !== undefined) tx.date = edits[i].date;
+        if (edits[i].payee !== undefined) tx.payee = toTitleCase(edits[i].payee);
+        if (edits[i].category_name !== undefined) tx.category_name = toTitleCase(edits[i].category_name);
+        if (edits[i].amount !== undefined) tx.amount = edits[i].amount;
+      }
+    });
+  }
 
   return results;
 }
@@ -554,17 +615,19 @@ function confirmCsvImport() {
 
   const existingIds = new Set(state.transactions.map(t => t.id));
   let idCounter = 0;
+  const importedIds = [];
 
   parsed.forEach(tx => {
     let id = 'tx-' + Date.now() + '-' + (++idCounter);
     while (existingIds.has(id)) id = 'tx-' + Date.now() + '-' + (++idCounter);
     existingIds.add(id);
+    importedIds.push(id);
     state.transactions.push({
       id,
       date: tx.date,
       account_id: tx.account_id,
-      payee: tx.payee,
-      category_name: tx.category_name || 'Otros',
+      payee: toTitleCase(tx.payee),
+      category_name: toTitleCase(tx.category_name) || 'Otros',
       amount: tx.amount,
       notes: tx.notes || '',
       tags: tx.tags || [],
@@ -575,8 +638,8 @@ function confirmCsvImport() {
       installment_total: null,
       installment_index: null,
     });
-    if (tx.payee && !state.predefined.payees.includes(tx.payee)) {
-      state.predefined.payees.push(tx.payee);
+    if (tx.payee && !state.predefined.payees.includes(toTitleCase(tx.payee))) {
+      state.predefined.payees.push(toTitleCase(tx.payee));
     }
     if (tx.category_name) {
       const exists = state.predefined.categories.some(c =>
@@ -592,6 +655,19 @@ function confirmCsvImport() {
   saveData('predefined');
   renderAll();
   closeImportModal();
+
+  if (importedIds.length > 0) {
+    importedIds.forEach(id => state.selectedTxIds.add(id));
+    updateSelectionBar();
+    const rows = document.querySelectorAll('#tx-table-body tr');
+    rows.forEach(row => {
+      const cb = row.querySelector('.tx-checkbox');
+      if (cb && importedIds.includes(cb.dataset.txId)) {
+        row.classList.add('selected');
+        cb.checked = true;
+      }
+    });
+  }
 }
 
 // ── SAMPLE DATA ───────────────────────────────────────────
@@ -747,54 +823,71 @@ Reglas:
 
     console.log('[IA] Enviando archivo a Gemini:', file.name, mimeType, '(' + Math.round(base64Data.length * 0.75 / 1024) + ' KB)');
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const maxRetries = 2;
+    let lastError = null;
 
-    let response;
-    try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        console.log('[IA] Reintento ' + attempt + '/' + maxRetries + '…');
+        await new Promise(r => setTimeout(r, 2000 * attempt));
+      }
 
-    const result = await response.json();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
 
-    if (!response.ok) {
+      let response;
+      try {
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const result = await response.json();
+
+      if (response.ok) {
+        let textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!textResponse) throw new Error('Respuesta vacía de Gemini');
+
+        textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        console.log('[IA] Respuesta:', textResponse.substring(0, 200));
+        const parsed = JSON.parse(textResponse);
+
+        if (!parsed.headers || !parsed.rows || !Array.isArray(parsed.rows)) {
+          throw new Error('Formato de respuesta inválido de la IA');
+        }
+
+        console.log('[IA] Transacciones extraídas:', parsed.rows.length);
+        loadGeminiDataAsCsv(parsed, file.name);
+        return;
+      }
+
       console.error('[IA] Error HTTP:', response.status, result);
       const apiMsg = result.error?.message || '';
-      if (response.status === 503 || apiMsg.includes('high demand') || apiMsg.includes('unavailable')) {
-        throw new Error('El servicio de IA está sobrecargado. Intentá de nuevo en unos segundos.');
+      const isRetryable = response.status === 503 || apiMsg.includes('high demand') || apiMsg.includes('unavailable');
+
+      if (!isRetryable || attempt === maxRetries) {
+        if (response.status === 429 || apiMsg.includes('quota') || apiMsg.includes('rate limit')) {
+          throw new Error('Se agotó la cuota de la API. Revisá tu plan en Google AI Studio.');
+        }
+        if (response.status === 400) {
+          throw new Error(apiMsg || 'El archivo no pudo ser procesado. Probá con otro formato.');
+        }
+        if (response.status === 403) {
+          throw new Error('La API key no tiene permisos. Verificala en Ajustes → General.');
+        }
+        if (isRetryable) {
+          throw new Error('El servicio de IA sigue sobrecargado. Intentá de nuevo más tarde.');
+        }
+        throw new Error(apiMsg || `Error HTTP ${response.status}`);
       }
-      if (response.status === 429 || apiMsg.includes('quota') || apiMsg.includes('rate limit')) {
-        throw new Error('Se agotó la cuota de la API. Revisá tu plan en Google AI Studio.');
-      }
-      if (response.status === 400) {
-        throw new Error(apiMsg || 'El archivo no pudo ser procesado. Probá con otro formato.');
-      }
-      if (response.status === 403) {
-        throw new Error('La API key no tiene permisos. Verificala en Ajustes → General.');
-      }
-      throw new Error(apiMsg || `Error HTTP ${response.status}`);
+
+      lastError = apiMsg;
     }
-
-    let textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!textResponse) throw new Error('Respuesta vacía de Gemini');
-
-    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-    console.log('[IA] Respuesta:', textResponse.substring(0, 200));
-    const parsed = JSON.parse(textResponse);
-
-    if (!parsed.headers || !parsed.rows || !Array.isArray(parsed.rows)) {
-      throw new Error('Formato de respuesta inválido de la IA');
-    }
-
-    console.log('[IA] Transacciones extraídas:', parsed.rows.length);
-    loadGeminiDataAsCsv(parsed, file.name);
 
   } catch (err) {
     console.error('[IA] Error:', err);
