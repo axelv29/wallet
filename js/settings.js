@@ -7,7 +7,7 @@
 
 // ── SETTINGS PANE SWITCHING ───────────────────────────────────
 function switchSettingsPane(name) {
-  const panes = ['general', 'accounts', 'payees', 'categories', 'tags', 'currency'];
+  const panes = ['general', 'accounts', 'payees', 'categories', 'tags'];
   panes.forEach(p => {
     const pane = document.getElementById('spane-' + p);
     const btn  = document.getElementById('snav-' + p);
@@ -210,9 +210,10 @@ function renderListItems(type, list) {
     const name = typeof item === 'string' ? item : item.name;
     const icon = typeof item === 'string' ? null : item.icon;
     const iconHtml = type === 'categories' && icon ? `<i data-lucide="${icon}" style="width:14px;height:14px;"></i>` : '';
+    const isProtected = type === 'categories' && name === 'Sin asignar';
     li.innerHTML = `
       <span>${iconHtml} ${type === 'tags' ? '#' : ''}${name}</span>
-      <button class="delete-btn" onclick="removePredefined('${type}', '${name}')"><i data-lucide="x"></i></button>
+      ${isProtected ? '' : `<button class="delete-btn" onclick="removePredefined('${type}', '${name}')"><i data-lucide="x"></i></button>`}
     `;
     ul.appendChild(li);
   });
@@ -248,10 +249,54 @@ function addPredefined(type) {
 
 function removePredefined(type, item) {
   if (type === 'categories') {
-    state.predefined[type] = state.predefined[type].filter(c => (typeof c === 'string' ? c : c.name) !== item);
-  } else {
-    state.predefined[type] = state.predefined[type].filter(i => i !== item);
+    const name = typeof item === 'string' ? item : item.name;
+    if (name === 'Sin asignar') return;
+    const usedCount = state.transactions.filter(t => t.category_name === name).length;
+    if (usedCount > 0) {
+      showConfirm(
+        `La categoría "${name}" está siendo usada en ${usedCount} transacciones. Se moverán a "Sin asignar". ¿Continuar?`,
+        { title: 'Eliminar categoría', confirmText: 'Eliminar', danger: true }
+      ).then(ok => {
+        if (!ok) return;
+        state.transactions.forEach(t => {
+          if (t.category_name === name) t.category_name = 'Sin asignar';
+        });
+        state.predefined[type] = state.predefined[type].filter(c => (typeof c === 'string' ? c : c.name) !== name);
+        saveData('predefined');
+        saveData('transactions');
+        renderPredefinedLists();
+      });
+    } else {
+      state.predefined[type] = state.predefined[type].filter(c => (typeof c === 'string' ? c : c.name) !== name);
+      saveData('predefined');
+      renderPredefinedLists();
+    }
+    return;
   }
+  if (type === 'tags') {
+    const usedCount = state.transactions.filter(t => (t.tags || []).includes(item)).length;
+    if (usedCount > 0) {
+      showConfirm(
+        `La etiqueta "#${item}" está siendo usada en ${usedCount} transacciones. Se eliminará de todas. ¿Continuar?`,
+        { title: 'Eliminar etiqueta', confirmText: 'Eliminar', danger: true }
+      ).then(ok => {
+        if (!ok) return;
+        state.transactions.forEach(t => {
+          if (t.tags && t.tags.includes(item)) t.tags = t.tags.filter(tag => tag !== item);
+        });
+        state.predefined[type] = state.predefined[type].filter(i => i !== item);
+        saveData('predefined');
+        saveData('transactions');
+        renderPredefinedLists();
+      });
+    } else {
+      state.predefined[type] = state.predefined[type].filter(i => i !== item);
+      saveData('predefined');
+      renderPredefinedLists();
+    }
+    return;
+  }
+  state.predefined[type] = state.predefined[type].filter(i => i !== item);
   saveData('predefined');
   renderPredefinedLists();
 }

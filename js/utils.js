@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  utils.js — Utilidades / helpers
 //  Contiene: formatCurrency(), formatAccountCurrency(), getConvertedTooltip(),
-//  formatDate(), getCategoryIcon(), calculateBalances(), _tagColor(), getEditOptions().
+//  formatDate(), getCategoryIcon(), calculateBalances(), getPeriodRange(),
+//  isTxInPeriod(), _tagColor(), getEditOptions().
 // ═══════════════════════════════════════════════════════════════════════
 
 // ── UTILITIES ─────────────────────────────────────────────────
@@ -62,11 +63,14 @@ function getCategoryIcon(catName) {
   return `<span class="cat-icon"><i data-lucide="${icon}"></i></span>`;
 }
 
-function calculateBalances() {
+function calculateBalances(accountIds) {
   const settingsCur = state.settings.currency || 'ARS';
   const balances = { liquid: 0, credit_card: 0, receivables: 0 };
+  const accFilter = accountIds ? new Set(accountIds) : null;
   state.transactions.forEach(tx => {
     if (tx.is_future) return;
+    if (!isTxInPeriod(tx)) return;
+    if (accFilter && !accFilter.has(tx.account_id)) return;
     const acc = state.accounts.find(a => a.id === tx.account_id);
     if (acc) {
       const accCur = acc.currency || settingsCur;
@@ -84,6 +88,73 @@ function calculateBalances() {
     }
   });
   return balances;
+}
+
+// ── PERIOD FILTER ────────────────────────────────────────────
+function getPeriodRange() {
+  const p = state.period;
+  if (!p || p.type === 'all') return { start: null, end: null };
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  if (p.type === 'this_month') {
+    return {
+      start: new Date(year, month, 1).toISOString().split('T')[0],
+      end: new Date(year, month + 1, 0).toISOString().split('T')[0]
+    };
+  }
+  if (p.type === 'prev_month') {
+    const prev = new Date(year, month - 1, 1);
+    return {
+      start: prev.toISOString().split('T')[0],
+      end: new Date(prev.getFullYear(), prev.getMonth() + 1, 0).toISOString().split('T')[0]
+    };
+  }
+  if (p.type === 'next_month') {
+    const next = new Date(year, month + 1, 1);
+    return {
+      start: next.toISOString().split('T')[0],
+      end: new Date(next.getFullYear(), next.getMonth() + 1, 0).toISOString().split('T')[0]
+    };
+  }
+  if (p.type === 'last_3_months') {
+    const start = new Date(year, month - 2, 1);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: now.toISOString().split('T')[0]
+    };
+  }
+  if (p.type === 'custom') {
+    return { start: p.startDate || null, end: p.endDate || null };
+  }
+  return { start: null, end: null };
+}
+
+function isTxInPeriod(tx) {
+  const range = getPeriodRange();
+  if (!range.start && !range.end) return true;
+  const d = tx.date || '';
+  if (range.start && d < range.start) return false;
+  if (range.end && d > range.end) return false;
+  return true;
+}
+
+function getPeriodLabel() {
+  const p = state.period;
+  if (!p || p.type === 'all') return 'Todos';
+  if (p.type === 'this_month') return 'Este mes';
+  if (p.type === 'prev_month') return 'Mes anterior';
+  if (p.type === 'next_month') return 'Próximo mes';
+  if (p.type === 'last_3_months') return 'Últimos 3 meses';
+  if (p.type === 'custom') {
+    if (p.startDate && p.endDate) return formatDate(p.startDate) + ' – ' + formatDate(p.endDate);
+    if (p.startDate) return 'Desde ' + formatDate(p.startDate);
+    if (p.endDate) return 'Hasta ' + formatDate(p.endDate);
+    return 'Personalizado';
+  }
+  return 'Todos';
 }
 
 // ── helpers de color de tag ───────────────────────────────────

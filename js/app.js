@@ -18,14 +18,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // Fetch exchange rates, then render
   fetchExchangeRates().then(() => {
     if (lastView === 'main' && lastFilter) {
-      filterTransactions(lastFilter);
+      if (lastFilter.startsWith('multi:')) {
+        const ids = lastFilter.replace('multi:', '').split(',').filter(Boolean);
+        if (ids.length > 1) {
+          state.selectedAccounts = ids;
+          state.currentView = 'multi';
+          showView('main');
+          clearTxSelection();
+          renderAll();
+        } else {
+          filterTransactions(ids[0] || 'all');
+        }
+      } else {
+        filterTransactions(lastFilter);
+      }
     } else {
       showView(lastView);
     }
     renderAll();
+    updatePeriodLabel();
     initColumnResize();
     initCatIconPicker();
     initCsvDropzone();
+    initTagsTrash();
   });
 
   // Re-draw charts on resize
@@ -39,10 +54,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 120);
   });
 
-  // Close section dropdown on outside click
+  // Close dropdowns on outside click
   document.addEventListener('click', e => {
     const dd = document.querySelector('.dash-section-dropdown');
     if (dd && !dd.contains(e.target)) dd.classList.remove('open');
+    const accFilter = document.getElementById('dash-acc-filter');
+    if (accFilter && !accFilter.contains(e.target)) accFilter.classList.remove('open');
+    const pdd = document.getElementById('period-dropdown');
+    if (pdd && pdd.classList.contains('open') && !e.target.closest('.period-selector')) {
+      pdd.classList.remove('open');
+    }
+    const pcal = document.getElementById('period-calendar-popup');
+    if (pcal && pcal.classList.contains('open') && !e.target.closest('.modal-card') && !e.target.closest('.period-option-custom')) {
+      closePeriodCalendar();
+    }
   });
 });
 
@@ -66,6 +91,10 @@ function showView(name) {
   document.getElementById('nav-dash-pill').classList.toggle('active', name === 'dashboard');
   localStorage.setItem('wallet_last_view', name);
 
+  if (name === 'dashboard') {
+    dashSyncAccountsFromSidebar();
+  }
+
   if (name !== 'main') {
     state.currentView = '';
     renderSidebar();
@@ -73,7 +102,6 @@ function showView(name) {
 
   if (name === 'dashboard') {
     renderDashboard();
-    // Sync theme icon
     applyTheme();
   }
 
@@ -257,15 +285,12 @@ window.handleTransactionSubmit   = handleTransactionSubmit;
 window.deleteTransaction         = deleteTransaction;
 window.markAsCollected           = markAsCollected;
 window.filterTransactions        = filterTransactions;
+window.toggleAccountSelection   = toggleAccountSelection;
+window.toggleTypeSelection      = toggleTypeSelection;
 window.openAccountCreator        = openAccountCreator;
 window.openImportModal           = openImportModal;
 window.closeImportModal          = closeImportModal;
-window.openGeminiImportModal     = openGeminiImportModal;
-window.closeGeminiImportModal    = closeGeminiImportModal;
-window.backToImportSetup         = backToImportSetup;
-window.processImportWithGemini   = processImportWithGemini;
-window.confirmImportedTransactions = confirmImportedTransactions;
-window.updateImportedTx          = updateImportedTx;
+window.onAiFileSelected          = onAiFileSelected;
 window.renderTransactions        = renderTransactions;
 window.openHelpModal             = openHelpModal;
 window.closeHelpModal            = closeHelpModal;
@@ -284,9 +309,33 @@ window.batchDeleteTransactions   = batchDeleteTransactions;
 window.dashToggleSection         = dashToggleSection;
 window.dashToggleDropdown        = dashToggleDropdown;
 window.dashCloseDropdown         = dashCloseDropdown;
+window.dashToggleAccDropdown     = dashToggleAccDropdown;
+window.dashCloseAccDropdown      = dashCloseAccDropdown;
+window.dashToggleAccountFilter   = dashToggleAccountFilter;
+window.dashToggleAccountSidebar  = dashToggleAccountSidebar;
+window.dashToggleAllAccounts     = dashToggleAllAccounts;
+window.dashCloseDropdown         = dashCloseDropdown;
 window.onCsvFileSelected         = onCsvFileSelected;
 window.reparseCsv                = reparseCsv;
 window.onCsvMappingChange        = onCsvMappingChange;
 window.confirmCsvImport          = confirmCsvImport;
 window.loadSampleCsv             = loadSampleCsv;
 window.resetCsvImport            = resetCsvImport;
+window.togglePeriodDropdown      = togglePeriodDropdown;
+window.setPeriod                 = setPeriod;
+window.openPeriodCalendar        = openPeriodCalendar;
+window.closePeriodCalendar       = closePeriodCalendar;
+window.switchCalMode             = switchCalMode;
+window.calNavMonth               = calNavMonth;
+window.calNavYear                = calNavYear;
+window.applyPeriodCalendar       = applyPeriodCalendar;
+window.clearPeriodCalendar       = clearPeriodCalendar;
+window.calSelectDay              = calSelectDay;
+window.calSelectMonth            = calSelectMonth;
+window.exportBackup             = exportBackup;
+window.openImportBackupModal    = openImportBackupModal;
+window.closeImportBackupModal   = closeImportBackupModal;
+window.onImportBackupFile       = onImportBackupFile;
+window.confirmImportBackup      = confirmImportBackup;
+window.confirmDeleteAllData     = confirmDeleteAllData;
+window.clearBackupDates         = clearBackupDates;

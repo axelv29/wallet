@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="css/settings.css">
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/helpers.css">
+  <link rel="stylesheet" href="css/period.css">
 </head>
 <body class="theme-light">
 
@@ -33,6 +34,24 @@
     <div class="sidebar-primary">
       <div class="sidebar-label-sm">Patrimonio neto</div>
       <div class="net-worth-amount" id="net-worth-val">$0,00</div>
+      <div class="period-selector">
+        <button class="period-btn" id="period-btn" onclick="togglePeriodDropdown()">
+          <i data-lucide="calendar"></i>
+          <span id="period-label">Todos</span>
+          <i data-lucide="chevron-down" class="period-chevron"></i>
+        </button>
+        <div class="period-dropdown" id="period-dropdown">
+          <button class="period-option" data-period="all" onclick="setPeriod('all')">Todos</button>
+          <button class="period-option" data-period="this_month" onclick="setPeriod('this_month')">Este mes</button>
+          <button class="period-option" data-period="prev_month" onclick="setPeriod('prev_month')">Mes anterior</button>
+          <button class="period-option" data-period="next_month" onclick="setPeriod('next_month')">Próximo mes</button>
+          <button class="period-option" data-period="last_3_months" onclick="setPeriod('last_3_months')">Últimos 3 meses</button>
+          <div class="period-separator"></div>
+          <button class="period-option period-option-custom" data-period="custom" onclick="openPeriodCalendar()">
+            <i data-lucide="calendar-range"></i> Fecha personalizada...
+          </button>
+        </div>
+      </div>
     </div>
 
     <button class="sidebar-dash-btn" id="nav-dash-pill" onclick="showView('dashboard')">
@@ -53,7 +72,7 @@
 
         <div class="sidebar-section-group">
           <div class="sidebar-header-row">
-            <span class="section-filter-label" onclick="filterTransactions('type-liquid')">Líquidas</span>
+            <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('liquid');}else{filterTransactions('type-liquid');}">Líquidas</span>
             <button class="sidebar-add-btn" onclick="openAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
           </div>
           <ul class="account-list" id="sidebar-liquid-list"></ul>
@@ -61,7 +80,7 @@
 
         <div class="sidebar-section-group">
           <div class="sidebar-header-row">
-            <span class="section-filter-label" onclick="filterTransactions('type-credit_card')">Tarjetas de crédito</span>
+            <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('credit_card');}else{filterTransactions('type-credit_card');}">Tarjetas de crédito</span>
             <button class="sidebar-add-btn" onclick="openAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
           </div>
           <ul class="account-list" id="sidebar-credit-list"></ul>
@@ -205,7 +224,16 @@
             <span class="dash-month-label" id="dash-month-label">Junio 2026</span>
             <button class="dash-month-btn" id="dash-month-next" onclick="dashNextMonth()"><i data-lucide="chevron-right"></i></button>
           </div>
-          <div class="dash-section-dropdown">
+          <div class="dash-toolbar-right">
+            <div class="dash-acc-filter" id="dash-acc-filter">
+              <button class="dash-section-btn" onclick="dashToggleAccDropdown()">
+                <i data-lucide="wallet"></i>
+                <span id="dash-acc-label">Todas las cuentas</span>
+                <i data-lucide="chevron-down" class="dash-section-chevron"></i>
+              </button>
+              <div class="dash-acc-menu" id="dash-acc-menu"></div>
+            </div>
+            <div class="dash-section-dropdown">
             <button class="dash-section-btn" id="dash-section-btn" onclick="dashToggleDropdown()">
               <i data-lucide="columns-3"></i>
               <span>Secciones</span>
@@ -229,6 +257,7 @@
                 <span>Cobertura</span>
               </label>
             </div>
+          </div>
           </div>
         </div>
 
@@ -429,9 +458,6 @@
           <button class="settings-nav-btn" id="snav-tags" onclick="switchSettingsPane('tags')">
             <i data-lucide="hash"></i> Etiquetas
           </button>
-          <button class="settings-nav-btn" id="snav-currency" onclick="switchSettingsPane('currency')">
-            <i data-lucide="dollar-sign"></i> Moneda
-          </button>
         </nav>
 
         <div class="settings-pane-wrap">
@@ -440,9 +466,44 @@
           <div class="settings-pane active" id="spane-general">
             <div class="pane-section-title">Configuración general</div>
 
-            <!-- Color scheme section -->
-            <div class="theme-section">
-              <div class="theme-section-label">Tema</div>
+            <!-- ── Moneda ── -->
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">Moneda</div>
+              <form onsubmit="saveCurrencySettings(event)">
+                <div class="form-group">
+                  <label class="form-label">Divisa</label>
+                  <select id="set-currency" class="sel-fit">
+                    <option value="ARS">ARS Peso argentino</option>
+                    <option value="USD">USD Dólar</option>
+                    <option value="EUR">EUR Euro</option>
+                    <option value="UYU">UYU Peso uruguayo</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Símbolo de moneda</label>
+                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="set-show-symbol" checked>
+                    <span>Mostrar símbolo ($, €, etc.)</span>
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Decimales</label>
+                  <select id="set-decimals" class="sel-fit">
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2" selected>2</option>
+                    <option value="3">3</option>
+                  </select>
+                </div>
+                <div style="margin-top:14px;">
+                  <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- ── Tema ── -->
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">Tema</div>
               <div class="scheme-grid">
                 <button class="scheme-card active" data-scheme="default" onclick="setColorScheme('default')">
                   <div class="scheme-dots">
@@ -510,19 +571,58 @@
               </div>
             </div>
 
-            <div style="margin-top:18px;"></div>
+            <!-- ── API ── -->
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">API</div>
+              <form onsubmit="saveGeneralSettings(event)">
+                <div class="form-group">
+                  <label class="form-label">Gemini API Key</label>
+                  <input type="password" id="set-gemini-key" placeholder="AIzaSy…" style="max-width:380px;">
+                  <span class="help-note">La clave se almacena únicamente en el almacenamiento local de tu navegador.</span>
+                </div>
+                <div style="margin-top:14px;">
+                  <button type="submit" class="btn btn-primary">Guardar configuración</button>
+                </div>
+              </form>
+            </div>
 
-            <!-- Gemini API Key -->
-            <form onsubmit="saveGeneralSettings(event)">
-              <div class="form-group">
-                <label class="form-label">Gemini API Key</label>
-                <input type="password" id="set-gemini-key" placeholder="AIzaSy…" style="max-width:380px;">
-                <span class="help-note">La clave se almacena únicamente en el almacenamiento local de tu navegador.</span>
+            <!-- ── Backup ── -->
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">Backup de datos</div>
+              <p class="help-note" style="margin-bottom:12px;">Exportá tus transacciones y cuentas a un archivo JSON. Podés filtrar por fechas o exportar todo.</p>
+              <div class="backup-export-row">
+                <div class="form-row" style="align-items:end;">
+                  <div class="form-group">
+                    <label class="form-label">Desde</label>
+                    <input type="date" id="backup-date-from">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Hasta</label>
+                    <input type="date" id="backup-date-to">
+                  </div>
+                  <div class="form-group">
+                    <button class="btn" onclick="clearBackupDates()" type="button">Todos los tiempos</button>
+                  </div>
+                </div>
+                <div class="backup-actions">
+                  <button class="btn btn-primary" onclick="exportBackup()">
+                    <i data-lucide="download"></i> Exportar backup
+                  </button>
+                  <button class="btn" onclick="openImportBackupModal()">
+                    <i data-lucide="upload"></i> Importar backup
+                  </button>
+                </div>
               </div>
-              <div style="margin-top:14px;">
-                <button type="submit" class="btn btn-primary">Guardar configuración</button>
-              </div>
-            </form>
+            </div>
+
+            <!-- ── Zona de peligro ── -->
+            <div class="pane-subsection">
+              <div class="pane-subsection-title">Zona de peligro</div>
+              <p class="help-note" style="margin-bottom:12px;">Borrá todos tus datos: transacciones, cuentas y listas personalizadas. Las categorías, beneficiarios y etiquetas predeterminadas se mantienen.</p>
+              <button class="btn btn-danger" onclick="confirmDeleteAllData()">
+                <i data-lucide="trash-2"></i> Borrar todos los datos
+              </button>
+            </div>
           </div>
 
           <!-- Accounts -->
@@ -623,41 +723,6 @@
             </div>
           </div>
 
-          <!-- Currency -->
-          <div class="settings-pane" id="spane-currency">
-            <div class="pane-section-title">Moneda</div>
-            <form onsubmit="saveCurrencySettings(event)">
-              <div class="form-group">
-                <label class="form-label">Divisa</label>
-                <select id="set-currency" class="sel-fit">
-                  <option value="ARS">ARS Peso argentino</option>
-                  <option value="USD">USD Dólar</option>
-                  <option value="EUR">EUR Euro</option>
-                  <option value="UYU">UYU Peso uruguayo</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Símbolo de moneda</label>
-                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                  <input type="checkbox" id="set-show-symbol" checked>
-                  <span>Mostrar símbolo ($, €, etc.)</span>
-                </label>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Decimales</label>
-                <select id="set-decimals" class="sel-fit">
-                  <option value="0">0</option>
-                  <option value="1">1</option>
-                  <option value="2" selected>2</option>
-                  <option value="3">3</option>
-                </select>
-              </div>
-              <div style="margin-top:14px;">
-                <button type="submit" class="btn btn-primary">Guardar</button>
-              </div>
-            </form>
-          </div>
-
         </div><!-- /.settings-pane-wrap -->
       </div><!-- /.settings-layout -->
     </div><!-- /#view-settings -->
@@ -743,7 +808,12 @@
 
         <div class="form-group">
           <label class="form-label">Etiquetas</label>
-          <div class="tags-box" id="tx-tags-checklist"></div>
+          <div class="tags-wrapper">
+            <div class="tags-box" id="tx-tags-checklist"></div>
+            <div class="tags-trash" id="tx-tags-trash">
+              <i data-lucide="trash-2"></i>
+            </div>
+          </div>
         </div>
 
         <div class="form-group">
@@ -778,57 +848,7 @@
   </div>
 </div>
 
-<!-- ══════════════ MODAL: Importar extracto ══════════════ -->
-<div class="modal-overlay" id="import-modal">
-  <div class="modal-card wide">
-    <div class="modal-head">
-      <span class="modal-title">Importar extracto bancario</span>
-      <button class="modal-close" onclick="closeGeminiImportModal()"><i data-lucide="x"></i></button>
-    </div>
-    <div class="modal-body import-body">
-
-      <div id="import-setup-view">
-        <div class="form-group">
-          <label class="form-label">Pegá el texto del extracto o CSV</label>
-          <textarea id="import-text" rows="8" placeholder="Ejemplo:
-02/06  Supermercado    -12000
-03/06  Sueldo recibido  150000"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Asignar movimientos a la cuenta</label>
-          <select id="import-account-id"></select>
-        </div>
-        <button class="btn btn-primary w-full" id="btn-process-import" onclick="processImportWithGemini()">
-          <i data-lucide="sparkles"></i> Procesar con Gemini IA
-        </button>
-      </div>
-
-      <div id="import-review-view" style="display:none;">
-        <p style="font-size:12px; color:var(--text-lo); margin-bottom:8px;">Revisá y ajustá las transacciones detectadas antes de confirmar.</p>
-        <div class="compact-table">
-          <table class="ledger">
-            <thead>
-              <tr>
-                <th style="width:100px;">Fecha</th>
-                <th>Beneficiario</th>
-                <th style="width:140px;">Categoría</th>
-                <th class="r" style="width:110px;">Monto</th>
-              </tr>
-            </thead>
-            <tbody id="import-review-tbody"></tbody>
-          </table>
-        </div>
-        <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:12px;">
-          <button class="btn" onclick="backToImportSetup()">← Atrás</button>
-          <button class="btn btn-primary" onclick="confirmImportedTransactions()">Importar movimientos</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════ MODAL: Importar CSV/XLS ══════════════ -->
+<!-- ══════════════ MODAL: Importar CSV/XLS/PDF/IMG ══════════════ -->
 <div class="modal-overlay" id="csv-import-modal">
   <div class="modal-card wide csv-import-card">
     <div class="modal-head">
@@ -852,12 +872,13 @@
           <button class="btn" onclick="loadSampleCsv('bank')"><i data-lucide="file-text"></i> Extracto bancario</button>
           <button class="btn" onclick="loadSampleCsv('credit')"><i data-lucide="credit-card"></i> Tarjeta de crédito</button>
         </div>
-        <div class="csv-ai-divider">
-          <span>o importá desde texto con IA</span>
+        <div class="csv-ai-row">
+          <span class="csv-ai-row-label">¿Tenés un PDF o imagen del extracto?</span>
+          <button class="btn csv-ai-btn" onclick="document.getElementById('csv-ai-file-input').click()">
+            <i data-lucide="sparkles"></i> Importar con IA
+          </button>
+          <input type="file" id="csv-ai-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp" style="display:none;" onchange="onAiFileSelected(event)">
         </div>
-        <button class="btn csv-ai-btn" onclick="openGeminiImportModal()">
-          <i data-lucide="sparkles"></i> Importar con inteligencia artificial
-        </button>
       </div>
 
       <!-- Step 2: Config & Mapping -->
@@ -1006,6 +1027,109 @@
   </div>
 </div>
 
+<!-- ══════════════ MODAL: Importar Backup ══════════════ -->
+<div class="modal-overlay" id="import-backup-modal">
+  <div class="modal-card" style="max-width:420px;">
+    <div class="modal-head">
+      <span class="modal-title">Importar backup</span>
+      <button class="modal-close" onclick="closeImportBackupModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="import-backup-upload">
+        <div class="csv-dropzone" onclick="document.getElementById('import-backup-input').click()">
+          <i data-lucide="upload" class="csv-dropzone-icon"></i>
+          <div class="csv-dropzone-text">
+            <span class="csv-dropzone-title">Seleccioná tu archivo de backup</span>
+            <span class="csv-dropzone-sub">o arrastralo acá · Archivo .json</span>
+          </div>
+          <input type="file" id="import-backup-input" accept=".json" style="display:none;" onchange="onImportBackupFile(event)">
+        </div>
+      </div>
+      <div id="import-backup-preview" style="display:none;">
+        <div class="import-backup-info">
+          <div class="import-backup-info-row">
+            <i data-lucide="file-text"></i>
+            <span id="import-backup-filename"></span>
+          </div>
+          <div class="import-backup-stats" id="import-backup-stats"></div>
+        </div>
+        <div class="form-group" style="margin-top:12px;">
+          <label class="form-label">¿Cómo querés importar?</label>
+          <div class="import-backup-mode">
+            <label class="import-backup-option">
+              <input type="radio" name="import-backup-mode" value="replace" checked>
+              <span class="import-backup-option-text">
+                <strong>Reemplazar</strong>
+                <small>Borra todos los datos actuales y carga el backup</small>
+              </span>
+            </label>
+            <label class="import-backup-option">
+              <input type="radio" name="import-backup-mode" value="merge">
+              <span class="import-backup-option-text">
+                <strong>Agregar</strong>
+                <small>Agrega las transacciones y cuentas del backup a las existentes</small>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeImportBackupModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirm-import-backup" onclick="confirmImportBackup()" style="display:none;">
+        <i data-lucide="download"></i> Importar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ POPUP: Calendario de período ══════════════ -->
+<div class="modal-overlay" id="period-calendar-popup">
+  <div class="modal-card" style="max-width:340px;">
+    <div class="modal-head">
+      <span class="modal-title">Seleccionar período</span>
+      <button class="modal-close" onclick="closePeriodCalendar()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:0 16px;">
+      <div class="period-cal-tabs">
+        <button class="period-cal-tab active" data-cal-mode="days" onclick="switchCalMode('days')">Días</button>
+        <button class="period-cal-tab" data-cal-mode="months" onclick="switchCalMode('months')">Meses</button>
+      </div>
+      <div class="period-cal-body" id="period-cal-body-days">
+        <div class="period-cal-nav">
+          <button class="period-cal-nav-btn" onclick="calNavYear(-1)"><i data-lucide="chevrons-left"></i></button>
+          <button class="period-cal-nav-btn" onclick="calNavMonth(-1)"><i data-lucide="chevron-left"></i></button>
+          <span class="period-cal-month-label" id="period-cal-month-label"></span>
+          <button class="period-cal-nav-btn" onclick="calNavMonth(1)"><i data-lucide="chevron-right"></i></button>
+          <button class="period-cal-nav-btn" onclick="calNavYear(1)"><i data-lucide="chevrons-right"></i></button>
+        </div>
+        <div class="period-cal-weekdays">
+          <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span>
+        </div>
+        <div class="period-cal-grid" id="period-cal-grid"></div>
+        <div class="period-cal-range-display">
+          <span id="period-cal-range-text">Seleccioná un rango de fechas</span>
+        </div>
+      </div>
+      <div class="period-cal-body period-cal-body-months" id="period-cal-body-months" style="display:none;">
+        <div class="period-cal-nav">
+          <button class="period-cal-nav-btn" onclick="calNavYear(-1)"><i data-lucide="chevrons-left"></i></button>
+          <span class="period-cal-month-label" id="period-cal-year-label"></span>
+          <button class="period-cal-nav-btn" onclick="calNavYear(1)"><i data-lucide="chevrons-right"></i></button>
+        </div>
+        <div class="period-cal-grid period-cal-months-grid" id="period-cal-months-grid"></div>
+        <div class="period-cal-range-display">
+          <span id="period-cal-month-range-text">Seleccioná un rango de meses</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="clearPeriodCalendar()">Limpiar</button>
+      <button class="btn btn-primary" onclick="applyPeriodCalendar()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/state.js"></script>
 <script src="js/currency.js"></script>
 <script src="js/utils.js"></script>
@@ -1015,6 +1139,8 @@
 <script src="js/dashboard.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/import.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/calendar.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

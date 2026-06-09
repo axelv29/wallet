@@ -24,6 +24,7 @@
 - `js/dashboard.js` — Dashboard, charts, navegación mensual
 - `js/settings.js` — Settings, cuentas, predefinidos, icon picker
 - `js/import.js` — Gemini import, CSV/XLS parsing
+- `js/backup.js` — Exportación e importación de datos (backup JSON)
 - `js/app.js` — Init, showView, theme, shortcuts, renderAll, window.* bindings
 - `schema.sql` — Schema PostgreSQL de referencia (no usado actualmente)
 
@@ -61,6 +62,12 @@
 - `predefined-payees-list` / `predefined-categories-list` / `predefined-tags-list` — Listas editables
 - `set-gemini-key` — Input de API key
 - `import-text` / `import-account-id` / `import-review-tbody` — Modal de importación
+- `import-backup-modal` — Modal de importación de backup
+- `import-backup-upload` / `import-backup-preview` — Secciones del modal de backup
+- `import-backup-input` — Input de archivo de backup
+- `import-backup-filename` / `import-backup-stats` — Info del archivo de backup
+- `btn-confirm-import-backup` — Botón de confirmación de importación
+- `backup-date-from` / `backup-date-to` — Filtros de fecha para exportación de backup
 - `sidebar-liquid-list` / `sidebar-credit-list` — Listas de cuentas en sidebar
 - `receivables-sum-val` — Suma de préstamos activos
 - `theme-icon` / `theme-icon-settings` — Íconos de tema
@@ -83,6 +90,7 @@
 - `settings-nav-btn` — Botones de navegación de settings (modificador `.active`)
 - `settings-pane` — Paneles de settings (modificador `.active`)
 - `btn` — Botones (modificador `.btn-primary` / `.btn-ghost` / `.w-full`)
+- `btn-danger` — Botón de peligro (fondo rojo, para acciones destructivas)
 - `theme-light` / `theme-dark` — Modo en body
 - `scheme-ocean` / `scheme-forest` / `scheme-lavender` / `scheme-midnight` / `scheme-ember` / `scheme-default-dark` — Esquemas de color en body
 - `scheme-grid` / `scheme-card` — Grid de esquemas de color (modificador `.active`)
@@ -156,12 +164,19 @@
 - `formatDate(dateString)` — Formatea a locale argentino
 - `fetchExchangeRates()` — Descarga cotizaciones de open.er-api.com (cache 24h en localStorage)
 - `convertCurrency(value, from, to)` — Convierte monto entre monedas usando cotizaciones cacheadas
+- `exportBackup()` — Exporta todos los datos a un archivo JSON descargable
+- `openImportBackupModal()` — Abre modal de importación de backup
+- `closeImportBackupModal()` — Cierra modal de importación
+- `onImportBackupFile(e)` — Procesa archivo JSON seleccionado
+- `confirmImportBackup()` — Confirma e ejecuta la importación (reemplazar o agregar)
+- `confirmDeleteAllData()` — Abre modal de confirmación para borrar todos los datos
+- `deleteAllData()` — Ejecuta el borrado: transacciones, cuentas y listas personalizadas
 
 ### Predefinidos editables
 ```js
 state.predefined = {
   payees: ['Leo', 'Escaramuza', ...],
-  categories: ['Fuera del presupuesto', 'Entretenimiento', ...],
+  categories: ['Fuera del presupuesto', 'Entretenimiento', ...],  // + 'Sin asignar' (protegida, no se puede borrar)
   tags: ['Rocio', 'NyL', 'pan', 'viaje', 'compras']
 }
 ```
@@ -323,3 +338,5 @@ state.predefined = {
 - [x] Persistencia con localStorage
 - [x] Dashboard con resumen mensual, categorías y cobertura
 - [x] Modal de ayuda explicativo
+- [x] Backup de datos (exportar/importar JSON con filtro de fechas)
+- [x] Borrar todos los datos (con confirmación, mantiene predefinidos)

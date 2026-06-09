@@ -9,6 +9,7 @@
 // ── DASHBOARD STATE ───────────────────────────────────────────
 let dashState = {
   month: null, // { year, month } — null = current
+  accounts: null, // null = all, array of account IDs = filtered
   visibleSections: { resumen: true, gastos: true, ingresos: true, cobertura: true },
   lineChartInstance: null,
   donutChartInstance: null,
@@ -16,9 +17,40 @@ let dashState = {
 };
 
 function dashGetPeriod() {
-  if (dashState.month) return dashState.month;
+  // When global period is active, derive from it
+  const p = state.period;
+  if (p && p.type !== 'all') {
+    const range = getPeriodRange();
+    if (range.start) {
+      const d = new Date(range.start + 'T00:00:00');
+      return { year: d.getFullYear(), month: d.getMonth(), range };
+    }
+    if (range.end) {
+      const d = new Date(range.end + 'T00:00:00');
+      return { year: d.getFullYear(), month: d.getMonth(), range };
+    }
+  }
+  if (dashState.month) return { ...dashState.month, range: null };
   const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() };
+  return { year: now.getFullYear(), month: now.getMonth(), range: null };
+}
+
+function dashGetTxForPeriod() {
+  const period = dashGetPeriod();
+  let txs;
+  if (period.range && (period.range.start || period.range.end)) {
+    txs = state.transactions.filter(tx => isTxInPeriod(tx));
+  } else {
+    txs = state.transactions.filter(tx => {
+      const d = new Date(tx.date + 'T00:00:00');
+      return d.getMonth() === period.month && d.getFullYear() === period.year;
+    });
+  }
+  if (dashState.accounts !== null) {
+    const accSet = new Set(dashState.accounts);
+    txs = txs.filter(tx => accSet.has(tx.account_id));
+  }
+  return txs;
 }
 
 function dashPrevMonth() {
@@ -54,6 +86,118 @@ function dashToggleDropdown() {
 function dashCloseDropdown() {
   const dd = document.querySelector('.dash-section-dropdown');
   if (dd) dd.classList.remove('open');
+}
+
+// ── ACCOUNT FILTER (dashboard) ──────────────────────────────
+function dashToggleAccDropdown() {
+  const dd = document.getElementById('dash-acc-filter');
+  if (dd) dd.classList.toggle('open');
+}
+
+function dashCloseAccDropdown() {
+  const dd = document.getElementById('dash-acc-filter');
+  if (dd) dd.classList.remove('open');
+}
+
+function dashSyncAccountsFromSidebar() {
+  if (state.selectedAccounts.length > 0) {
+    dashState.accounts = [...state.selectedAccounts];
+  } else if (state.currentView !== 'all' && state.currentView !== 'multi' && !state.currentView.startsWith('type-') && state.currentView !== 'receivables') {
+    dashState.accounts = [state.currentView];
+  } else {
+    dashState.accounts = null;
+  }
+  dashBuildAccMenu();
+  dashUpdateAccLabel();
+}
+
+function dashBuildAccMenu() {
+  const menu = document.getElementById('dash-acc-menu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  const isAll = !dashState.accounts;
+  const selSet = new Set(dashState.accounts || []);
+
+  const allItem = document.createElement('label');
+  allItem.className = 'dash-acc-item';
+  allItem.innerHTML = `<input type="checkbox" ${isAll ? 'checked' : ''} onchange="dashToggleAllAccounts()"><span>Todas las cuentas</span>`;
+  menu.appendChild(allItem);
+
+  const sep = document.createElement('div');
+  sep.className = 'dash-acc-separator';
+  menu.appendChild(sep);
+
+  state.accounts.forEach(acc => {
+    const checked = isAll || selSet.has(acc.id);
+    const item = document.createElement('label');
+    item.className = 'dash-acc-item';
+    item.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} onchange="dashToggleAccountFilter('${acc.id}')"><span>${acc.name}</span>`;
+    menu.appendChild(item);
+  });
+}
+
+function dashUpdateAccLabel() {
+  const label = document.getElementById('dash-acc-label');
+  if (!label) return;
+  if (!dashState.accounts) {
+    label.textContent = 'Todas las cuentas';
+  } else if (dashState.accounts.length === 0) {
+    label.textContent = 'Sin cuentas';
+  } else if (dashState.accounts.length === 1) {
+    const acc = state.accounts.find(a => a.id === dashState.accounts[0]);
+    label.textContent = acc ? acc.name : '1 cuenta';
+  } else {
+    label.textContent = dashState.accounts.length + ' cuentas';
+  }
+}
+
+function dashToggleAllAccounts() {
+  dashState.accounts = dashState.accounts ? null : [];
+  dashBuildAccMenu();
+  dashUpdateAccLabel();
+  renderDashboard();
+}
+
+function dashToggleAccountFilter(accId) {
+  if (!dashState.accounts) {
+    dashState.accounts = state.accounts.map(a => a.id).filter(id => id !== accId);
+  } else {
+    const idx = dashState.accounts.indexOf(accId);
+    if (idx === -1) {
+      dashState.accounts.push(accId);
+    } else {
+      dashState.accounts.splice(idx, 1);
+    }
+    if (dashState.accounts.length === state.accounts.length) {
+      dashState.accounts = null;
+    }
+  }
+  dashBuildAccMenu();
+  dashUpdateAccLabel();
+  renderDashboard();
+}
+
+function dashToggleAccountSidebar(accId) {
+  if (!dashState.accounts || dashState.accounts.length === 0) {
+    dashState.accounts = [accId];
+  } else if (dashState.accounts.length === 1 && dashState.accounts[0] === accId) {
+    dashState.accounts = null;
+  } else {
+    const idx = dashState.accounts.indexOf(accId);
+    if (idx === -1) {
+      dashState.accounts.push(accId);
+    } else {
+      if (dashState.accounts.length <= 1) return;
+      dashState.accounts.splice(idx, 1);
+    }
+    if (dashState.accounts.length === state.accounts.length) {
+      dashState.accounts = null;
+    }
+  }
+  state.selectedAccounts = dashState.accounts ? [...dashState.accounts] : [];
+  dashBuildAccMenu();
+  dashUpdateAccLabel();
+  renderAll();
 }
 
 // ── Chart helpers (pure canvas, no dependencies) ──────────────
@@ -280,7 +424,8 @@ function drawProgressCircle(circleEl, pct) {
 
 // ── MAIN renderDashboard ──────────────────────────────────────
 function renderDashboard() {
-  const balances = calculateBalances();
+  const accFilter = dashState.accounts !== null ? (dashState.accounts.length > 0 ? dashState.accounts : []) : null;
+  const balances = calculateBalances(accFilter);
   const period = dashGetPeriod();
   const now = new Date();
 
@@ -304,17 +449,27 @@ function renderDashboard() {
 
   // ── Month label ──
   const monthLabel = document.getElementById('dash-month-label');
+  const prevBtn = document.getElementById('dash-month-prev');
+  const nextBtn = document.getElementById('dash-month-next');
+  const hasGlobalPeriod = state.period && state.period.type !== 'all';
   if (monthLabel) {
-    const d = new Date(period.year, period.month, 1);
-    monthLabel.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' })
-      .replace(/^./, s => s.toUpperCase());
+    const p = state.period;
+    if (hasGlobalPeriod) {
+      monthLabel.textContent = getPeriodLabel();
+    } else if (dashState.month) {
+      const d = new Date(period.year, period.month, 1);
+      monthLabel.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' })
+        .replace(/^./, s => s.toUpperCase());
+    } else {
+      monthLabel.textContent = 'Resumen total';
+    }
   }
+  // Hide prev/next buttons when global period is active
+  if (prevBtn) prevBtn.style.display = hasGlobalPeriod ? 'none' : '';
+  if (nextBtn) nextBtn.style.display = hasGlobalPeriod ? 'none' : '';
 
-  // ── Filter transactions for selected month ──
-  const monthTxs = state.transactions.filter(tx => {
-    const d = new Date(tx.date + 'T00:00:00');
-    return d.getMonth() === period.month && d.getFullYear() === period.year;
-  });
+  // ── Filter transactions for selected period ──
+  const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
 
   let totalIncome = 0, totalExpenses = 0;
   monthTxs.forEach(tx => {
@@ -452,7 +607,12 @@ function renderDashboard() {
   const recentList = document.getElementById('dash-recent-list');
   if (recentList) {
     recentList.innerHTML = '';
-    const recent = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+    let recent = [...state.transactions].filter(tx => !tx.is_future && isTxInPeriod(tx));
+    if (dashState.accounts !== null) {
+      const accSet = new Set(dashState.accounts);
+      recent = recent.filter(tx => accSet.has(tx.account_id));
+    }
+    recent.sort((a, b) => b.date.localeCompare(a.date)).splice(8);
     if (recent.length === 0) {
       recentList.innerHTML = '<div class="dash-empty">Sin movimientos aún</div>';
     } else {
@@ -488,29 +648,61 @@ function renderDashboard() {
 }
 
 function renderDashCharts() {
-  // ── Line chart (last 6 months) ──
+  // ── Line chart ──
   const lineCanvas = document.getElementById('dash-line-chart');
   if (lineCanvas && dashState.visibleSections.resumen && lineCanvas.offsetWidth > 0) {
     const labels = [];
     const incomeData = [];
     const expenseData = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - i);
-      const m = d.getMonth(), y = d.getFullYear();
-      const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
-      labels.push(label.charAt(0).toUpperCase() + label.slice(1));
-      let inc = 0, exp = 0;
-      state.transactions.forEach(tx => {
-        const td = new Date(tx.date + 'T00:00:00');
-        if (td.getMonth() === m && td.getFullYear() === y) {
-          if (tx.amount > 0) inc += tx.amount;
-          else exp += Math.abs(tx.amount);
-        }
-      });
-      incomeData.push(inc);
-      expenseData.push(exp);
+
+    const period = dashGetPeriod();
+    if (period.range && (period.range.start || period.range.end)) {
+      // Range-based: show months within the range
+      const startDate = period.range.start ? new Date(period.range.start + 'T00:00:00') : new Date(2020, 0, 1);
+      const endDate = period.range.end ? new Date(period.range.end + 'T00:00:00') : new Date();
+      const startMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+      let current = new Date(startMonth);
+      while (current <= endMonth) {
+        const m = current.getMonth(), y = current.getFullYear();
+        const label = current.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
+        labels.push(label.charAt(0).toUpperCase() + label.slice(1));
+        let inc = 0, exp = 0;
+        const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
+        state.transactions.forEach(tx => {
+          const td = new Date(tx.date + 'T00:00:00');
+          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future) {
+            if (accFilter && !accFilter.has(tx.account_id)) return;
+            if (tx.amount > 0) inc += tx.amount;
+            else exp += Math.abs(tx.amount);
+          }
+        });
+        incomeData.push(inc);
+        expenseData.push(exp);
+        current.setMonth(current.getMonth() + 1);
+      }
+    } else {
+      // No period or "all": show last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(1);
+        d.setMonth(d.getMonth() - i);
+        const m = d.getMonth(), y = d.getFullYear();
+        const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
+        labels.push(label.charAt(0).toUpperCase() + label.slice(1));
+        let inc = 0, exp = 0;
+        const accFilter2 = dashState.accounts !== null ? new Set(dashState.accounts) : null;
+        state.transactions.forEach(tx => {
+          const td = new Date(tx.date + 'T00:00:00');
+          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future) {
+            if (accFilter2 && !accFilter2.has(tx.account_id)) return;
+            if (tx.amount > 0) inc += tx.amount;
+            else exp += Math.abs(tx.amount);
+          }
+        });
+        incomeData.push(inc);
+        expenseData.push(exp);
+      }
     }
     drawLineChart(lineCanvas, labels, incomeData, expenseData);
   }
@@ -518,11 +710,7 @@ function renderDashCharts() {
   // ── Donut chart (expenses) ──
   const donutCanvas = document.getElementById('dash-donut-chart');
   if (donutCanvas && dashState.visibleSections.gastos && donutCanvas.offsetWidth > 0) {
-    const period = dashGetPeriod();
-    const monthTxs = state.transactions.filter(tx => {
-      const d = new Date(tx.date + 'T00:00:00');
-      return d.getMonth() === period.month && d.getFullYear() === period.year;
-    });
+    const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
     const catTotals = {};
     monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';
@@ -536,11 +724,7 @@ function renderDashCharts() {
   // ── Donut chart (income) ──
   const donutIncomeCanvas = document.getElementById('dash-donut-income-chart');
   if (donutIncomeCanvas && dashState.visibleSections.ingresos && donutIncomeCanvas.offsetWidth > 0) {
-    const period = dashGetPeriod();
-    const monthTxs = state.transactions.filter(tx => {
-      const d = new Date(tx.date + 'T00:00:00');
-      return d.getMonth() === period.month && d.getFullYear() === period.year;
-    });
+    const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
     const catTotals = {};
     monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';

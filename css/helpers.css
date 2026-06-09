@@ -48,7 +48,6 @@
 /* ═══════════════════════════════════════════════════════════
    IMPORT MODAL
    ═══════════════════════════════════════════════════════════ */
-.import-body { display: flex; flex-direction: column; gap: 10px; }
 
 /* ── MISC ────────────────────────────────────────────────── */
 .delete-btn {
@@ -323,18 +322,11 @@ tr.tx-future td {
 
 tr.tx-future:hover { opacity: 0.75; }
 
-/* subtle separator between future and present */
-tr.future-spacer td {
-  padding: 0 !important;
-  border-bottom: none !important;
-  height: 6px;
-  background: var(--bg-raised);
-}
-
 /* Separador "Cuotas futuras" colapsable */
 .future-group-row td {
   padding: 0 !important;
   border-bottom: none !important;
+  border-top: none !important;
 }
 
 .future-group-header {
@@ -342,6 +334,7 @@ tr.future-spacer td {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
+  line-height: 1;
   cursor: pointer;
   user-select: none;
   font-size: 10.5px;
@@ -356,9 +349,11 @@ tr.future-spacer td {
   font-size: 13px;
   transition: transform 0.15s;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
-.future-group-arrow.open { transform: rotate(90deg); }
+.future-group-arrow.open { transform: rotate(-90deg); }
 
 .future-group-count {
   margin-left: auto;
@@ -377,6 +372,12 @@ tr.future-spacer td {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+#csv-step-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* Drop zone */
@@ -684,37 +685,39 @@ tr.future-spacer td {
   overflow-y: auto;
 }
 
-/* ── AI import entry inside CSV modal ───────────────────── */
-.csv-ai-divider {
+/* ── AI import row ──────────────────────────────────────── */
+.csv-ai-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 6px 0 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
 }
 
-.csv-ai-divider::before,
-.csv-ai-divider::after {
-  content: '';
+.csv-ai-row-label {
+  font-size: 12px;
+  color: var(--text-mid);
   flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-.csv-ai-divider span {
-  font-size: 11px;
-  color: var(--text-lo);
-  white-space: nowrap;
-  text-transform: lowercase;
 }
 
 .csv-ai-btn {
-  width: 100%;
-  justify-content: center;
   color: var(--accent) !important;
   border-color: var(--accent) !important;
+  white-space: nowrap;
 }
 
 .csv-ai-btn:hover {
   background: var(--accent-soft) !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }
 

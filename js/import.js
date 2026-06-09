@@ -1,140 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  import.js — Importación de extractos bancarios (Gemini AI y CSV/XLS)
-//  Contiene: modales de importación, integración con Gemini API,
-//  procesamiento CSV/XLS, mapeo de columnas, preview, confirmación.
+//  import.js — Importación de extractos bancarios (CSV/XLS y Gemini IA)
+//  Contiene: modales de importación, procesamiento CSV/XLS,
+//  mapeo de columnas, preview, confirmación, y procesamiento de
+//  archivos PDF/imagen con Gemini API.
 // ═══════════════════════════════════════════════════════════════════════
-
-// ── IMPORT (GEMINI) ───────────────────────────────────────────
-function openGeminiImportModal() {
-  if (!state.settings.geminiKey) {
-    alert('Configurá primero tu Gemini API Key en Ajustes → General.');
-    showView('settings');
-    return;
-  }
-  closeImportModal();
-  updateSelectors();
-  document.getElementById('import-setup-view').style.display  = 'block';
-  document.getElementById('import-review-view').style.display = 'none';
-  document.getElementById('import-modal').classList.add('open');
-}
-
-function closeGeminiImportModal() {
-  document.getElementById('import-modal').classList.remove('open');
-  state.importedTransactions = [];
-}
-
-function backToImportSetup() {
-  document.getElementById('import-setup-view').style.display  = 'block';
-  document.getElementById('import-review-view').style.display = 'none';
-}
-
-async function processImportWithGemini() {
-  const text = document.getElementById('import-text').value.trim();
-  const key  = state.settings.geminiKey;
-  const btn  = document.getElementById('btn-process-import');
-
-  if (!text) { alert('Ingresá el texto del extracto bancario.'); return; }
-
-  btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="loader-2"></i> Procesando…';
-  lucide.createIcons();
-
-  const categoriesList = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name).join(', ');
-  const curCode = state.settings.currency || 'ARS';
-  const prompt = `Actúas como un procesador estructurado de extractos bancarios en español.
-Analiza el siguiente texto y extrae todas las transacciones financieras.
-Moneda del usuario: ${curCode}.
-
-Texto:
-"${text}"
-
-Categorías válidas (usá estrictamente una de estas o mapeá a 'Otros'):
-[${categoriesList}]
-
-Reglas:
-- Gastos/egresos: monto NEGATIVO.
-- Ingresos/cobros: monto POSITIVO.
-- Fechas en formato YYYY-MM-DD. Si no hay año, usá 2026.
-- Respondé ÚNICAMENTE con un arreglo JSON válido, sin markdown ni texto adicional.
-- Todos los montos deben expresarse numéricamente en ${curCode}.
-
-Formato:
-[{"date":"YYYY-MM-DD","payee":"Nombre","amount":-120.00,"category":"Categoría","notes":""}]`;
-
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-    });
-
-    const result = await response.json();
-    let textResponse = result.candidates[0].content.parts[0].text;
-    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsedTxs = JSON.parse(textResponse);
-
-    if (Array.isArray(parsedTxs)) {
-      state.importedTransactions = parsedTxs;
-      renderImportReview();
-    } else {
-      throw new Error('JSON inválido');
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Error al procesar con Gemini. Revisá tu API Key y la consola.');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="sparkles"></i> Procesar con Gemini IA';
-    lucide.createIcons();
-  }
-}
-
-function renderImportReview() {
-  document.getElementById('import-setup-view').style.display  = 'none';
-  document.getElementById('import-review-view').style.display = 'block';
-
-  const tbody = document.getElementById('import-review-tbody');
-  tbody.innerHTML = '';
-
-  state.importedTransactions.forEach((tx, idx) => {
-    const catOptions = state.predefined.categories.map(c => {
-      const name = typeof c === 'string' ? c : c.name;
-      return `<option value="${name}" ${name.toLowerCase() === (tx.category || '').toLowerCase() ? 'selected' : ''}>${name}</option>`;
-    }).join('');
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="date" value="${tx.date}" onchange="updateImportedTx(${idx}, 'date', this.value)"></td>
-      <td><input type="text" value="${tx.payee}" onchange="updateImportedTx(${idx}, 'payee', this.value)"></td>
-      <td><select onchange="updateImportedTx(${idx}, 'category_name', this.value)">${catOptions}</select></td>
-      <td><input type="number" step="0.01" value="${tx.amount}" style="text-align:right;" onchange="updateImportedTx(${idx}, 'amount', parseFloat(this.value))"></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function updateImportedTx(index, field, value) {
-  state.importedTransactions[index][field] = value;
-}
-
-function confirmImportedTransactions() {
-  const accountId = document.getElementById('import-account-id').value;
-  const newTxs = state.importedTransactions.map(itx => ({
-    id: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-    date: itx.date,
-    account_id: accountId,
-    payee: itx.payee,
-    category_name: itx.category_name || itx.category || 'Otros',
-    amount: parseFloat(itx.amount),
-    notes: itx.notes || '',
-    tags: [],
-    is_receivable: false
-  }));
-  state.transactions = [...newTxs, ...state.transactions];
-  saveData('transactions');
-  closeGeminiImportModal();
-  renderAll();
-}
 
 // ════════════════════════════════════════════════════════════
 //  CSV / XLS IMPORTER
@@ -195,6 +64,10 @@ function resetCsvImport() {
   document.getElementById('csv-import-errors').textContent = '';
   const dropzone = document.getElementById('csv-dropzone');
   if (dropzone) dropzone.style.display = '';
+  const aiInput = document.getElementById('csv-ai-file-input');
+  if (aiInput) aiInput.value = '';
+  const aiBtn = document.querySelector('.csv-ai-btn');
+  if (aiBtn) { aiBtn.disabled = false; aiBtn.innerHTML = '<i data-lucide="sparkles"></i> Importar con IA'; lucide.createIcons(); }
 }
 
 // ── FILE SELECTION & PARSING ──────────────────────────────
@@ -296,7 +169,6 @@ function parseCsv(text, separator) {
       else { field += ch; }
     }
   }
-  // Last field
   current.push(field.trim());
   if (current.length > 0 && current.some(c => c !== '')) lines.push(current);
   return lines;
@@ -313,10 +185,8 @@ function afterParse() {
     csvImportState.headers = raw[0].map((_, i) => 'Columna ' + (i + 1));
   }
 
-  // Auto-map columns
   autoMapColumns();
 
-  // Show mapping view
   document.getElementById('csv-step-upload').style.display = 'none';
   document.getElementById('csv-step-mapping').style.display = '';
   document.getElementById('csv-dropzone').style.display = 'none';
@@ -324,7 +194,6 @@ function afterParse() {
   document.getElementById('csv-file-name').textContent = csvImportState.fileName;
   document.getElementById('csv-file-dims').textContent = '· ' + csvImportState.fileDims;
 
-  // Populate account selector
   const accSel = document.getElementById('csv-target-account');
   if (accSel) {
     accSel.innerHTML = '<option value="">Seleccionar cuenta…</option>';
@@ -373,7 +242,6 @@ function renderCsvMapping() {
   const headers = csvImportState.headers;
   const map = csvImportState.mapping;
 
-  // Header row
   const headerTr = document.createElement('tr');
   headers.forEach((h, i) => {
     const th = document.createElement('th');
@@ -403,7 +271,6 @@ function renderCsvMapping() {
   });
   thead.appendChild(headerTr);
 
-  // Data rows (max 15)
   const maxRows = Math.min(raw.length, 15);
   for (let r = 0; r < maxRows; r++) {
     const tr = document.createElement('tr');
@@ -485,7 +352,7 @@ function onCsvMappingChange() {
   countEl.textContent = parsed.length;
 
   tbody.innerHTML = '';
-  const importAccId = document.getElementById('import-account-id')?.value;
+  const importAccId = document.getElementById('csv-target-account')?.value;
   const importAcc = state.accounts.find(a => a.id === importAccId);
   const importCur = importAcc?.currency || state.settings.currency || 'ARS';
   parsed.forEach(tx => {
@@ -582,28 +449,24 @@ function parseDate(val, format) {
   val = val.trim();
   if (!val) return '';
 
-  // Already ISO-like
   if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
 
   let parts;
   if (format === 'auto') {
-    // Try common formats
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) parts = val.split('/');
     else if (/^\d{2}\/\d{2}\/\d{2}$/.test(val)) parts = val.split('/');
     else if (/^\d{2}-\d{2}-\d{4}$/.test(val)) parts = val.split('-');
     else if (/^\d{2}-\d{2}-\d{2}$/.test(val)) parts = val.split('-');
     else if (/^\d{4}\/\d{2}\/\d{2}$/.test(val)) parts = val.split('/');
     else if (/^\d{8}$/.test(val)) {
-      // DDMMYYYY or YYYYMMDD
       if (val.substring(0, 4) > '1900' && val.substring(0, 4) < '2100') {
         return val.substring(0, 4) + '-' + val.substring(4, 6) + '-' + val.substring(6, 8);
       }
       return val.substring(4, 6) + '-' + val.substring(6, 8) + '-' + val.substring(0, 4);
     }
-    else return val; // fallback
+    else return val;
 
     if (parts && parts[2].length === 4 && parseInt(parts[2]) > 1900) {
-      // Likely DD/MM/YYYY
       return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
     }
     if (parts && parts[2].length === 2) {
@@ -613,7 +476,6 @@ function parseDate(val, format) {
     return val;
   }
 
-  // Specific format
   if (format === 'dd/mm/yyyy') {
     parts = val.split(/[\/\-\.]/);
     if (parts.length === 3) return parts[2] + '-' + parts[1].padStart(2, '0') + '-' + parts[0].padStart(2, '0');
@@ -642,27 +504,20 @@ function parseDate(val, format) {
 function parseNumber(val, format) {
   if (!val) return NaN;
   let s = val.trim();
-  // Remove currency symbols and spaces
   s = s.replace(/[$€£¥$]\s*/g, '').replace(/\s+/g, '');
 
   if (format === 'auto') {
-    // Detect format: if uses . for thousands and , for decimals → EU
-    // If uses , for thousands and . for decimals → US
     const hasDot = s.includes('.');
     const hasComma = s.includes(',');
     if (hasDot && hasComma) {
       const lastDot = s.lastIndexOf('.');
       const lastComma = s.lastIndexOf(',');
       if (lastComma > lastDot) {
-        // EU: 1.234,56
         s = s.replace(/\./g, '').replace(',', '.');
       } else {
-        // US: 1,234.56
         s = s.replace(/,/g, '');
       }
     } else if (hasComma) {
-      // Could be EU decimal (1234,56) or US thousands (1,234)
-      // If only one comma and followed by exactly 2 digits → EU decimal
       const parts = s.split(',');
       if (parts.length === 2 && parts[1].length <= 2) {
         s = s.replace(',', '.');
@@ -670,18 +525,14 @@ function parseNumber(val, format) {
         s = s.replace(/,/g, '');
       }
     }
-    // If hasDot but no comma, it's either US decimal or thousands separator
-    // Try to interpret: if after last dot there are 2 digits → likely decimal
     else if (hasDot) {
       const parts = s.split('.');
       if (parts.length > 1) {
         const last = parts[parts.length - 1];
         if (last.length === 2 && parts.length > 2) {
-          // EU: 1.234.56 → remove dots except last
           s = s.replace(/\./g, '');
           s = s.substring(0, s.length - 2) + '.' + s.substring(s.length - 2);
         }
-        // else: US or simple number with dot → keep as is
       }
     }
   } else if (format === 'eu') {
@@ -724,7 +575,6 @@ function confirmCsvImport() {
       installment_total: null,
       installment_index: null,
     });
-    // Auto-add new payees and categories
     if (tx.payee && !state.predefined.payees.includes(tx.payee)) {
       state.predefined.payees.push(tx.payee);
     }
@@ -769,11 +619,9 @@ function loadSampleCsv(type) {
 10/06/2026;YPF;Transporte;15000,00`;
   }
 
-  // Set separator to semicolon
   const sepSel = document.getElementById('csv-separator');
   if (sepSel) sepSel.value = ';';
 
-  // Parse directly
   const sep = ';';
   const raw = parseCsv(text, sep);
   if (raw.length < 1) return;
@@ -784,4 +632,216 @@ function loadSampleCsv(type) {
   csvImportState.fileDims = `${raw[0].length} columnas · ${raw.length} filas`;
   document.getElementById('csv-dropzone').style.display = 'none';
   afterParse();
+}
+
+// ════════════════════════════════════════════════════════════
+//  GEMINI AI — PDF / IMAGE IMPORT
+// ════════════════════════════════════════════════════════════
+
+function onAiFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  processFileWithGemini(file);
+}
+
+function getMimeType(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const map = {
+    'pdf': 'application/pdf',
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'webp': 'image/webp',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function processFileWithGemini(file) {
+  const key = state.settings.geminiKey;
+  if (!key) {
+    alert('Configurá tu Gemini API Key en Ajustes → General.');
+    closeImportModal();
+    showView('settings');
+    return;
+  }
+
+  const supportedExts = ['pdf', 'png', 'jpg', 'jpeg', 'webp'];
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!supportedExts.includes(ext)) {
+    showCsvError('Formato no soportado. Subí un archivo PDF, PNG, JPG o WEBP.');
+    return;
+  }
+
+  const maxBytes = 10 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showCsvError('El archivo es muy grande (' + Math.round(file.size / 1024 / 1024) + ' MB). El máximo es 10 MB.');
+    return;
+  }
+
+  const aiBtn = document.querySelector('.csv-ai-btn');
+  const aiFileInput = document.getElementById('csv-ai-file-input');
+  if (aiBtn) {
+    aiBtn.disabled = true;
+    aiBtn.innerHTML = '<i data-lucide="loader-2" class="spinning"></i> Procesando…';
+    lucide.createIcons();
+  }
+
+  try {
+    const base64Data = await readFileAsBase64(file);
+    const mimeType = getMimeType(file);
+
+    const categoriesList = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name).join(', ');
+    const curCode = state.settings.currency || 'ARS';
+
+    const prompt = `Actúas como un procesador de extractos bancarios.
+El usuario subió un archivo que contiene su extracto bancario o resumen de cuenta.
+Tu tarea es extraer TODAS las transacciones visibles en el archivo.
+
+Moneda del usuario: ${curCode}.
+
+Categorías válidas (usá estrictamente una de estas o mapeá a 'Otros'):
+[${categoriesList}]
+
+Respondé ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto adicional.
+
+El JSON debe tener esta estructura exacta:
+{
+  "headers": ["Fecha", "Beneficiario", "Monto", "Categoría"],
+  "rows": [
+    ["02/06/2026", "Supermercado Coto", "-12580.00", "Supermercado"],
+    ["04/06/2026", "Sueldo Mensual", "250000.00", "Otros"]
+  ]
+}
+
+Reglas:
+- "headers" debe contener los nombres de las columnas que detectes.
+- "rows" debe contener arrays donde cada elemento corresponde al header en la misma posición.
+- Gastos/egresos: monto NEGATIVO (con signo -).
+- Ingresos/cobros: monto POSITIVO.
+- Si hay columnas separadas de Débito y Crédito, creá columnas "Débito" y "Crédito" con valores positivos.
+- Fechas: mantené el formato original del archivo.
+- Si no podés detectar una categoría, usá 'Otros'.
+- No omitas ninguna transacción.
+- Montos numéricos sin símbolo de moneda ni separadores de miles.`;
+
+    const requestBody = {
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: base64Data } }
+        ]
+      }]
+    };
+
+    console.log('[IA] Enviando archivo a Gemini:', file.name, mimeType, '(' + Math.round(base64Data.length * 0.75 / 1024) + ' KB)');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
+    let response;
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('[IA] Error HTTP:', response.status, result);
+      const apiMsg = result.error?.message || '';
+      if (response.status === 503 || apiMsg.includes('high demand') || apiMsg.includes('unavailable')) {
+        throw new Error('El servicio de IA está sobrecargado. Intentá de nuevo en unos segundos.');
+      }
+      if (response.status === 429 || apiMsg.includes('quota') || apiMsg.includes('rate limit')) {
+        throw new Error('Se agotó la cuota de la API. Revisá tu plan en Google AI Studio.');
+      }
+      if (response.status === 400) {
+        throw new Error(apiMsg || 'El archivo no pudo ser procesado. Probá con otro formato.');
+      }
+      if (response.status === 403) {
+        throw new Error('La API key no tiene permisos. Verificala en Ajustes → General.');
+      }
+      throw new Error(apiMsg || `Error HTTP ${response.status}`);
+    }
+
+    let textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textResponse) throw new Error('Respuesta vacía de Gemini');
+
+    textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    console.log('[IA] Respuesta:', textResponse.substring(0, 200));
+    const parsed = JSON.parse(textResponse);
+
+    if (!parsed.headers || !parsed.rows || !Array.isArray(parsed.rows)) {
+      throw new Error('Formato de respuesta inválido de la IA');
+    }
+
+    console.log('[IA] Transacciones extraídas:', parsed.rows.length);
+    loadGeminiDataAsCsv(parsed, file.name);
+
+  } catch (err) {
+    console.error('[IA] Error:', err);
+    if (err.name === 'AbortError') {
+      showCsvError('La IA tardó demasiado en responder. Intentá con un archivo más pequeño o intentá más tarde.');
+    } else {
+      showCsvError('Error al procesar con IA: ' + err.message);
+    }
+  } finally {
+    if (aiBtn) {
+      aiBtn.disabled = false;
+      aiBtn.innerHTML = '<i data-lucide="sparkles"></i> Importar con IA';
+      lucide.createIcons();
+    }
+    if (aiFileInput) aiFileInput.value = '';
+  }
+}
+
+function loadGeminiDataAsCsv(aiResult, fileName) {
+  csvImportState.headers = aiResult.headers;
+  csvImportState.rawData = aiResult.rows.map(row =>
+    row.map(cell => (cell === null || cell === undefined ? '' : String(cell)))
+  );
+  csvImportState.rawText = '';
+  csvImportState.isExcel = false;
+  csvImportState.fileName = fileName;
+  csvImportState.fileDims = `${csvImportState.headers.length} columnas · ${csvImportState.rawData.length} filas`;
+
+  document.getElementById('csv-step-upload').style.display = 'none';
+  document.getElementById('csv-step-mapping').style.display = '';
+  document.getElementById('csv-dropzone').style.display = 'none';
+
+  document.getElementById('csv-file-name').textContent = csvImportState.fileName;
+  document.getElementById('csv-file-dims').textContent = '· ' + csvImportState.fileDims;
+
+  const accSel = document.getElementById('csv-target-account');
+  if (accSel) {
+    accSel.innerHTML = '<option value="">Seleccionar cuenta…</option>';
+    state.accounts.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = a.name + (a.type === 'credit_card' ? ' (TC)' : '');
+      accSel.appendChild(opt);
+    });
+    accSel.onchange = onCsvMappingChange;
+  }
+
+  autoMapColumns();
+  renderCsvMapping();
 }

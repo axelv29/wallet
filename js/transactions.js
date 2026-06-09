@@ -48,11 +48,123 @@ function bindSearchSelect(inputId, dropdownId, listId, dataAccessor) {
 }
 
 // ── TRANSACTIONS CRUD ─────────────────────────────────────────
+let _draggedTag = null;
+
+function renderTagsChecklist(selectedTags) {
+  const checklist = document.getElementById('tx-tags-checklist');
+  const checked = selectedTags || [];
+  checklist.innerHTML = '';
+  state.predefined.tags.forEach(tag => {
+    const isChecked = checked.includes(tag);
+    const label = document.createElement('label');
+    label.className = 'tag-check-label';
+    label.draggable = true;
+    label.dataset.tag = tag;
+    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}" ${isChecked ? 'checked' : ''}><span>#${tag}</span>`;
+    label.addEventListener('dragstart', e => {
+      _draggedTag = tag;
+      e.dataTransfer.setData('text/plain', tag);
+      e.dataTransfer.effectAllowed = 'move';
+      label.classList.add('dragging');
+      document.getElementById('tx-tags-trash').classList.add('visible');
+    });
+    label.addEventListener('dragend', () => {
+      label.classList.remove('dragging');
+      _draggedTag = null;
+      const trash = document.getElementById('tx-tags-trash');
+      trash.classList.remove('visible', 'drag-hover');
+    });
+    checklist.appendChild(label);
+  });
+
+  const addBtn = document.createElement('span');
+  addBtn.className = 'tag-add-btn';
+  addBtn.innerHTML = `<i data-lucide="plus"></i>Nueva`;
+  addBtn.onclick = () => {
+    const input = createTagInput();
+    addBtn.replaceWith(input);
+    lucide.createIcons();
+    input.querySelector('input').focus();
+  };
+  checklist.appendChild(addBtn);
+  lucide.createIcons();
+}
+
+function removeTag(tag) {
+  state.predefined.tags = state.predefined.tags.filter(t => t !== tag);
+  saveData('predefined');
+  const checked = getCheckedTags().filter(t => t !== tag);
+  renderTagsChecklist(checked);
+}
+
+function initTagsTrash() {
+  const trash = document.getElementById('tx-tags-trash');
+  const checklist = document.getElementById('tx-tags-checklist');
+  lucide.createIcons();
+
+  trash.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    trash.classList.add('drag-hover');
+  });
+
+  trash.addEventListener('dragleave', () => {
+    trash.classList.remove('drag-hover');
+  });
+
+  trash.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    trash.classList.remove('visible', 'drag-hover');
+    const tag = _draggedTag || e.dataTransfer.getData('text/plain');
+    if (tag) removeTag(tag);
+  });
+
+  checklist.addEventListener('dragover', e => {
+    e.preventDefault();
+  });
+}
+
+function getCheckedTags() {
+  return [...document.querySelectorAll('#tx-tags-checklist input[name="tx-tags"]:checked')]
+    .map(cb => cb.value);
+}
+
+function createTagInput() {
+  const wrap = document.createElement('span');
+  wrap.className = 'tag-add-input';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'nueva…';
+  const resize = () => { input.style.width = Math.max(5, input.value.length + 1) + 'ch'; };
+  input.addEventListener('input', resize);
+  wrap.appendChild(input);
+
+  const commit = () => {
+    const name = input.value.trim();
+    if (name && !state.predefined.tags.includes(name)) {
+      state.predefined.tags.push(name);
+      saveData('predefined');
+    }
+    const checked = getCheckedTags();
+    if (name && !checked.includes(name)) checked.push(name);
+    renderTagsChecklist(checked);
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') renderTagsChecklist(getCheckedTags());
+  });
+  input.addEventListener('blur', commit);
+
+  return wrap;
+}
+
 function openTransactionModal(txId) {
   updateSelectors();
   state.editingTxId = txId || null;
 
-  if (!txId && state.currentView !== 'all' && state.currentView !== 'receivables') {
+  if (!txId && state.currentView !== 'all' && state.currentView !== 'multi' && state.currentView !== 'receivables') {
     document.getElementById('tx-account').value = state.currentView;
   }
 
@@ -75,15 +187,7 @@ function openTransactionModal(txId) {
 
     setTxSign(tx.amount < 0 ? -1 : 1);
 
-    const checklist = document.getElementById('tx-tags-checklist');
-    checklist.innerHTML = '';
-    state.predefined.tags.forEach(tag => {
-      const checked = (tx.tags || []).includes(tag) ? 'checked' : '';
-      const label = document.createElement('label');
-      label.className = 'tag-check-label';
-      label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}" ${checked}><span>#${tag}</span>`;
-      checklist.appendChild(label);
-    });
+    renderTagsChecklist(tx.tags);
 
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = !!tx.is_receivable;
@@ -116,14 +220,7 @@ function openTransactionModal(txId) {
     document.getElementById('tx-amount').value          = '';
     document.getElementById('tx-notes').value           = '';
 
-    const checklist = document.getElementById('tx-tags-checklist');
-    checklist.innerHTML = '';
-    state.predefined.tags.forEach(tag => {
-      const label = document.createElement('label');
-      label.className = 'tag-check-label';
-      label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}"><span>#${tag}</span>`;
-      checklist.appendChild(label);
-    });
+    renderTagsChecklist();
 
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = false;
@@ -756,13 +853,7 @@ function openBatchEditModal() {
   document.getElementById('tx-notes').value = '';
   setTxSign(-1);
 
-  document.getElementById('tx-tags-checklist').innerHTML = '';
-  state.predefined.tags.forEach(tag => {
-    const label = document.createElement('label');
-    label.className = 'tag-check-label';
-    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}"><span>#${tag}</span>`;
-    document.getElementById('tx-tags-checklist').appendChild(label);
-  });
+  renderTagsChecklist();
 
   document.getElementById('tx-is-receivable').checked = false;
   toggleReceivableFields(false);
@@ -1065,10 +1156,14 @@ function renderTransactions() {
   let filtered = [...state.transactions];
 
   // Show/hide account column
-  const isSingleAccount = state.currentView !== 'all' && !state.currentView.startsWith('type-') && state.currentView !== 'receivables';
+  const isSingleAccount = state.selectedAccounts.length === 1
+    || (state.currentView !== 'all' && state.currentView !== 'multi' && !state.currentView.startsWith('type-') && state.currentView !== 'receivables');
   document.querySelector('.ledger')?.classList.toggle('hide-account-col', isSingleAccount);
   if (state.currentView === 'receivables') {
     filtered = filtered.filter(t => t.is_receivable);
+  } else if (state.currentView === 'multi') {
+    const selSet = new Set(state.selectedAccounts);
+    filtered = filtered.filter(t => selSet.has(t.account_id));
   } else if (state.currentView.startsWith('type-')) {
     const type = state.currentView.replace('type-', '');
     const accIds = new Set(state.accounts.filter(a => a.type === type).map(a => a.id));
@@ -1161,10 +1256,31 @@ function renderTransactions() {
   const present = filtered.filter(tx => !tx.is_future);
   const futures  = filtered.filter(tx => tx.is_future);
 
-  // Count badge only counts present rows
-  document.getElementById('tx-count-badge').textContent = present.length;
+  // Split by period: in-period vs out-of-period
+  const periodRange = getPeriodRange();
+  const hasPeriodFilter = periodRange.start || periodRange.end;
 
-  if (present.length === 0 && futures.length === 0) {
+  let inPeriodPresent, outOfPeriodPresent, inPeriodFuture, outOfPeriodFuture;
+  if (hasPeriodFilter) {
+    inPeriodPresent = present.filter(tx => isTxInPeriod(tx));
+    outOfPeriodPresent = present.filter(tx => !isTxInPeriod(tx));
+    // Future installments in period → treat as present (normal rows)
+    inPeriodFuture = futures.filter(tx => isTxInPeriod(tx));
+    outOfPeriodFuture = futures.filter(tx => !isTxInPeriod(tx));
+  } else {
+    inPeriodPresent = present;
+    outOfPeriodPresent = [];
+    inPeriodFuture = [];
+    outOfPeriodFuture = futures;
+  }
+
+  // Merged in-period rows (present + future that fell in period)
+  const inPeriodRows = [...inPeriodPresent, ...inPeriodFuture];
+
+  // Count badge only counts in-period present rows
+  document.getElementById('tx-count-badge').textContent = inPeriodRows.length;
+
+  if (inPeriodRows.length === 0 && outOfPeriodFuture.length === 0 && outOfPeriodPresent.length === 0) {
     const colCount = isSingleAccount ? 10 : 11;
     tbody.innerHTML = `<tr class="empty-row"><td colspan="${colCount}">No hay movimientos registrados.</td></tr>`;
     return;
@@ -1239,13 +1355,17 @@ function renderTransactions() {
     }
   };
 
-  // Render future group first (above present)
-  if (futures.length > 0) {
+  // Render future rows first (above header) so they expand upward
+  if (outOfPeriodFuture.length > 0) {
     const colCount  = isSingleAccount ? 10 : 11;
     const groupKey  = 'future-group-open';
     const isOpen    = sessionStorage.getItem(groupKey) === 'true';
 
-    // Header row
+    if (isOpen) {
+      outOfPeriodFuture.forEach(tx => appendTxRow(tx, true));
+    }
+
+    // Header acts as separator between future and present
     const headerTr  = document.createElement('tr');
     headerTr.className = 'future-group-row';
     const headerTd  = document.createElement('td');
@@ -1255,7 +1375,37 @@ function renderTransactions() {
     headerDiv.innerHTML = `
       <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
       <span>Cuotas futuras</span>
-      <span class="future-group-count">${futures.length}</span>
+      <span class="future-group-count">${outOfPeriodFuture.length}</span>
+    `;
+    headerDiv.addEventListener('click', () => {
+      const nowOpen = sessionStorage.getItem(groupKey) === 'true';
+      sessionStorage.setItem(groupKey, (!nowOpen).toString());
+      renderTransactions();
+    });
+    headerTd.appendChild(headerDiv);
+    headerTr.appendChild(headerTd);
+    tbody.appendChild(headerTr);
+  }
+
+  // Render in-period rows (present + future that fell in period as normal)
+  inPeriodRows.forEach(tx => appendTxRow(tx, false));
+
+  // Render out-of-period present group (collapsible, only when period filter is active)
+  if (hasPeriodFilter && outOfPeriodPresent.length > 0) {
+    const colCount  = isSingleAccount ? 10 : 11;
+    const groupKey  = 'oop-group-open';
+    const isOpen    = sessionStorage.getItem(groupKey) === 'true';
+
+    const headerTr  = document.createElement('tr');
+    headerTr.className = 'future-group-row oop-group-row';
+    const headerTd  = document.createElement('td');
+    headerTd.colSpan = colCount;
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'future-group-header';
+    headerDiv.innerHTML = `
+      <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
+      <span>Fuera del período</span>
+      <span class="future-group-count">${outOfPeriodPresent.length}</span>
     `;
     headerDiv.addEventListener('click', () => {
       const nowOpen = sessionStorage.getItem(groupKey) === 'true';
@@ -1266,21 +1416,10 @@ function renderTransactions() {
     headerTr.appendChild(headerTd);
     tbody.appendChild(headerTr);
 
-    // Future rows (collapsible)
     if (isOpen) {
-      futures.forEach(tx => appendTxRow(tx, true));
-      // spacer between future and present
-      const spacer = document.createElement('tr');
-      spacer.className = 'future-spacer';
-      const td = document.createElement('td');
-      td.colSpan = colCount;
-      spacer.appendChild(td);
-      tbody.appendChild(spacer);
+      outOfPeriodPresent.forEach(tx => appendTxRow(tx, true));
     }
   }
-
-  // Render present rows below future
-  present.forEach(tx => appendTxRow(tx, false));
 
   updateSelectAllCheckbox();
   updateSelectionBar();

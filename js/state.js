@@ -27,13 +27,16 @@ let state = {
       { name: 'Ropa', icon: 'shirt' },
       { name: 'Tecnología', icon: 'smartphone' },
       { name: 'Otros', icon: 'more-horizontal' },
+      { name: 'Sin asignar', icon: 'circle-dashed' },
     ],
-    tags: ['Rocio', 'NyL', 'pan', 'viaje', 'compras']
+    tags: []
   },
   settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'ARS', showSymbol: true, decimals: 2 },
+  period: { type: 'all', startDate: null, endDate: null },
   currentTxSign: -1,
   importedTransactions: [],
   currentView: 'all',
+  selectedAccounts: [],
   editingTxId: null,
   selectedTxIds: new Set(),
   tableFilters: [],
@@ -90,8 +93,14 @@ function loadData() {
     if (state.predefined.categories.length && typeof state.predefined.categories[0] === 'string') {
       state.predefined.categories = state.predefined.categories.map((c, i) => ({
         name: c,
-        icon: ['shopping-cart','utensils-crossed','package','car','zap','gamepad-2','heart-pulse','book-open','briefcase','laptop','gift','home','shirt','smartphone','more-horizontal'][i] || 'tag'
+        icon: ['shopping-cart','utensils-crossed','package','car','zap','gamepad-2','heart-pulse','book-open','briefcase','laptop','gift','home','shirt','smartphone','more-horizontal','circle-dashed'][i] || 'tag'
       }));
+      saveData('predefined');
+    }
+    // Ensure 'Sin asignar' category exists
+    const hasSinAsignar = state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === 'Sin asignar');
+    if (!hasSinAsignar) {
+      state.predefined.categories.push({ name: 'Sin asignar', icon: 'circle-dashed' });
       saveData('predefined');
     }
   } else {
@@ -139,5 +148,14 @@ function saveData(type) {
 
 function loadSettings() {
   const s = localStorage.getItem('wallet_settings');
-  if (s) state.settings = JSON.parse(s);
+  if (s) {
+    const parsed = JSON.parse(s);
+    state.settings = parsed;
+    if (parsed.period) state.period = parsed.period;
+  }
+}
+
+function savePeriod() {
+  state.settings.period = state.period;
+  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
 }

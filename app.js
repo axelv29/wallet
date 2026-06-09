@@ -516,15 +516,7 @@ function openTransactionModal(txId) {
 
     setTxSign(tx.amount < 0 ? -1 : 1);
 
-    const checklist = document.getElementById('tx-tags-checklist');
-    checklist.innerHTML = '';
-    state.predefined.tags.forEach(tag => {
-      const checked = (tx.tags || []).includes(tag) ? 'checked' : '';
-      const label = document.createElement('label');
-      label.className = 'tag-check-label';
-      label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}" ${checked}><span>#${tag}</span>`;
-      checklist.appendChild(label);
-    });
+    renderTagsChecklist(tx.tags);
 
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = !!tx.is_receivable;
@@ -557,14 +549,7 @@ function openTransactionModal(txId) {
     document.getElementById('tx-amount').value          = '';
     document.getElementById('tx-notes').value           = '';
 
-    const checklist = document.getElementById('tx-tags-checklist');
-    checklist.innerHTML = '';
-    state.predefined.tags.forEach(tag => {
-      const label = document.createElement('label');
-      label.className = 'tag-check-label';
-      label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}"><span>#${tag}</span>`;
-      checklist.appendChild(label);
-    });
+    renderTagsChecklist();
 
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = false;
@@ -578,6 +563,7 @@ function openTransactionModal(txId) {
   }
 
   document.getElementById('tx-modal').classList.add('open');
+  lucide.createIcons();
 }
 
 function closeTransactionModal() {
@@ -2124,13 +2110,7 @@ function openBatchEditModal() {
   document.getElementById('tx-notes').value = '';
   setTxSign(-1);
 
-  document.getElementById('tx-tags-checklist').innerHTML = '';
-  state.predefined.tags.forEach(tag => {
-    const label = document.createElement('label');
-    label.className = 'tag-check-label';
-    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tag}"><span>#${tag}</span>`;
-    document.getElementById('tx-tags-checklist').appendChild(label);
-  });
+  renderTagsChecklist();
 
   document.getElementById('tx-is-receivable').checked = false;
   toggleReceivableFields(false);

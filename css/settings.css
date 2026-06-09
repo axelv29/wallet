@@ -70,6 +70,17 @@
   margin-bottom: 14px;
 }
 
+.pane-subsection {
+  margin-bottom: 20px;
+}
+
+.pane-subsection-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-hi);
+  margin-bottom: 10px;
+}
+
 /* Settings custom select */
 .sel-fit {
   width: auto !important;
@@ -296,4 +307,135 @@
 .scheme-card.active .scheme-name {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* ── Backup section ── */
+.backup-export-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.backup-export-row .form-row {
+  gap: 10px;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pane-subsection-danger {
+  margin-top: 24px;
+}
+
+.btn-danger {
+  background: var(--danger, #dc2626);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 8px 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.12s;
+}
+
+.btn-danger:hover {
+  opacity: 0.88;
+}
+
+.import-backup-info {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px;
+}
+
+.import-backup-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-hi);
+}
+
+.import-backup-info-row svg { width: 14px; height: 14px; color: var(--text-lo); }
+
+.import-backup-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.import-backup-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-backup-stat-val {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-hi);
+}
+
+.import-backup-stat-label {
+  font-size: 10.5px;
+  color: var(--text-lo);
+}
+
+.import-backup-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.import-backup-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.import-backup-option:hover {
+  border-color: var(--text-lo);
+}
+
+.import-backup-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.import-backup-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.import-backup-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-backup-option-text strong {
+  font-size: 12px;
+  color: var(--text-hi);
+}
+
+.import-backup-option-text small {
+  font-size: 11px;
+  color: var(--text-lo);
 }
