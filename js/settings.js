@@ -30,6 +30,8 @@ function saveCurrencySettings(event) {
   state.settings.currency = document.getElementById('set-currency').value;
   state.settings.showSymbol = document.getElementById('set-show-symbol').checked;
   state.settings.decimals = parseInt(document.getElementById('set-decimals').value);
+  const checkedRadio = document.querySelector('input[name="amount-style"]:checked');
+  state.settings.amountStyle = checkedRadio ? checkedRadio.value : 'default';
   localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
   const btn = event.submitter;
   if (btn) { const t = btn.textContent; btn.textContent = '✓ Guardado'; setTimeout(() => { btn.textContent = t; }, 1500); }
@@ -103,8 +105,8 @@ function createAccountFromFloating(event) {
       id: 'tx-init-' + Date.now(),
       date: new Date().toISOString().split('T')[0],
       account_id: newAcc.id,
-      payee: 'Saldo inicial',
-      category_name: 'Saldo inicial',
+      payee: 'Ajuste de saldo',
+      category_name: 'Ajuste de saldo',
       amount: balance,
       notes: '',
       tags: [],
@@ -150,8 +152,8 @@ function createNewAccount(event) {
       id: 'tx-init-' + Date.now(),
       date: new Date().toISOString().split('T')[0],
       account_id: newAcc.id,
-      payee: 'Saldo inicial',
-      category_name: 'Saldo inicial',
+      payee: 'Ajuste de saldo',
+      category_name: 'Ajuste de saldo',
       amount: balance,
       notes: '',
       tags: [],
@@ -271,6 +273,103 @@ function saveAccountEdit(event) {
   closeEditAccountModal();
   renderSettingsAccountsList();
   renderAll();
+}
+
+// ── BALANCE ADJUSTMENT ────────────────────────────────────
+let balanceModalState = { accountId: null };
+
+function calculateAccountBalance(accountId) {
+  let balance = 0;
+  state.transactions.forEach(tx => {
+    if (tx.account_id === accountId && !tx.is_future && !tx.excluded && isTxInPeriod(tx)) {
+      balance += Number(tx.amount) || 0;
+    }
+  });
+  return balance;
+}
+
+function openBalanceModal(accountId) {
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc) return;
+
+  balanceModalState.accountId = accountId;
+  const currentBalance = calculateAccountBalance(accountId);
+  const settingsCur = state.settings.currency || 'ARS';
+  const accCur = acc.currency || settingsCur;
+
+  document.getElementById('balance-account-name').textContent = acc.name;
+  document.getElementById('balance-current').textContent = formatAccountCurrency(currentBalance, accCur);
+  document.getElementById('balance-target').value = currentBalance.toFixed(2);
+  document.getElementById('balance-target').setAttribute('data-currency', accCur);
+  updateBalanceDiff();
+
+  document.getElementById('balance-modal').classList.add('open');
+  setTimeout(() => document.getElementById('balance-target')?.focus(), 100);
+}
+
+function closeBalanceModal() {
+  document.getElementById('balance-modal').classList.remove('open');
+  balanceModalState.accountId = null;
+}
+
+function updateBalanceDiff() {
+  const accountId = balanceModalState.accountId;
+  if (!accountId) return;
+
+  const acc = state.accounts.find(a => a.id === accountId);
+  const settingsCur = state.settings.currency || 'ARS';
+  const accCur = acc?.currency || settingsCur;
+
+  const currentBalance = calculateAccountBalance(accountId);
+  const targetBalance = parseFloat(document.getElementById('balance-target').value) || 0;
+  const diff = targetBalance - currentBalance;
+
+  const diffEl = document.getElementById('balance-diff');
+  diffEl.textContent = (diff >= 0 ? '+' : '') + formatAccountCurrency(diff, accCur);
+  diffEl.style.color = diff > 0 ? 'var(--positive)' : diff < 0 ? 'var(--negative)' : 'var(--text-mid)';
+}
+
+function confirmBalanceAdjustment() {
+  const accountId = balanceModalState.accountId;
+  if (!accountId) return;
+
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc) return;
+
+  const currentBalance = calculateAccountBalance(accountId);
+  const targetBalance = parseFloat(document.getElementById('balance-target').value);
+  if (isNaN(targetBalance)) return;
+
+  const diff = targetBalance - currentBalance;
+  if (diff === 0) {
+    closeBalanceModal();
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  state.transactions.push({
+    id: 'tx-balance-' + Date.now(),
+    date: today,
+    account_id: accountId,
+    payee: 'Balanceo de cuenta',
+    category_name: 'Ajuste de saldo',
+    amount: diff,
+    notes: '',
+    tags: [],
+    is_receivable: false,
+    due_date: ''
+  });
+
+  saveData('transactions');
+  closeBalanceModal();
+  renderAll();
+}
+
+function openBalanceFromEditModal() {
+  const accId = document.getElementById('acc-edit-id')?.value;
+  if (!accId) return;
+  closeEditAccountModal();
+  setTimeout(() => openBalanceModal(accId), 200);
 }
 
 // ── CATEGORY ICON PICKER ─────────────────────────────────

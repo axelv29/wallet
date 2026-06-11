@@ -253,14 +253,32 @@ function renderHeaderAndMetrics() {
     if (acc) {
       const accCur = acc.currency || settingsCur;
       const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
-      title    = acc.name;
+      const accBal = calculateAccountBalance(acc.id);
+      title = acc.name;
       subtitle = acc.type === 'credit_card'
         ? `Tarjeta · cierre día ${acc.card_closing_day || '—'} · vencimiento día ${acc.card_due_day || '—'}${curLabel}`
         : getAccountTypeLabel(acc.type) + curLabel;
     }
   }
 
-  if (titleEl)    titleEl.textContent    = title;
+  const isSingleAccount = state.currentView && !state.currentView.startsWith('type-') && state.currentView !== 'all' && state.currentView !== 'multi' && state.currentView !== 'receivables';
+
+  if (titleEl) {
+    if (isSingleAccount && state.accounts.find(a => a.id === state.currentView)) {
+      const acc = state.accounts.find(a => a.id === state.currentView);
+      const accCur = acc.currency || settingsCur;
+      const accBal = calculateAccountBalance(acc.id);
+      titleEl.innerHTML = `<span>${title}</span><span class="balance-clickable" onclick="openBalanceModal('${acc.id}')" title="Ajustar saldo">${formatAccountCurrency(accBal, accCur)}</span>`;
+      titleEl.style.display = 'flex';
+      titleEl.style.alignItems = 'baseline';
+      titleEl.style.gap = '10px';
+    } else {
+      titleEl.textContent = title;
+      titleEl.style.display = '';
+      titleEl.style.alignItems = '';
+      titleEl.style.gap = '';
+    }
+  }
   const subtitleTextEl = document.getElementById('view-subtitle-text');
   const addBtn = document.getElementById('subtitle-add-btn');
   if (subtitleTextEl) subtitleTextEl.textContent = subtitle;

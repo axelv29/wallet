@@ -14,7 +14,7 @@ const DEFAULT_PREDEFINED = {
     { id: 'credit_card', label: 'Tarjeta de crédito', isDefault: true },
   ],
   categories: [
-    { name: 'Saldo inicial', icon: 'banknote' },
+    { name: 'Ajuste de saldo', icon: 'banknote' },
     { name: 'Supermercado', icon: 'shopping-cart' },
     { name: 'Alimentos', icon: 'utensils-crossed' },
     { name: 'Compras', icon: 'package' },

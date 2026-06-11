@@ -228,12 +228,25 @@
           </div>
         </div>
 
-        <!-- Month selector -->
+        <!-- Period selector -->
         <div class="dash-toolbar">
-          <div class="dash-month-nav">
-            <button class="dash-month-btn" id="dash-month-prev" onclick="dashPrevMonth()"><i data-lucide="chevron-left"></i></button>
-            <span class="dash-month-label" id="dash-month-label">Junio 2026</span>
-            <button class="dash-month-btn" id="dash-month-next" onclick="dashNextMonth()"><i data-lucide="chevron-right"></i></button>
+          <div class="dash-toolbar-left">
+            <div class="dash-period-nav" id="dash-period-nav">
+              <button class="dash-month-btn" id="dash-month-prev" onclick="dashPrevMonth()"><i data-lucide="chevron-left"></i></button>
+              <div class="dash-period-dropdown" id="dash-period-dropdown">
+                <button class="dash-period-trigger" id="dash-period-trigger" onclick="dashTogglePeriodDropdown()">
+                  <span id="dash-period-label">Este mes</span>
+                  <i data-lucide="chevron-down" class="dash-period-chevron"></i>
+                </button>
+                <div class="dash-period-menu" id="dash-period-menu">
+                  <div class="dash-period-item" data-period="month" onclick="dashSetPeriod('month')">Este mes</div>
+                  <div class="dash-period-item" data-period="3m" onclick="dashSetPeriod('3m')">Últimos 3 meses</div>
+                  <div class="dash-period-item" data-period="6m" onclick="dashSetPeriod('6m')">Últimos 6 meses</div>
+                  <div class="dash-period-item" data-period="all" onclick="dashSetPeriod('all')">Histórico</div>
+                </div>
+              </div>
+              <button class="dash-month-btn" id="dash-month-next" onclick="dashNextMonth()"><i data-lucide="chevron-right"></i></button>
+            </div>
           </div>
           <div class="dash-toolbar-right">
             <div class="dash-acc-filter" id="dash-acc-filter">
@@ -310,7 +323,7 @@
           <div class="dash-card">
             <div class="dash-card-head">
               <i data-lucide="bar-chart-2"></i>
-              <span>Ingresos vs Gastos — últimos 6 meses</span>
+              <span>Ingresos vs Gastos</span>
             </div>
             <div class="dash-line-chart-wrap">
               <canvas id="dash-line-chart" class="dash-line-canvas"></canvas>
@@ -322,7 +335,7 @@
             <div class="dash-card">
               <div class="dash-card-head">
                 <i data-lucide="piggy-bank"></i>
-                <span>Tasa de ahorro del mes</span>
+                <span>Tasa de ahorro</span>
               </div>
               <div class="dash-progress-row">
                 <div class="dash-progress-circle-wrap">
@@ -364,6 +377,7 @@
                   <div class="dash-donut-total-val" id="dash-donut-total">$0</div>
                 </div>
               </div>
+              <div class="dash-donut-legend" id="dash-donut-legend"></div>
             </div>
             <div class="dash-card">
               <div class="dash-card-head">
@@ -390,6 +404,7 @@
                   <div class="dash-donut-total-val" id="dash-donut-income-total">$0</div>
                 </div>
               </div>
+              <div class="dash-donut-legend" id="dash-donut-income-legend"></div>
             </div>
             <div class="dash-card">
               <div class="dash-card-head">
@@ -504,14 +519,31 @@
                     <option value="3">3</option>
                   </select>
                 </div>
-                <div style="margin-top:14px;">
-                  <button type="submit" class="btn btn-primary">Guardar moneda</button>
-                </div>
-              </form>
+          <div class="form-group">
+            <label class="form-label">Formato de montos</label>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:2px;">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="radio" name="amount-style" value="default" checked>
+                <span>Predeterminado (símbolos + colores)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="radio" name="amount-style" value="no-sign">
+                <span>Sin símbolos +/− (colores solamente)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="radio" name="amount-style" value="no-color">
+                <span>Sin colores (símbolos solamente)</span>
+              </label>
             </div>
+          </div>
+          <div style="margin-top:14px;">
+            <button type="submit" class="btn btn-primary">Guardar moneda</button>
+          </div>
+        </form>
+      </div>
 
-            <div class="pane-subsection">
-              <div class="pane-subsection-title">API</div>
+      <div class="pane-subsection">
+        <div class="pane-subsection-title">API</div>
               <form onsubmit="saveGeneralSettings(event)">
                 <div class="form-group">
                   <label class="form-label">Gemini API Key</label>
@@ -637,7 +669,7 @@
                       <select id="acc-type" onchange="toggleAccountClosingFields(this.value)" required></select>
                     </div>
                     <div class="form-group">
-                      <label class="form-label">Saldo inicial</label>
+                      <label class="form-label">Ajuste de saldo</label>
                       <input type="number" step="0.01" id="acc-balance" value="0.00" required>
                     </div>
                   </div>
@@ -853,7 +885,7 @@
               <button type="button" class="sign-btn active-expense" id="btn-sign-expense" onclick="setTxSign(-1)">Gasto</button>
               <button type="button" class="sign-btn" id="btn-sign-income" onclick="setTxSign(1)">Ingreso</button>
             </div>
-            <input type="number" id="tx-amount" step="0.01" min="0" placeholder="0.00" required>
+            <input type="text" id="tx-amount" inputmode="decimal" placeholder="0" required>
           </div>
         </div>
 
@@ -870,12 +902,16 @@
             <div class="installment-editor-body">
               <div class="form-group" style="flex:1; margin-bottom:0;">
                 <label class="form-label">Número de cuotas</label>
-                <input type="number" id="tx-installment-count" min="2" max="48" value="3" oninput="updateInstallmentPreview()">
+                <div class="compound-input">
+                  <input type="number" id="tx-installment-index" min="1" max="48" value="1" oninput="updateInstallmentPreview()">
+                  <span class="compound-sep">/</span>
+                  <input type="number" id="tx-installment-count" min="2" max="48" value="3" oninput="updateInstallmentPreview()">
+                </div>
               </div>
               <div class="form-group" style="flex:1; margin-bottom:0;">
                 <label class="form-label">Por cuota</label>
-                <div class="installment-preview" id="installment-preview">
-                  <span class="inst-preview-val" id="inst-preview-val">—</span>
+                <div class="compound-input">
+                  <input type="text" id="inst-cuota-input" class="inst-cuota-input" inputmode="decimal" placeholder="0" oninput="onCuotaInput()">
                 </div>
               </div>
             </div>
@@ -1154,7 +1190,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Saldo inicial</label>
+            <label class="form-label">Ajuste de saldo</label>
             <input type="number" step="0.01" id="acc-f-balance" value="0.00" required>
           </div>
         </div>
@@ -1228,6 +1264,11 @@
           </div>
           <div class="cc-note">Los días de cierre y vencimiento se usan para calcular la deuda del período activo.</div>
         </div>
+        <div style="margin-top:10px;">
+          <button type="button" class="btn" onclick="openBalanceFromEditModal()" style="width:100%;justify-content:center;">
+            <i data-lucide="scale"></i> Ajustar saldo
+          </button>
+        </div>
         <div class="modal-foot" style="padding:12px 0 0; border-top:1px solid var(--border); margin-top:8px;">
           <button type="button" class="btn" onclick="closeEditAccountModal()">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar cambios</button>
@@ -1237,8 +1278,37 @@
   </div>
 </div>
 
+<!-- ══════════════ MODAL: Ajustar saldo ══════════════ -->
+<div class="modal-overlay" id="balance-modal">
+  <div class="modal-card" style="max-width:320px;">
+    <div class="modal-head">
+      <span class="modal-title">Ajustar saldo</span>
+      <button class="modal-close" onclick="closeBalanceModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--r-sm);background:var(--bg-sunken);border:1px solid var(--border);margin-bottom:12px;">
+        <span id="balance-account-name" style="color:var(--text-mid);font-size:12px;">—</span>
+        <span id="balance-current" style="color:var(--text-lo);font-size:12px;">—</span>
+      </div>
+      <div style="text-align:center;margin-bottom:8px;">
+        <i data-lucide="arrow-down" style="width:14px;height:14px;color:var(--text-lo);"></i>
+      </div>
+      <div class="form-group">
+        <input type="number" step="0.01" id="balance-target" style="text-align:center;font-size:15px;border-bottom-width:2px;border-radius:var(--r-sm) var(--r-sm) 0 0;" oninput="updateBalanceDiff()">
+      </div>
+      <div id="balance-diff-wrap" style="text-align:center;padding:8px 0 2px;">
+        <span id="balance-diff" style="color:var(--text-mid);font-size:12px;">—</span>
+      </div>
+    </div>
+    <div class="modal-foot" style="padding:12px 16px; border-top:1px solid var(--border);">
+      <button type="button" class="btn" onclick="closeBalanceModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="confirmBalanceAdjustment()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ MODAL: Confirmar acción ══════════════ -->
-<div class="modal-overlay" id="confirm-modal">
+<div class="modal-overlay" id="confirm-modal" style="z-index:1000;">
   <div class="modal-card" style="max-width:360px;">
     <div class="modal-head">
       <span class="modal-title" id="confirm-title">Confirmar</span>
@@ -1248,9 +1318,72 @@
       <p id="confirm-message" style="font-size:12.5px; color:var(--text-mid); line-height:1.6;"></p>
     </div>
     <div class="modal-foot">
-      <button class="btn" onclick="resolveConfirm(false)">Cancelar</button>
+      <button class="btn" id="confirm-cancel-btn" onclick="resolveConfirm(false)">Cancelar</button>
       <button class="btn btn-primary" id="confirm-action-btn" onclick="resolveConfirm(true)">Confirmar</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Dividir Transacción ══════════════ -->
+<div class="modal-overlay" id="split-modal">
+  <div class="modal-card" style="max-width:600px;">
+
+    <div class="modal-head">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <i data-lucide="scissors" style="width:16px;height:16px;color:var(--accent);"></i>
+        <span class="modal-title">Dividir transacción</span>
+      </div>
+      <button class="modal-close" onclick="closeSplitModal()"><i data-lucide="x"></i></button>
+    </div>
+
+    <div class="modal-body" style="padding:0;">
+
+      <div class="split-summary-bar">
+        <div class="split-summary-item">
+          <span class="split-summary-label">Total</span>
+          <span id="split-total-val" class="split-summary-val">$0</span>
+        </div>
+        <div class="split-summary-divider"></div>
+        <div class="split-summary-item">
+          <span class="split-summary-label">Estado</span>
+          <span id="split-remaining" class="split-total-remaining">—</span>
+        </div>
+      </div>
+
+      <div class="split-progress-track">
+        <div id="split-progress-segments" class="split-progress-segments"></div>
+      </div>
+
+      <div class="split-rows-header">
+        <span class="split-col-label">#</span>
+        <span class="split-col-label">Monto</span>
+        <span class="split-col-label">Nota</span>
+        <span class="split-col-label">Etiquetas</span>
+        <span class="split-col-label">Categoría</span>
+        <span class="split-col-label"></span>
+      </div>
+
+      <div id="split-rows-wrap" class="split-rows-wrap"></div>
+
+      <div class="split-actions-row">
+        <button class="btn" style="font-size:12px;height:28px;" onclick="addSplitRow()">
+          <i data-lucide="plus"></i> Agregar parte
+        </button>
+        <button class="btn" style="font-size:12px;height:28px;" onclick="distributeEqually()">
+          <i data-lucide="equal"></i> Igualar
+        </button>
+        <button class="btn" style="font-size:12px;height:28px;color:var(--negative);border-color:transparent;" onclick="removeAllSplits()">
+          <i data-lucide="trash-2"></i> Limpiar
+        </button>
+      </div>
+
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn" onclick="closeSplitModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSplits()"><i data-lucide="check"></i> Guardar divisiones</button>
+    </div>
+
   </div>
 </div>
 
@@ -1361,6 +1494,7 @@
 <script src="js/currency.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/modals.js"></script>
+<div id="dash-donut-tooltip" class="dash-donut-tooltip" style="display:none"></div>
 <script src="js/sidebar.js"></script>
 <script src="js/transactions.js"></script>
 <script src="js/dashboard.js"></script>

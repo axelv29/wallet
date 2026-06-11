@@ -76,7 +76,7 @@
   line-height: 1.3;
 }
 
-.net-worth-amount.negative { color: var(--negative); }
+.net-worth-amount.negative { color: var(--negative); opacity: .78; }
 
 /* ── Dashboard button ───────────────────────────────────── */
 .sidebar-dash-btn {
@@ -403,6 +403,12 @@
   font-weight: 600;
   color: var(--text-hi);
   letter-spacing: -0.01em;
+}
+
+.header-title .balance-clickable {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-mid);
 }
 
 .header-sub {

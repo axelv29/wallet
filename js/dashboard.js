@@ -8,7 +8,8 @@
 
 // ── DASHBOARD STATE ───────────────────────────────────────────
 let dashState = {
-  month: null, // { year, month } — null = current
+  month: null, // { year, month } — null = current (only used when periodType === 'month')
+  periodType: 'month', // 'month' | '3m' | '6m' | 'all'
   accounts: null, // null = all, array of account IDs = filtered
   visibleSections: { resumen: true, gastos: true, ingresos: true, cobertura: true },
   lineChartInstance: null,
@@ -17,34 +18,66 @@ let dashState = {
 };
 
 function dashGetPeriod() {
-  // When global period is active, derive from it
-  const p = state.period;
-  if (p && p.type !== 'all') {
-    const range = getPeriodRange();
-    if (range.start) {
-      const d = new Date(range.start + 'T00:00:00');
-      return { year: d.getFullYear(), month: d.getMonth(), range };
+  if (dashState.periodType === 'month') {
+    const p = state.period;
+    if (p && p.type !== 'all') {
+      const range = getPeriodRange();
+      if (range.start) {
+        const d = new Date(range.start + 'T00:00:00');
+        return { year: d.getFullYear(), month: d.getMonth(), range };
+      }
+      if (range.end) {
+        const d = new Date(range.end + 'T00:00:00');
+        return { year: d.getFullYear(), month: d.getMonth(), range };
+      }
     }
-    if (range.end) {
-      const d = new Date(range.end + 'T00:00:00');
-      return { year: d.getFullYear(), month: d.getMonth(), range };
-    }
+    if (dashState.month) return { ...dashState.month, range: null };
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth(), range: null };
   }
-  if (dashState.month) return { ...dashState.month, range: null };
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth(), range: null };
+  // Range-based periods
+  if (dashState.periodType === '3m') {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 2);
+    start.setDate(1);
+    return { year: end.getFullYear(), month: end.getMonth(), range: { start: toDateStr(start), end: null }, rangeLabel: 'Últimos 3 meses' };
+  }
+  if (dashState.periodType === '6m') {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 5);
+    start.setDate(1);
+    return { year: end.getFullYear(), month: end.getMonth(), range: { start: toDateStr(start), end: null }, rangeLabel: 'Últimos 6 meses' };
+  }
+  // 'all'
+  return { year: null, month: null, range: { start: null, end: null }, rangeLabel: 'Histórico' };
+}
+
+function toDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function dashGetTxForPeriod() {
   const period = dashGetPeriod();
   let txs;
   if (period.range && (period.range.start || period.range.end)) {
-    txs = state.transactions.filter(tx => !tx.excluded && isTxInPeriod(tx));
-  } else {
+    txs = state.transactions.filter(tx => {
+      if (tx.excluded) return false;
+      if (period.range.start && tx.date < period.range.start) return false;
+      if (period.range.end && tx.date > period.range.end) return false;
+      return true;
+    });
+  } else if (period.year != null) {
     txs = state.transactions.filter(tx => {
       const d = new Date(tx.date + 'T00:00:00');
       return !tx.excluded && d.getMonth() === period.month && d.getFullYear() === period.year;
     });
+  } else {
+    txs = state.transactions.filter(tx => !tx.excluded);
   }
   if (dashState.accounts !== null) {
     const accSet = new Set(dashState.accounts);
@@ -54,6 +87,7 @@ function dashGetTxForPeriod() {
 }
 
 function dashPrevMonth() {
+  if (dashState.periodType !== 'month') return;
   const p = dashGetPeriod();
   let m = p.month - 1, y = p.year;
   if (m < 0) { m = 11; y--; }
@@ -62,11 +96,28 @@ function dashPrevMonth() {
 }
 
 function dashNextMonth() {
+  if (dashState.periodType !== 'month') return;
   const p = dashGetPeriod();
   let m = p.month + 1, y = p.year;
   if (m > 11) { m = 0; y++; }
   dashState.month = { year: y, month: m };
   renderDashboard();
+}
+
+function dashSetPeriod(type) {
+  dashState.periodType = type;
+  if (type !== 'month') dashState.month = null;
+  renderDashboard();
+}
+
+function dashTogglePeriodDropdown() {
+  const dd = document.getElementById('dash-period-dropdown');
+  if (dd) dd.classList.toggle('open');
+}
+
+function dashClosePeriodDropdown() {
+  const dd = document.getElementById('dash-period-dropdown');
+  if (dd) dd.classList.remove('open');
 }
 
 function dashToggleSection(name) {
@@ -100,13 +151,7 @@ function dashCloseAccDropdown() {
 }
 
 function dashSyncAccountsFromSidebar() {
-  if (state.selectedAccounts.length > 0) {
-    dashState.accounts = [...state.selectedAccounts];
-  } else if (state.currentView !== 'all' && state.currentView !== 'multi' && !state.currentView.startsWith('type-') && state.currentView !== 'receivables') {
-    dashState.accounts = [state.currentView];
-  } else {
-    dashState.accounts = null;
-  }
+  dashState.accounts = null;
   dashBuildAccMenu();
   dashUpdateAccLabel();
 }
@@ -208,8 +253,10 @@ function destroyChart(instance) {
 
 function getChartColors(n) {
   const palette = [
-    '#e6b800','#8b5cf6','#92400e','#22c55e','#3b82f6',
-    '#ec4899','#06b6d4','#d97706','#6366f1','#78350f',
+    '#e6b800','#8b5cf6','#e11d48','#22c55e','#3b82f6',
+    '#f97316','#06b6d4','#a855f7','#14b8a6','#ef4444',
+    '#6366f1','#84cc16','#f43f5e','#0ea5e9','#d946ef',
+    '#10b981','#f59e0b','#6b7280','#be185d','#0891b2',
   ];
   return Array.from({ length: n }, (_, i) => palette[i % palette.length]);
 }
@@ -388,6 +435,7 @@ function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
     ctx.beginPath();
     ctx.arc(cx, cy, (outerR + innerR) / 2, 0, Math.PI * 2);
     ctx.stroke();
+    canvas._segments = [];
     return;
   }
 
@@ -396,6 +444,7 @@ function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
   ctx.shadowBlur = 4;
   ctx.shadowOffsetY = 1;
 
+  const segments = [];
   let startAngle = -Math.PI / 2;
   values.forEach((v, i) => {
     const sweep = (v / total) * Math.PI * 2;
@@ -405,12 +454,84 @@ function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
     ctx.closePath();
     ctx.fillStyle = colors[i];
     ctx.fill();
+    segments.push({ startAngle, endAngle: startAngle + sweep, label: labels[i], value: v, color: colors[i] });
     startAngle += sweep;
   });
 
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
+
+  // Store segments for hit testing
+  canvas._segments = segments;
+  canvas._cx = cx;
+  canvas._cy = cy;
+  canvas._outerR = outerR;
+  canvas._innerR = innerR;
+
+  updateDonutTooltip(canvas);
+}
+
+function updateDonutTooltip(canvas) {
+  const tooltip = document.getElementById('dash-donut-tooltip');
+  if (!tooltip) return;
+
+  const onMove = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (canvas.width / (r.width * (window.devicePixelRatio || 1)));
+    const my = (e.clientY - r.top) * (canvas.height / (r.height * (window.devicePixelRatio || 1)));
+    const segments = canvas._segments || [];
+    if (segments.length === 0) { tooltip.style.display = 'none'; return; }
+
+    const cx = canvas._cx, cy = canvas._cy;
+    const dx = mx - cx, dy = my - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < canvas._innerR || dist > canvas._outerR) {
+      tooltip.style.display = 'none';
+      return;
+    }
+
+    let angle = Math.atan2(dy, dx);
+    if (angle < -Math.PI / 2) angle += Math.PI * 2;
+
+    let found = null;
+    for (const seg of segments) {
+      let sa = seg.startAngle, ea = seg.endAngle;
+      if (angle >= sa && angle < ea) { found = seg; break; }
+    }
+
+    if (!found) { tooltip.style.display = 'none'; return; }
+
+    const isIncome = found.value >= 0;
+    const pct = ((found.value / segments.reduce((a, s) => a + s.value, 0)) * 100).toFixed(1);
+    const sign = found.label === 'label' ? '' : '';
+    tooltip.innerHTML = `<strong>${found.label}</strong><br>${formatCurrency(found.value)} <span style="color:var(--text-lo)">(${pct}%)</span>`;
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 12) + 'px';
+    tooltip.style.top = (e.clientY - 10) + 'px';
+  };
+
+  const onOut = () => {
+    tooltip.style.display = 'none';
+  };
+
+  canvas.removeEventListener('mousemove', canvas._tooltipMove);
+  canvas.removeEventListener('mouseout', canvas._tooltipOut);
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseout', onOut);
+  canvas._tooltipMove = onMove;
+  canvas._tooltipOut = onOut;
+}
+
+function renderDonutLegend(legendId, segments, formatFn) {
+  const el = document.getElementById(legendId);
+  if (!el) return;
+  if (!segments || segments.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = segments.map(s => {
+    const val = formatFn ? formatFn(s.value) : s.value;
+    return `<div class="dash-donut-legend-item"><span class="dash-donut-legend-dot" style="background:${s.color}"></span><span>${s.label}</span><span style="margin-left:auto;color:var(--text-hi);font-weight:600">${val}</span></div>`;
+  }).join('');
 }
 
 // ── Progress circle helper ────────────────────────────────────
@@ -447,26 +568,32 @@ function renderDashboard() {
   const nwEl = document.getElementById('dash-net-worth');
   if (nwEl) nwEl.textContent = formatCurrency(netWorth);
 
-  // ── Month label ──
-  const monthLabel = document.getElementById('dash-month-label');
+  // ── Period label ──
+  const periodLabel = document.getElementById('dash-period-label');
   const prevBtn = document.getElementById('dash-month-prev');
   const nextBtn = document.getElementById('dash-month-next');
-  const hasGlobalPeriod = state.period && state.period.type !== 'all';
-  if (monthLabel) {
-    const p = state.period;
-    if (hasGlobalPeriod) {
-      monthLabel.textContent = getPeriodLabel();
-    } else if (dashState.month) {
-      const d = new Date(period.year, period.month, 1);
-      monthLabel.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' })
-        .replace(/^./, s => s.toUpperCase());
+  const isMonthMode = dashState.periodType === 'month';
+
+  if (periodLabel) {
+    if (isMonthMode) {
+      const p = state.period;
+      if (p && p.type !== 'all') {
+        periodLabel.textContent = getPeriodLabel();
+      } else if (dashState.month) {
+        const d = new Date(period.year, period.month, 1);
+        periodLabel.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' })
+          .replace(/^./, s => s.toUpperCase());
+      } else {
+        const now = new Date();
+        periodLabel.textContent = now.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' })
+          .replace(/^./, s => s.toUpperCase());
+      }
     } else {
-      monthLabel.textContent = 'Resumen total';
+      periodLabel.textContent = period.rangeLabel || 'Histórico';
     }
   }
-  // Hide prev/next buttons when global period is active
-  if (prevBtn) prevBtn.style.display = hasGlobalPeriod ? 'none' : '';
-  if (nextBtn) nextBtn.style.display = hasGlobalPeriod ? 'none' : '';
+  if (prevBtn) prevBtn.style.display = isMonthMode ? '' : 'none';
+  if (nextBtn) nextBtn.style.display = isMonthMode ? '' : 'none';
 
   // ── Filter transactions for selected period ──
   const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
@@ -485,7 +612,9 @@ function renderDashboard() {
   const netEl = document.getElementById('dash-net');
   if (netEl) {
     netEl.textContent = (netDiff >= 0 ? '+' : '') + formatCurrency(netDiff);
-    netEl.className = 'dash-metric-val' + (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '');
+    const amtStyle = state.settings.amountStyle || 'default';
+    const showDashColor = amtStyle !== 'no-color';
+    netEl.className = 'dash-metric-val' + (showDashColor ? (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '') : '');
   }
   setEl('dash-tx-count', monthTxs.length);
 
@@ -498,7 +627,7 @@ function renderDashboard() {
   if (savingsPctEl) savingsPctEl.textContent = savingsPct.toFixed(1) + '%';
   if (savingsDesc) {
     if (totalIncome === 0) savingsDesc.textContent = 'Sin ingresos registrados en este período.';
-    else if (savingsPct <= 0) savingsDesc.textContent = 'Los gastos superan los ingresos este mes.';
+    else if (savingsPct <= 0) savingsDesc.textContent = 'Los gastos superan los ingresos en este período.';
     else if (savingsPct < 10) savingsDesc.textContent = `Ahorrás ${savingsPct.toFixed(1)}% de tus ingresos. Meta sugerida: 20%.`;
     else if (savingsPct < 20) savingsDesc.textContent = `Ahorrás ${savingsPct.toFixed(1)}% de tus ingresos. Vas bien, seguí así.`;
     else savingsDesc.textContent = `¡Excelente! Ahorrás ${savingsPct.toFixed(1)}% de tus ingresos este mes.`;
@@ -542,7 +671,7 @@ function renderDashboard() {
   if (catList) {
     catList.innerHTML = '';
     if (catEntries.length === 0) {
-      catList.innerHTML = '<div class="dash-empty">Sin gastos este mes</div>';
+      catList.innerHTML = '<div class="dash-empty">Sin gastos en este período</div>';
     } else {
       catEntries.forEach(([cat, amount], idx) => {
         const pct = maxCat > 0 ? (amount / maxCat) * 100 : 0;
@@ -576,7 +705,7 @@ function renderDashboard() {
   if (incomeCatList) {
     incomeCatList.innerHTML = '';
     if (incomeCatEntries.length === 0) {
-      incomeCatList.innerHTML = '<div class="dash-empty">Sin ingresos este mes</div>';
+      incomeCatList.innerHTML = '<div class="dash-empty">Sin ingresos en este período</div>';
     } else {
       incomeCatEntries.forEach(([cat, amount]) => {
         const pct = maxIncomeCat > 0 ? (amount / maxIncomeCat) * 100 : 0;
@@ -621,13 +750,16 @@ function renderDashboard() {
         const rAcc = state.accounts.find(a => a.id === tx.account_id);
         const rCur = rAcc?.currency || state.settings.currency || 'ARS';
         const rTooltip = getConvertedTooltip(tx.amount, rCur);
+        const amtStyle = state.settings.amountStyle || 'default';
+        const showSign = amtStyle !== 'no-sign';
+        const showColor = amtStyle !== 'no-color';
         const item = document.createElement('div');
         item.className = 'dash-recent-item';
         item.innerHTML = `
           <span class="dash-recent-date">${formatDate(tx.date)}</span>
-          <span class="dash-recent-dot ${isExpense ? 'expense' : 'income'}"></span>
+          <span class="dash-recent-dot ${showColor ? (isExpense ? 'expense' : 'income') : ''}"></span>
           <span class="dash-recent-payee">${tx.payee || '—'}</span>
-          <span class="dash-recent-amount ${isExpense ? 'expense' : 'income'}" ${rTooltip ? 'title="' + rTooltip + '"' : ''}>${isExpense ? '-' : '+'}${formatAccountCurrency(Math.abs(tx.amount), rCur)}</span>
+          <span class="dash-recent-amount ${showColor ? (isExpense ? 'expense' : 'income') : 'amount-no-color'}" ${rTooltip ? 'title="' + rTooltip + '"' : ''}>${isExpense ? (showSign ? '-' : '') : (showSign ? '+' : '')}${formatAccountCurrency(Math.abs(tx.amount), rCur)}</span>
         `;
         recentList.appendChild(item);
       });
@@ -656,53 +788,45 @@ function renderDashCharts() {
     const expenseData = [];
 
     const period = dashGetPeriod();
-    if (period.range && (period.range.start || period.range.end)) {
-      // Range-based: show months within the range
-      const startDate = period.range.start ? new Date(period.range.start + 'T00:00:00') : new Date(2020, 0, 1);
-      const endDate = period.range.end ? new Date(period.range.end + 'T00:00:00') : new Date();
-      const startMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-      const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-      let current = new Date(startMonth);
-      while (current <= endMonth) {
-        const m = current.getMonth(), y = current.getFullYear();
-        const label = current.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
-        labels.push(label.charAt(0).toUpperCase() + label.slice(1));
-        let inc = 0, exp = 0;
-        const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
-        state.transactions.forEach(tx => {
-          const td = new Date(tx.date + 'T00:00:00');
-          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded) {
-            if (accFilter && !accFilter.has(tx.account_id)) return;
-            if (tx.amount > 0) inc += tx.amount;
-            else exp += Math.abs(tx.amount);
-          }
-        });
-        incomeData.push(inc);
-        expenseData.push(exp);
-        current.setMonth(current.getMonth() + 1);
+    const isMonthMode = dashState.periodType === 'month';
+    const isAllMode = dashState.periodType === 'all';
+
+    // Determine how many months to show
+    let numMonths = 6;
+    if (!isMonthMode && !isAllMode && period.range && period.range.start) {
+      const start = new Date(period.range.start + 'T00:00:00');
+      const end = period.range.end ? new Date(period.range.end + 'T00:00:00') : new Date();
+      numMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1);
+    }
+    if (isAllMode) {
+      // Find all months that have transactions
+      const dates = state.transactions.filter(t => !t.is_future && !t.excluded).map(t => t.date);
+      if (dates.length > 0) {
+        dates.sort();
+        const first = new Date(dates[0] + 'T00:00:00');
+        const last = new Date(dates[dates.length - 1] + 'T00:00:00');
+        numMonths = Math.max(1, (last.getFullYear() - first.getFullYear()) * 12 + last.getMonth() - first.getMonth() + 1);
       }
-    } else {
-      // No period or "all": show last 6 months
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(1);
-        d.setMonth(d.getMonth() - i);
-        const m = d.getMonth(), y = d.getFullYear();
-        const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
-        labels.push(label.charAt(0).toUpperCase() + label.slice(1));
-        let inc = 0, exp = 0;
-        const accFilter2 = dashState.accounts !== null ? new Set(dashState.accounts) : null;
-        state.transactions.forEach(tx => {
-          const td = new Date(tx.date + 'T00:00:00');
-          if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded) {
-            if (accFilter2 && !accFilter2.has(tx.account_id)) return;
-            if (tx.amount > 0) inc += tx.amount;
-            else exp += Math.abs(tx.amount);
-          }
-        });
-        incomeData.push(inc);
-        expenseData.push(exp);
-      }
+    }
+
+    const now = new Date();
+    for (let i = numMonths - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = d.getMonth(), y = d.getFullYear();
+      const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
+      labels.push(label.charAt(0).toUpperCase() + label.slice(1));
+      let inc = 0, exp = 0;
+      const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
+      state.transactions.forEach(tx => {
+        const td = new Date(tx.date + 'T00:00:00');
+        if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded) {
+          if (accFilter && !accFilter.has(tx.account_id)) return;
+          if (tx.amount > 0) inc += tx.amount;
+          else exp += Math.abs(tx.amount);
+        }
+      });
+      incomeData.push(inc);
+      expenseData.push(exp);
     }
     drawLineChart(lineCanvas, labels, incomeData, expenseData);
   }
@@ -719,6 +843,7 @@ function renderDashCharts() {
     const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const colors = getChartColors(entries.length);
     drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total gastos');
+    renderDonutLegend('dash-donut-legend', donutCanvas._segments || [], val => formatCurrency(val));
   }
 
   // ── Donut chart (income) ──
@@ -731,10 +856,8 @@ function renderDashCharts() {
       catTotals[cat] = (catTotals[cat] || 0) + tx.amount;
     });
     const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    const colors = getChartColors(entries.length).map((_, i) => {
-      const pastels = ['#22c55e','#8b5cf6','#92400e','#3b82f6','#d97706','#06b6d4','#6366f1','#78350f'];
-      return pastels[i % pastels.length];
-    });
+    const colors = getChartColors(entries.length);
     drawDonutChart(donutIncomeCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total ingresos');
+    renderDonutLegend('dash-donut-income-legend', donutIncomeCanvas._segments || [], val => formatCurrency(val));
   }
 }

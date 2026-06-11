@@ -248,6 +248,62 @@
   flex: 1;
 }
 
+.compound-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-root);
+  overflow: hidden;
+}
+
+.compound-input input {
+  box-sizing: border-box;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  height: 32px;
+  padding: 0 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.compound-input input[type="number"]::-webkit-inner-spin-button,
+.compound-input input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
+}
+
+.compound-input input[type="number"] {
+  -moz-appearance: auto;
+  appearance: auto;
+}
+
+.compound-input #tx-installment-index::-webkit-inner-spin-button,
+.compound-input #tx-installment-index::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+.compound-input #tx-installment-index {
+  -moz-appearance: textfield;
+  flex: 1;
+}
+
+.compound-input #tx-installment-count {
+  flex: 1;
+}
+
+.compound-sep {
+  color: var(--text-lo);
+  font-size: 15px;
+  font-weight: 600;
+  flex: none;
+  padding: 0 2px;
+}
+
 .installment-editor-body .form-group input[type="number"] {
   box-sizing: border-box;
   flex: none;
@@ -271,7 +327,7 @@
   justify-content: center;
   flex: none;
   height: 32px;
-  padding: 0 8px;
+  padding: 0;
   background: var(--bg-root);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -280,6 +336,55 @@
   color: var(--text-hi);
   font-family: var(--font-ui);
   text-align: center;
+  overflow: hidden;
+}
+
+.inst-cuota-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.inst-cuota-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.inst-cuota-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 6px;
+  outline: none;
+  font-family: var(--font-ui);
+}
+
+.inst-cuota-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 8px;
+  outline: none;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-hi);
+}
+
+.inst-cuota-input:focus {
+  background: transparent !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .inst-preview-label {
@@ -372,7 +477,7 @@
 }
 
 /* ── Tabla: filas de cuotas futuras ───────────────────── */
-tr.tx-future {
+tr.tx-future td:not(.actions-cell) {
   opacity: 0.6;
 }
 
@@ -380,7 +485,9 @@ tr.tx-future td {
   background: transparent !important;
 }
 
-tr.tx-future:hover { opacity: 0.75; }
+tr.tx-future:hover td:not(.actions-cell) {
+  opacity: 0.75;
+}
 
 /* Separador "Cuotas futuras" colapsable */
 .future-group-row td {
@@ -416,7 +523,6 @@ tr.tx-future:hover { opacity: 0.75; }
 .future-group-arrow.open { transform: rotate(-90deg); }
 
 .future-group-count {
-  margin-left: auto;
   font-size: 10px;
   font-weight: 500;
   padding: 1px 6px;

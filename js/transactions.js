@@ -186,7 +186,7 @@ function openTransactionModal(txId) {
     document.getElementById('tx-account').value = tx.account_id;
     document.getElementById('tx-payee-search').value = tx.payee;
     document.getElementById('tx-category-search').value = tx.category_name || '';
-    document.getElementById('tx-amount').value = Math.abs(tx.amount);
+    document.getElementById('tx-amount').value = formatNoTrailingZeros(Math.abs(tx.amount));
     document.getElementById('tx-notes').value = tx.notes || '';
 
     setTxSign(tx.amount < 0 ? -1 : 1);
@@ -204,15 +204,17 @@ function openTransactionModal(txId) {
     const isInst = !!(tx.installment_group && tx.installment_total);
     const instChk = document.getElementById('tx-is-installment');
     instChk.checked = isInst;
-    instChk.disabled = isInst; // can't change cuota structure when editing
+    document.getElementById('tx-installment-index-display').style.display = 'none';
+    document.getElementById('tx-installment-editor').style.display = isInst ? 'block' : 'none';
     if (isInst) {
-      document.getElementById('tx-installment-index-display').textContent =
-        `Cuota ${tx.installment_index} de ${tx.installment_total}`;
-      document.getElementById('tx-installment-index-display').style.display = 'inline-flex';
-      document.getElementById('tx-installment-editor').style.display = 'none';
+      document.getElementById('tx-amount').value = formatNoTrailingZeros(tx.installment_full_amount || Math.abs(tx.amount));
+      document.getElementById('tx-installment-count').value = tx.installment_total;
+      document.getElementById('tx-installment-count').disabled = true;
+      document.getElementById('tx-installment-index').value = tx.installment_index;
+      document.getElementById('tx-installment-index').max = tx.installment_total;
+      updateInstallmentPreview();
     } else {
-      document.getElementById('tx-installment-index-display').style.display = 'none';
-      document.getElementById('tx-installment-editor').style.display = 'none';
+      document.getElementById('tx-installment-count').disabled = false;
     }
     onAccountChangeInModal();
   } else {
@@ -237,6 +239,8 @@ function openTransactionModal(txId) {
     // Reset installment fields
     document.getElementById('tx-is-installment').checked = false;
     document.getElementById('tx-installment-count').value = '3';
+    document.getElementById('tx-installment-count').disabled = false;
+    document.getElementById('tx-installment-index').value = '1';
     document.getElementById('tx-installment-editor').style.display = 'none';
     onAccountChangeInModal();
   }
@@ -267,6 +271,12 @@ function closeTransactionModal() {
   if (instChk) { instChk.checked = false; instChk.disabled = false; }
   const instBadge = document.getElementById('tx-installment-index-display');
   if (instBadge) instBadge.style.display = 'none';
+  const instIndex = document.getElementById('tx-installment-index');
+  if (instIndex) instIndex.value = '1';
+  const instCount = document.getElementById('tx-installment-count');
+  if (instCount) { instCount.disabled = false; instCount.value = '3'; }
+  const cuotaInput = document.getElementById('inst-cuota-input');
+  if (cuotaInput) cuotaInput.value = '';
 }
 
 function toggleReceivableFields(show) {
@@ -291,7 +301,11 @@ function onInstallmentCheck(checked) {
   const editor = document.getElementById('tx-installment-editor');
   editor.style.display = checked ? 'block' : 'none';
   if (checked) {
-    document.getElementById('tx-installment-count').value = '3';
+    const tx = state.editingTxId ? state.transactions.find(t => t.id === state.editingTxId) : null;
+    if (!tx || !tx.installment_group) {
+      document.getElementById('tx-installment-count').value = '3';
+      document.getElementById('tx-installment-index').value = '1';
+    }
     updateInstallmentPreview();
   }
 }
@@ -304,42 +318,33 @@ function getInstallmentMonthOffset(dateVal, accountId) {
   return acc.card_closing_day < txDay ? 1 : 0;
 }
 
-function updateInstallmentPreview() {
-  const total   = parseInt(document.getElementById('tx-installment-count').value) || 0;
-  const rawAmt  = parseFloat(document.getElementById('tx-amount').value) || 0;
-  const previewVal = document.getElementById('inst-preview-val');
-  const timeline   = document.getElementById('installment-timeline');
-  const dateVal    = document.getElementById('tx-date').value;
-  const accId      = document.getElementById('tx-account')?.value;
-  const acc        = state.accounts.find(a => a.id === accId);
-  const accCur     = acc?.currency || state.settings.currency || 'ARS';
-  const offset     = getInstallmentMonthOffset(dateVal, accId);
+function buildInstallmentTimeline() {
+  const total     = parseInt(document.getElementById('tx-installment-count').value) || 0;
+  const timeline  = document.getElementById('installment-timeline');
+  const dateVal   = document.getElementById('tx-date').value;
+  const indexInput = document.getElementById('tx-installment-index');
+  let manualIdx   = parseInt(indexInput.value) || 1;
+  if (manualIdx < 1) manualIdx = 1;
+  if (total >= 2 && manualIdx > total) manualIdx = total;
 
-  if (total >= 2 && rawAmt > 0) {
-    const perCuota = rawAmt / total;
-    previewVal.textContent = formatAccountCurrency(perCuota, accCur);
-  } else {
-    previewVal.textContent = total >= 2 ? '—' : 'Mín. 2';
-  }
-
-  // Build timeline dots
   timeline.innerHTML = '';
-  for (let i = 0; i < total; i++) {
+  for (let i = manualIdx; i <= total; i++) {
     const cell = document.createElement('div');
     cell.className = 'inst-cell';
     const dot   = document.createElement('div');
-    dot.className = 'inst-dot ' + (i === 0 ? 'now' : 'future');
-    dot.textContent = i + 1;
+    const isCurrent = i === manualIdx;
+    dot.className = 'inst-dot ' + (isCurrent ? 'now' : 'future');
+    dot.textContent = i;
     const lbl   = document.createElement('div');
-    lbl.className = 'inst-dot-label ' + (i === 0 ? 'now' : '');
+    lbl.className = 'inst-dot-label ' + (isCurrent ? 'now' : '');
     if (dateVal) {
       const d = new Date(dateVal + 'T12:00:00');
-      d.setMonth(d.getMonth() + i + offset);
+      d.setMonth(d.getMonth() + i - 1);
       lbl.textContent = d.toLocaleDateString('es-AR', { month: 'short', timeZone: 'UTC' });
-    } else if (i === 0) {
+    } else if (isCurrent) {
       lbl.textContent = 'ahora';
     } else {
-      lbl.textContent = '+' + i + 'm';
+      lbl.textContent = '+' + (i - manualIdx) + 'm';
     }
     cell.appendChild(dot);
     cell.appendChild(lbl);
@@ -347,14 +352,51 @@ function updateInstallmentPreview() {
   }
 }
 
-function handleTransactionSubmit(event) {
+function formatNoTrailingZeros(num) {
+  return parseFloat(num.toFixed(2)).toString().replace('.', ',');
+}
+
+function updateInstallmentPreview() {
+  const total   = parseInt(document.getElementById('tx-installment-count').value) || 0;
+  const raw = document.getElementById('tx-amount').value.replace(/[^\d,.\-]/g, '').replace(',', '.');
+  const rawAmt  = parseFloat(raw) || 0;
+  const cuotaInput = document.getElementById('inst-cuota-input');
+
+  const indexInput = document.getElementById('tx-installment-index');
+  let manualIdx = parseInt(indexInput.value) || 1;
+  if (manualIdx < 1) manualIdx = 1;
+  if (total >= 2 && manualIdx > total) manualIdx = total;
+  indexInput.max = total || 48;
+  indexInput.value = manualIdx;
+
+  if (total >= 2 && rawAmt > 0) {
+    const perCuota = rawAmt / total;
+    cuotaInput.value = formatNoTrailingZeros(perCuota);
+  } else {
+    cuotaInput.value = '';
+  }
+
+  buildInstallmentTimeline();
+}
+
+function onCuotaInput() {
+  const total = parseInt(document.getElementById('tx-installment-count').value) || 0;
+  const raw = document.getElementById('inst-cuota-input').value.replace(/[^\d,.\-]/g, '').replace(',', '.');
+  const perCuota = parseFloat(raw) || 0;
+  if (total >= 2 && perCuota > 0) {
+    document.getElementById('tx-amount').value = formatNoTrailingZeros(perCuota * total);
+  }
+  buildInstallmentTimeline();
+}
+
+async function handleTransactionSubmit(event) {
   event.preventDefault();
 
   const dateVal     = document.getElementById('tx-date').value;
   const accountId   = document.getElementById('tx-account').value;
   const payee       = document.getElementById('tx-payee-search').value.trim();
   const categoryName = document.getElementById('tx-category-search').value.trim();
-  const rawAmount   = parseFloat(document.getElementById('tx-amount').value);
+  const rawAmount   = parseFloat(document.getElementById('tx-amount').value.replace(/[^\d,.\-]/g, '').replace(',', '.'));
   const notes       = document.getElementById('tx-notes').value.trim();
   const isReceivable = document.getElementById('tx-is-receivable').checked;
   const dueDate     = document.getElementById('tx-due-date').value;
@@ -404,16 +446,88 @@ function handleTransactionSubmit(event) {
   if (state.editingTxId) {
     const tx = state.transactions.find(t => t.id === state.editingTxId);
     if (tx) {
-      tx.date = dateVal;
-      tx.account_id = accountId;
-      tx.payee = payee;
-      tx.category_name = categoryName;
-      tx.amount = amount;
-      tx.notes = notes;
-      tx.tags = activeTags;
-      tx.is_receivable = isReceivable;
-      tx.due_date = isReceivable ? dueDate : '';
-      tx.excluded = isExcluded;
+      const isInst = document.getElementById('tx-is-installment').checked;
+      const totalCuotas = parseInt(document.getElementById('tx-installment-count').value) || 0;
+
+      if (isInst && totalCuotas >= 2 && !tx.installment_group) {
+        // Convert to installment: remove original, create installments
+        state.transactions = state.transactions.filter(t => t.id !== state.editingTxId);
+        const groupId   = 'ig-' + Date.now();
+        const perCuota  = amount / totalCuotas;
+        const today     = new Date().toISOString().split('T')[0];
+        let manualIdx = parseInt(document.getElementById('tx-installment-index').value) || 1;
+        if (manualIdx < 1) manualIdx = 1;
+        if (manualIdx > totalCuotas) manualIdx = totalCuotas;
+
+        for (let i = manualIdx; i <= totalCuotas; i++) {
+          const d = new Date(dateVal + 'T12:00:00');
+          d.setMonth(d.getMonth() + i - 1);
+          const instDate = d.toISOString().split('T')[0];
+          const isFuture = instDate > today;
+
+          state.transactions.unshift({
+            id: 'tx-' + Date.now() + '-' + i,
+            date: instDate,
+            account_id: accountId,
+            payee,
+            category_name: categoryName,
+            amount: perCuota,
+            notes: notes,
+            tags: activeTags,
+            is_receivable: false,
+            due_date: '',
+            excluded: isExcluded,
+            is_future: isFuture,
+            installment_group: groupId,
+            installment_total: totalCuotas,
+            installment_index: i,
+            installment_full_amount: Math.abs(amount)
+          });
+        }
+      } else if (!isInst && tx.installment_group) {
+        const count = state.transactions.filter(t => t.installment_group === tx.installment_group).length;
+        const ok = await showConfirm(
+          `¿Estás seguro? Se eliminarán ${count} cuotas siguientes de esta compra.`,
+          { title: 'Quitar cuotas', confirmText: 'Sí, eliminar cuotas', danger: true }
+        );
+        if (!ok) {
+          document.getElementById('tx-is-installment').checked = true;
+          onInstallmentCheck(true);
+          return;
+        }
+        state.transactions = state.transactions.filter(t => t.installment_group !== tx.installment_group);
+        delete tx.installment_group;
+        delete tx.installment_total;
+        delete tx.installment_index;
+        delete tx.installment_full_amount;
+        tx.date = dateVal;
+        tx.is_future = dateVal > new Date().toISOString().split('T')[0];
+        tx.account_id = accountId;
+        tx.payee = payee;
+        tx.category_name = categoryName;
+        tx.amount = amount;
+        tx.notes = notes;
+        tx.tags = activeTags;
+        tx.is_receivable = isReceivable;
+        tx.due_date = isReceivable ? dueDate : '';
+        tx.excluded = isExcluded;
+      } else {
+        tx.date = dateVal;
+        tx.is_future = dateVal > new Date().toISOString().split('T')[0];
+        tx.account_id = accountId;
+        tx.payee = payee;
+        tx.category_name = categoryName;
+        tx.amount = amount;
+        tx.notes = notes;
+        tx.tags = activeTags;
+        tx.is_receivable = isReceivable;
+        tx.due_date = isReceivable ? dueDate : '';
+        tx.excluded = isExcluded;
+        if (tx.installment_group && tx.installment_total) {
+          const newIdx = parseInt(document.getElementById('tx-installment-index').value) || tx.installment_index;
+          tx.installment_index = Math.max(1, Math.min(newIdx, tx.installment_total));
+        }
+      }
     }
   } else {
     const isInst = document.getElementById('tx-is-installment').checked;
@@ -423,11 +537,13 @@ function handleTransactionSubmit(event) {
       const groupId   = 'ig-' + Date.now();
       const perCuota  = amount / totalCuotas;  // negative amount / N = negative per cuota
       const today     = new Date().toISOString().split('T')[0];
-      const instOffset = getInstallmentMonthOffset(dateVal, accountId);
+      let manualIdx = parseInt(document.getElementById('tx-installment-index').value) || 1;
+      if (manualIdx < 1) manualIdx = 1;
+      if (manualIdx > totalCuotas) manualIdx = totalCuotas;
 
-      for (let i = 0; i < totalCuotas; i++) {
+      for (let i = manualIdx; i <= totalCuotas; i++) {
         const d = new Date(dateVal + 'T12:00:00');
-        d.setMonth(d.getMonth() + i + instOffset);
+        d.setMonth(d.getMonth() + i - 1);
         const instDate = d.toISOString().split('T')[0];
         const isFuture = instDate > today;
 
@@ -446,7 +562,7 @@ function handleTransactionSubmit(event) {
           is_future: isFuture,
           installment_group: groupId,
           installment_total: totalCuotas,
-          installment_index: i + 1,
+          installment_index: i,
           installment_full_amount: Math.abs(amount)
         });
       }
@@ -482,6 +598,21 @@ async function deleteTransaction(txId) {
     if (!await showConfirm('¿Eliminar todas las cuotas de esta compra?', { title: 'Eliminar cuotas', confirmText: 'Eliminar todo', danger: true })) return;
     state.transactions = state.transactions.filter(t => t.installment_group !== tx.installment_group);
     state.selectedTxIds.clear();
+  } else if (tx.split_group && !tx.split_parent_id) {
+    const childCount = state.transactions.filter(t => t.split_parent_id === txId).length;
+    if (childCount > 0) {
+      if (!await showConfirm(`¿Eliminar esta transacción y sus ${childCount} divisiones?`, { title: 'Eliminar dividida', confirmText: 'Eliminar todo', danger: true })) return;
+      deleteSplitChildren(txId);
+    } else {
+      if (!await showConfirm('¿Seguro que deseas eliminar esta transacción?', { title: 'Eliminar transacción', confirmText: 'Eliminar', danger: true })) return;
+    }
+    state.transactions = state.transactions.filter(t => t.id !== txId);
+    state.selectedTxIds.delete(txId);
+  } else if (tx.split_parent_id) {
+    const parent = state.transactions.find(t => t.id === tx.split_parent_id);
+    if (parent && !await showConfirm('¿Eliminar esta división? El monto restante se redistribuirá.', { title: 'Eliminar división', confirmText: 'Eliminar', danger: true })) return;
+    state.transactions = state.transactions.filter(t => t.id !== txId);
+    state.selectedTxIds.delete(txId);
   } else {
     if (!await showConfirm('¿Seguro que deseas eliminar esta transacción?', { title: 'Eliminar transacción', confirmText: 'Eliminar', danger: true })) return;
     state.transactions = state.transactions.filter(t => t.id !== txId);
@@ -515,8 +646,39 @@ async function markAsCollected(txId) {
 }
 
 // ── TX SELECTION ──────────────────────────────────────────────
-function toggleTxSelection(txId) {
-  if (state.selectedTxIds.has(txId)) {
+let _lastClickTxId = null;
+
+function handleTxRowClick(txId, event) {
+  if (!event) return;
+  event.stopPropagation();
+
+  if (event.shiftKey && _lastClickTxId !== null && _lastClickTxId !== txId) {
+    const tbody = document.getElementById('tx-table-body');
+    const rows = [...tbody.querySelectorAll('tr[data-tx-id]')];
+    const ids = rows.map(r => r.dataset.txId);
+    const start = ids.indexOf(_lastClickTxId);
+    const end = ids.indexOf(txId);
+    if (start !== -1 && end !== -1) {
+      state.selectedTxIds.clear();
+      const [from, to] = start < end ? [start, end] : [end, start];
+      for (let i = from; i <= to; i++) {
+        state.selectedTxIds.add(ids[i]);
+      }
+      rows.forEach(r => {
+        const id = r.dataset.txId;
+        r.classList.toggle('selected', state.selectedTxIds.has(id));
+        const cb = r.querySelector('.tx-checkbox');
+        if (cb) cb.checked = state.selectedTxIds.has(id);
+      });
+      updateSelectionBar();
+      updateSelectAllCheckbox();
+      return;
+    }
+    _lastClickTxId = null;
+  }
+
+  const wasSelected = state.selectedTxIds.has(txId);
+  if (wasSelected) {
     state.selectedTxIds.delete(txId);
   } else {
     state.selectedTxIds.add(txId);
@@ -525,8 +687,31 @@ function toggleTxSelection(txId) {
   if (row) row.classList.toggle('selected', state.selectedTxIds.has(txId));
   const cb = row ? row.querySelector('.tx-checkbox') : null;
   if (cb) cb.checked = state.selectedTxIds.has(txId);
+
+  // Propagate to children when parent is toggled
+  const tx = state.transactions.find(t => t.id === txId);
+  if (tx && tx.split_group && !tx.split_parent_id) {
+    const children = state.transactions.filter(t => t.split_parent_id === txId);
+    children.forEach(child => {
+      if (wasSelected) {
+        state.selectedTxIds.delete(child.id);
+      } else {
+        state.selectedTxIds.add(child.id);
+      }
+      const childRow = document.querySelector(`tr[data-tx-id="${child.id}"]`);
+      if (childRow) childRow.classList.toggle('selected', state.selectedTxIds.has(child.id));
+      const childCb = childRow ? childRow.querySelector('.tx-checkbox') : null;
+      if (childCb) childCb.checked = state.selectedTxIds.has(child.id);
+    });
+  }
+
   updateSelectionBar();
   updateSelectAllCheckbox();
+  _lastClickTxId = txId;
+}
+
+function toggleTxSelection(txId) {
+  handleTxRowClick(txId, { shiftKey: false, stopPropagation: () => {} });
 }
 
 function toggleSelectAll() {
@@ -542,11 +727,13 @@ function toggleSelectAll() {
     cb.closest('tr').classList.toggle('selected', selectAll);
     cb.checked = selectAll;
   });
+  _lastClickTxId = null;
   updateSelectionBar();
 }
 
 function clearTxSelection() {
   state.selectedTxIds.clear();
+  _lastClickTxId = null;
   document.querySelectorAll('.tx-checkbox').forEach(cb => {
     cb.checked = false;
     cb.closest('tr').classList.remove('selected');
@@ -821,6 +1008,29 @@ function openBatchEditModal() {
     openTransactionModal(id);
     return;
   }
+
+  const excludedCount = _countExcludedInSelection();
+  if (excludedCount > 0) {
+    const totalCount = state.selectedTxIds.size;
+    const activeCount = totalCount - excludedCount;
+    showConfirm(
+      `La selección incluye ${excludedCount} transacción${excludedCount > 1 ? 'es' : ''} excluida${excludedCount > 1 ? 's' : ''} del total.\n\n¿Qué deseas hacer?`,
+      {
+        title: 'Transacciones excluidas',
+        confirmText: `Incluir las ${excludedCount} excluidas`,
+        cancelText: `Solo las ${activeCount} activas`,
+        danger: false
+      }
+    ).then(ok => {
+      if (!ok) _filterExcludedFromSelection();
+      _openBatchEditModalInner();
+    });
+    return;
+  }
+  _openBatchEditModalInner();
+}
+
+function _openBatchEditModalInner() {
   updateSelectors();
   state.editingTxId = null;
   state._batchEditIds = [...state.selectedTxIds];
@@ -857,29 +1067,75 @@ function openBatchEditModal() {
   document.getElementById('tx-installment-editor').style.display = 'none';
   document.getElementById('tx-is-installment').checked = false;
   document.getElementById('tx-is-installment').disabled = false;
+  const batchCuotaInput = document.getElementById('inst-cuota-input');
+  if (batchCuotaInput) batchCuotaInput.value = '';
 
   document.getElementById('tx-modal').classList.add('open');
   lucide.createIcons();
 }
 
+function _countExcludedInSelection() {
+  let excludedCount = 0;
+  state.selectedTxIds.forEach(id => {
+    const tx = state.transactions.find(t => t.id === id);
+    if (tx && tx.excluded) excludedCount++;
+  });
+  return excludedCount;
+}
+
+function _filterExcludedFromSelection() {
+  state.selectedTxIds.forEach(id => {
+    const tx = state.transactions.find(t => t.id === id);
+    if (tx && tx.excluded) state.selectedTxIds.delete(id);
+  });
+}
+
 function batchDeleteTransactions() {
   if (state.selectedTxIds.size === 0) return;
-  const count = state.selectedTxIds.size;
-  showConfirm(`¿Eliminar ${count} transacciones seleccionadas? Esta acción no se puede deshacer.`, {
-    title: 'Eliminar transacciones',
-    confirmText: `Eliminar ${count}`,
-    danger: true
-  }).then(ok => {
-    if (!ok) return;
-    state.transactions = state.transactions.filter(t => !state.selectedTxIds.has(t.id));
-    state.selectedTxIds.clear();
-    saveData('transactions');
-    renderAll();
-  });
+  const excludedCount = _countExcludedInSelection();
+
+  const doDelete = (ids) => {
+    const count = ids.size;
+    showConfirm(`¿Eliminar ${count} transacciones seleccionadas? Esta acción no se puede deshacer.`, {
+      title: 'Eliminar transacciones',
+      confirmText: `Eliminar ${count}`,
+      danger: true
+    }).then(ok => {
+      if (!ok) return;
+      state.transactions = state.transactions.filter(t => !ids.has(t.id));
+      state.selectedTxIds.clear();
+      saveData('transactions');
+      renderAll();
+    });
+  };
+
+  if (excludedCount > 0) {
+    const totalCount = state.selectedTxIds.size;
+    const activeCount = totalCount - excludedCount;
+    showConfirm(
+      `La selección incluye ${excludedCount} transacción${excludedCount > 1 ? 'es' : ''} excluida${excludedCount > 1 ? 's' : ''} del total.\n\n¿Qué deseas hacer?`,
+      {
+        title: 'Transacciones excluidas',
+        confirmText: `Incluir las ${excludedCount} excluidas`,
+        cancelText: `Solo las ${activeCount} activas`,
+        danger: false
+      }
+    ).then(ok => {
+      if (ok) {
+        doDelete(state.selectedTxIds);
+      } else {
+        _filterExcludedFromSelection();
+        doDelete(state.selectedTxIds);
+      }
+    });
+  } else {
+    doDelete(state.selectedTxIds);
+  }
 }
 
 // ── INLINE EDITING — rewrite robusto ───────────────────────────
 let _ie = null;   // estado global del editor activo
+let _lastEditedPosition = null; // { txId, field } para Enter post-edición
 
 // ── posicionar dropdown fijo bajo una celda ───────────────────
 function _positionDD(dd, anchorEl) {
@@ -934,6 +1190,34 @@ function _makeListDD(items, currentValue, onSelect) {
     });
   }
 
+  // ── Navegación por teclado dentro del dropdown ────────
+  const _getDDItems = () => [...dd.querySelectorAll('.comfy-dropdown-item')];
+
+  const _highlightRel = (dir) => {
+    const els = _getDDItems();
+    if (!els.length) return;
+    let idx = els.findIndex(el => el.classList.contains('active'));
+    idx = idx === -1 ? (dir > 0 ? 0 : els.length - 1) : Math.max(0, Math.min(idx + dir, els.length - 1));
+    els.forEach((el, i) => el.classList.toggle('active', i === idx));
+    els[idx]?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const _selectActive = () => {
+    const els = _getDDItems();
+    if (!els.length) return;
+    let idx = els.findIndex(el => el.classList.contains('active'));
+    if (idx === -1) idx = 0;
+    if (idx >= 0 && idx < items.length) {
+      onSelect(items[idx]);
+    }
+  };
+
+  dd.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); _highlightRel(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _highlightRel(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); _selectActive(); }
+  });
+
   document.body.appendChild(dd);
   return dd;
 }
@@ -953,6 +1237,13 @@ function closeInlineEditor(commit) {
   _closeDD();
   cell.classList.remove('editing');
   _ie = null;
+
+  if (commit) {
+    _lastEditedPosition = { txId, field };
+  } else {
+    _lastEditedPosition = null;
+    document.querySelectorAll('.cell-selected').forEach(el => el.classList.remove('cell-selected'));
+  }
 
   if (commit) {
     const rawVal = getValue();
@@ -995,21 +1286,96 @@ function _globalMousedown(e) {
   const inDD   = _ie.dd && _ie.dd.contains(e.target);
   if (!inCell && !inDD) {
     closeInlineEditor(true);
+    _lastEditedPosition = null;
+    document.querySelectorAll('.cell-selected').forEach(el => el.classList.remove('cell-selected'));
   }
 }
 
 document.addEventListener('mousedown', _globalMousedown, true);
 
+// ── (navegación desde celda seleccionada ahora se maneja
+//     por listener directo en cada .editable-cell ──────────────
+
+// ── helper: celdas editables de una fila (ocultas excluidas) ─
+function _getEditableCellsInRow(tr) {
+  return [...tr.querySelectorAll('.editable-cell')].filter(c => c.offsetParent !== null);
+}
+
+// ── marcar celda como seleccionada (post-commit) ─────────────
+function _markCellSelected(txId, field) {
+  _lastEditedPosition = { txId, field };
+  document.querySelectorAll('.cell-selected').forEach(el => {
+    el.classList.remove('cell-selected');
+    el.removeAttribute('tabindex');
+  });
+  const tr = document.querySelector(`tr[data-tx-id="${txId}"]`);
+  if (!tr) return;
+  const cell = tr.querySelector(`.editable-cell[data-field="${field}"]`);
+  if (cell) {
+    cell.classList.add('cell-selected');
+    cell.tabIndex = -1;
+    cell.focus();
+  }
+}
+
+// ── navegar desde la celda actual a otra celda ────────────────
+function _navigateFromInline(fromTxId, fromField, dirRow, dirCol) {
+  const tr = document.querySelector(`tr[data-tx-id="${fromTxId}"]`);
+  if (!tr) return;
+  const tbody = tr.closest('tbody');
+  if (!tbody) return;
+
+  const rows = [...tbody.querySelectorAll('tr[data-tx-id]')];
+  const rowIdx = rows.indexOf(tr);
+  if (rowIdx === -1) return;
+
+  const curCells = _getEditableCellsInRow(tr);
+  let colIdx = curCells.findIndex(c => c.dataset.field === fromField);
+  if (colIdx === -1) return;
+
+  colIdx += dirCol;
+  let targetRowIdx = rowIdx + dirRow;
+  const curMax = curCells.length - 1;
+
+  // Tab wrapping: last col → next row first col, first col → prev row last col
+  if (dirCol !== 0 && dirRow === 0) {
+    if (colIdx > curMax) { targetRowIdx = rowIdx + 1; colIdx = 0; }
+    else if (colIdx < 0) { targetRowIdx = rowIdx - 1; }
+  }
+
+  if (targetRowIdx < 0 || targetRowIdx >= rows.length) return;
+
+  const targetRow = rows[targetRowIdx];
+  const targetCells = _getEditableCellsInRow(targetRow);
+
+  if (colIdx < 0) colIdx = targetCells.length - 1;
+  if (colIdx >= targetCells.length) colIdx = 0;
+
+  const targetCell = targetCells[colIdx];
+  if (!targetCell) return;
+
+  const targetTxId = targetRow.dataset.txId;
+  const targetField = targetCell.dataset.field;
+  if (!targetTxId || !targetField) return;
+
+  const targetTx = state.transactions.find(t => t.id === targetTxId);
+  if (!targetTx) return;
+  const opts = getEditOptions(targetField, targetTx);
+  if (!opts) return;
+
+  startInlineEdit(targetCell, targetTxId, targetField, opts.type, opts);
+}
+
 // ── función principal ─────────────────────────────────────────
 function startInlineEdit(cell, txId, field, type, options) {
   if (_ie) closeInlineEditor(false);
+  document.querySelectorAll('.cell-selected').forEach(el => el.classList.remove('cell-selected'));
 
   const tx = state.transactions.find(t => t.id === txId);
   if (!tx) return;
 
   const originalValue = tx[field];
   cell.classList.add('editing');
-  cell.innerHTML = '';
 
   _ie = {
     cell, txId, field, originalValue,
@@ -1018,24 +1384,61 @@ function startInlineEdit(cell, txId, field, type, options) {
     parser: options.parser || null
   };
 
-  // ── TIPO: text / number / date ─────────────────────────────
-  if (type === 'text' || type === 'number' || type === 'date') {
-    const input = document.createElement('input');
-    input.type = type;
-    input.className = 'inline-editor';
-    if (type === 'number') { input.step = '0.01'; input.min = '0'; }
-    let displayVal;
-    if (type === 'number') displayVal = Math.abs(originalValue);
-    else if (type === 'date') displayVal = originalValue || '';
-    else displayVal = originalValue || '';
-    input.value = displayVal;
-    cell.appendChild(input);
+  // ── TIPO: text / number (contentEditable span) ──────────
+  if (type === 'text' || type === 'number') {
+    cell.textContent = '';
+    const span = document.createElement('span');
+    span.className = 'inline-editor-span';
+    span.contentEditable = 'plaintext-only';
+    const displayVal = type === 'number' ? String(Math.abs(originalValue)) : (originalValue || '').trim();
+    span.textContent = displayVal;
+    cell.appendChild(span);
 
-    _ie.getValue = () => input.value;
+    _ie.getValue = () => {
+      let v = span.textContent.trim();
+      if (type === 'number') {
+        if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+        return parseFloat(v) || 0;
+      }
+      return v;
+    };
 
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter')  { e.preventDefault(); closeInlineEditor(true); }
-      if (e.key === 'Escape') { e.preventDefault(); closeInlineEditor(false); }
+    const _getDDItemText = (el) => {
+      const s = el.querySelector('span:first-child');
+      return s ? s.textContent.trim() : el.textContent.trim();
+    };
+
+    span.addEventListener('keydown', e => {
+      const ddItems = _ie && _ie.dd ? [..._ie.dd.querySelectorAll('.comfy-dropdown-item')] : [];
+
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        closeInlineEditor(true);
+        _navigateFromInline(txId, field, 0, e.shiftKey ? -1 : 1);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (ddItems.length) {
+          let idx = ddItems.findIndex(el => el.classList.contains('active'));
+          if (idx === -1) idx = 0;
+          if (idx < ddItems.length) span.textContent = _getDDItemText(ddItems[idx]);
+        }
+        closeInlineEditor(true);
+        _markCellSelected(txId, field);
+        return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); closeInlineEditor(false); return; }
+
+      // Arrow keys navigate the suggestion dropdown
+      if (ddItems.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        let idx = ddItems.findIndex(el => el.classList.contains('active'));
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        idx = idx === -1 ? (dir > 0 ? 0 : ddItems.length - 1) : Math.max(0, Math.min(idx + dir, ddItems.length - 1));
+        ddItems.forEach((el, i) => el.classList.toggle('active', i === idx));
+        ddItems[idx]?.scrollIntoView({ block: 'nearest' });
+      }
     });
 
     if (type === 'text' && options.suggestions) {
@@ -1050,31 +1453,96 @@ function startInlineEdit(cell, txId, field, type, options) {
         _lastSuggestKey = key;
         if (!filtered.length) { _closeDD(); return; }
         const dd = _makeListDD(filtered, originalValue, (item) => {
-          input.value = item;
+          span.textContent = item;
           _closeDD();
           closeInlineEditor(true);
+          _markCellSelected(txId, field);
         });
         dd.id = 'wallet-dd';
         _positionDD(dd, cell);
         _ie.dd = dd;
       };
-      input.addEventListener('focus', () => openSuggestDD(input.value));
       let _suggestTimer = null;
-      input.addEventListener('input', () => {
+      span.addEventListener('input', () => {
         clearTimeout(_suggestTimer);
-        _suggestTimer = setTimeout(() => openSuggestDD(input.value), 280);
+        _suggestTimer = setTimeout(() => openSuggestDD(span.textContent.trim()), 280);
       });
+      setTimeout(() => openSuggestDD(span.textContent.trim()), 0);
     }
+
+    span.focus();
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    // Click en padding del td → caret al final del span
+    cell.addEventListener('click', function _ceClick(e) {
+      if (!_ie || _ie.cell !== cell) return;
+      if (!span.contains(e.target)) {
+        const r = document.createRange();
+        r.selectNodeContents(span);
+        r.collapse(false);
+        const s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+        span.focus();
+      }
+    });
+  }
+
+  // ── TIPO: date (invisible input + display) ──────────────
+  else if (type === 'date') {
+    const plainText = originalValue || '';
+    cell.textContent = '';
+    cell.style.position = 'relative';
+
+    const display = document.createElement('span');
+    display.className = 'inline-display';
+    display.textContent = originalValue ? formatDate(originalValue) : '';
+    cell.appendChild(display);
+
+    const input = document.createElement('input');
+    input.className = 'inline-input-ghost';
+    input.type = 'date';
+    input.value = plainText;
+    cell.appendChild(input);
+
+    const syncDisplay = () => {
+      display.textContent = input.value ? formatDate(input.value) : '';
+    };
+    input.addEventListener('input', syncDisplay);
+
+    _ie.getValue = () => input.value || '';
+
+    const _dateTabHandler = e => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeInlineEditor(true);
+        _navigateFromInline(txId, field, 0, e.shiftKey ? -1 : 1);
+    }
+  };
+
+    cell.addEventListener('keydown', _dateTabHandler, { capture: true });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Tab') { e.preventDefault(); closeInlineEditor(true); _navigateFromInline(txId, field, 0, e.shiftKey ? -1 : 1); return; }
+      if (e.key === 'Enter') { e.preventDefault(); closeInlineEditor(true); _markCellSelected(txId, field); return; }
+      if (e.key === 'Escape') { e.preventDefault(); closeInlineEditor(false); }
+    });
 
     setTimeout(() => { input.focus(); input.select(); }, 0);
   }
 
   // ── TIPO: select ─────────────────────────────────────────
   else if (type === 'select') {
+    cell.innerHTML = '';
     const items  = options.options || [];
     const currentLabel = items.find(i => i.value === originalValue);
     const dispEl = document.createElement('div');
-    dispEl.className = 'inline-editor inline-editor-display';
+    dispEl.className = 'inline-editor-display';
     dispEl.textContent = currentLabel ? currentLabel.label : '—';
     cell.appendChild(dispEl);
 
@@ -1084,15 +1552,25 @@ function startInlineEdit(cell, txId, field, type, options) {
     const openSelectDD = () => {
       const labels = items.map(i => i.label);
       const curLabel = currentLabel ? currentLabel.label : '';
-      const dd = _makeListDD(labels, curLabel, (label) => {
+      const onSelectAccount = (label) => {
         const found = items.find(i => i.label === label);
         if (found) { _ie._chosen = found.value; dispEl.textContent = label; }
         _closeDD();
         closeInlineEditor(true);
-      });
+        _markCellSelected(txId, field);
+      };
+      const dd = _makeListDD(labels, curLabel, onSelectAccount);
       dd.id = 'wallet-dd';
       _positionDD(dd, cell);
       _ie.dd = dd;
+
+      // Navegación por teclado (Tab, Escape) y foco
+      dd.addEventListener('keydown', e => {
+        if (e.key === 'Tab') { e.preventDefault(); closeInlineEditor(true); _navigateFromInline(txId, field, 0, e.shiftKey ? -1 : 1); }
+        else if (e.key === 'Escape') { e.preventDefault(); closeInlineEditor(false); }
+      });
+      dd.tabIndex = -1;
+      setTimeout(() => dd.focus(), 0);
     };
 
     dispEl.addEventListener('click', openSelectDD);
@@ -1101,6 +1579,7 @@ function startInlineEdit(cell, txId, field, type, options) {
 
   // ── TIPO: tags ────────────────────────────────────────────
   else if (type === 'tags') {
+    cell.innerHTML = '';
     const current = new Set(Array.isArray(originalValue) ? originalValue : []);
 
     const tagsWrap = cell.querySelector('.tags-wrap');
@@ -1225,26 +1704,64 @@ function startInlineEdit(cell, txId, field, type, options) {
         });
       });
 
+      const _highlightTagItem = (dir) => {
+        const els = [...listWrap.querySelectorAll('.comfy-dropdown-item')];
+        if (!els.length) return;
+        let idx = els.findIndex(el => el.classList.contains('active'));
+        idx = idx === -1 ? (dir > 0 ? 0 : els.length - 1) : Math.max(0, Math.min(idx + dir, els.length - 1));
+        els.forEach((el, i) => el.classList.toggle('active', i === idx));
+        els[idx]?.scrollIntoView({ block: 'nearest' });
+      };
+
+      const _selectTagItem = () => {
+        const els = [...listWrap.querySelectorAll('.comfy-dropdown-item')];
+        let idx = els.findIndex(el => el.classList.contains('active'));
+        if (idx === -1) idx = 0;
+        if (idx < els.length) {
+          els[idx].click();
+          return true;
+        }
+        return false;
+      };
+
       input.addEventListener('keydown', e => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          _closeDD();
+          closeInlineEditor(true);
+          _navigateFromInline(txId, field, 0, e.shiftKey ? -1 : 1);
+          return;
+        }
         if (e.key === 'Enter') {
           e.preventDefault();
           const name = input.value.trim();
-          if (name && !current.has(name)) {
-            const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
-            if (!tagNames.includes(name)) {
-              state.predefined.tags.push({ name, color: getRandomTagColor() });
-              saveData('predefined');
+          if (name) {
+            // Try to add the typed text as a new tag
+            if (!current.has(name)) {
+              const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+              if (!tagNames.includes(name)) {
+                state.predefined.tags.push({ name, color: getRandomTagColor() });
+                saveData('predefined');
+              }
+              current.add(name);
+              renderPills();
+              _closeDD();
+              setTimeout(openTagsDD, 80);
             }
-            current.add(name);
-            renderPills();
-            _closeDD();
-            setTimeout(openTagsDD, 80);
+          } else if (!_selectTagItem()) {
+            // No text and no items to select → close only
+            closeInlineEditor(true);
+            _markCellSelected(txId, field);
           }
+          return;
         }
         if (e.key === 'Escape') {
           e.preventDefault();
           _closeDD();
+          return;
         }
+        if (e.key === 'ArrowDown') { e.preventDefault(); _highlightTagItem(1); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); _highlightTagItem(-1); return; }
       });
 
       document.body.appendChild(dd);
@@ -1267,8 +1784,9 @@ function startInlineEdit(cell, txId, field, type, options) {
     });
 
     wrap.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { e.preventDefault(); closeInlineEditor(false); }
-      if (e.key === 'Enter')  { e.preventDefault(); closeInlineEditor(true); }
+      if (e.key === 'Tab') { e.preventDefault(); closeInlineEditor(true); _navigateFromInline(txId, field, 0, e.shiftKey ? -1 : 1); return; }
+      if (e.key === 'Escape') { e.preventDefault(); closeInlineEditor(false); return; }
+      if (e.key === 'Enter') { e.preventDefault(); closeInlineEditor(true); _markCellSelected(txId, field); }
     });
 
     setTimeout(openTagsDD, 0);
@@ -1358,6 +1876,9 @@ function renderTransactions() {
   tbody.innerHTML = '';
 
   let filtered = [...state.transactions];
+
+  // Filter out split children (they render under their parent)
+  filtered = filtered.filter(t => !t.split_parent_id);
 
   // Show/hide account column
   const isSingleAccount = state.selectedAccounts.length === 1
@@ -1502,20 +2023,51 @@ function renderTransactions() {
       return `<span class="tag-pill" style="background:${c.bg};color:${c.text};">#${tag}</span>`;
     }).join('');
 
+    const excludedPill = tx.excluded ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
+
     const notesHtml = tx.notes || '';
-    const tagsHtml  = tagPills || '<span class="no-tags">—</span>';
+    const tagsHtml  = (tagPills || '') + excludedPill;
 
     const accCurrency = acc?.currency || state.settings.currency || 'ARS';
-    const amountVal   = isExpense ? '-' + formatAccountCurrency(Math.abs(tx.amount), accCurrency) : '+' + formatAccountCurrency(tx.amount, accCurrency);
-    const amountClass = isExpense ? 'expense' : 'income';
+    const amtStyle = state.settings.amountStyle || 'default';
+    const showSign = amtStyle !== 'no-sign';
+    const showColor = amtStyle !== 'no-color';
+    const amountVal   = isExpense
+      ? (showSign ? '-' : '') + formatAccountCurrency(Math.abs(tx.amount), accCurrency)
+      : (showSign ? '+' : '') + formatAccountCurrency(tx.amount, accCurrency);
+    const amountClass = showColor ? (isExpense ? 'expense' : 'income') : 'amount-no-color';
     const amountTooltip = getConvertedTooltip(tx.amount, accCurrency);
 
-    let payeeCellHtml = tx.payee === 'Sin asignar'
-      ? `<span class="payee-name" style="color:var(--text-lo);font-style:italic;">Sin asignar</span>`
-      : `<span class="payee-name">${tx.payee}</span>`;
-    let cuotaCellHtml = '<span style="color:var(--text-lo)">—</span>';
-    if (tx.installment_total) {
-      cuotaCellHtml = `<span class="cuota-badge" title="Total: ${formatAccountCurrency(tx.installment_full_amount, accCurrency)}">${tx.installment_index}/${tx.installment_total}</span>`;
+    let payeeCellHtml = '';
+    const hasSplitChildren = tx.split_group && !tx.split_parent_id && state.transactions.filter(t => t.split_parent_id === tx.id).length > 0;
+    const isSplitParent = tx.split_group && !tx.split_parent_id;
+    let hasChildrenVisible = false;
+
+    if (isSplitParent) {
+      const childCount = state.transactions.filter(t => t.split_parent_id === tx.id).length;
+      const isOpen = isSplitChildrenOpen(tx.id);
+      hasChildrenVisible = childCount > 0 && isOpen;
+
+      const payeeName = tx.payee === 'Sin asignar'
+        ? `<span class="payee-name" style="color:var(--text-lo);font-style:italic;">Sin asignar</span>`
+        : `<span class="payee-name">${tx.payee}</span>`;
+
+      if (hasSplitChildren) {
+        payeeCellHtml = `<span class="split-parent-indicator">
+          <button class="split-toggle-btn ${isOpen ? 'open' : ''}" onclick="event.stopPropagation();toggleSplitChildren('${tx.id}')" title="${isOpen ? 'Ocultar' : 'Mostrar'} divisiones"><i data-lucide="chevron-right"></i></button>
+          ${payeeName}
+          <span class="split-parent-split" onclick="event.stopPropagation();openSplitModal('${tx.id}')" title="Editar divisiones"><i data-lucide="scissors"></i> ${childCount}</span>
+        </span>`;
+      } else {
+        payeeCellHtml = `<span class="split-parent-indicator">
+          ${payeeName}
+          <span class="split-parent-split" onclick="event.stopPropagation();openSplitModal('${tx.id}')" title="Dividir transacción"><i data-lucide="scissors"></i></span>
+        </span>`;
+      }
+    } else {
+      payeeCellHtml = tx.payee === 'Sin asignar'
+        ? `<span class="payee-name" style="color:var(--text-lo);font-style:italic;">Sin asignar</span>`
+        : `<span class="payee-name">${tx.payee}</span>`;
     }
 
     let actionsHtml = `
@@ -1525,6 +2077,7 @@ function renderTransactions() {
         </button>
         <div class="row-action-menu" style="display:none;">
           ${tx.is_receivable ? `<button class="ram-item" onclick="markAsCollected('${tx.id}');closeRowMenu(this)"><i data-lucide="check-square"></i> Cobrado</button>` : ''}
+          ${hasSplitChildren ? `<button class="ram-item" onclick="openSplitModal('${tx.id}');closeRowMenu(this)"><i data-lucide="scissors"></i> Editar divisiones</button><button class="ram-item" onclick="mergeSplitChildren('${tx.id}');closeRowMenu(this)"><i data-lucide="merge"></i> Reunir</button>` : `<button class="ram-item" onclick="openSplitModal('${tx.id}');closeRowMenu(this)"><i data-lucide="scissors"></i> Dividir</button>`}
           <button class="ram-item" onclick="openTransactionModal('${tx.id}');closeRowMenu(this)"><i data-lucide="pencil"></i> Editar</button>
           <button class="ram-item danger" onclick="deleteTransaction('${tx.id}')"><i data-lucide="trash-2"></i> Eliminar</button>
         </div>
@@ -1535,14 +2088,15 @@ function renderTransactions() {
     tr.dataset.txId = tx.id;
     if (isSelected) tr.classList.add('selected');
     if (isFutureRow) tr.classList.add('tx-future');
+    if (hasChildrenVisible) tr.classList.add('has-children-visible');
 
     tr.innerHTML = `
-      <td class="tx-cell">${isFutureRow ? '' : `<input type="checkbox" class="tx-checkbox" data-tx-id="${tx.id}" ${isSelected ? 'checked' : ''} onchange="toggleTxSelection('${tx.id}')">`}</td>
+      <td class="tx-cell">${isFutureRow ? '' : `<input type="checkbox" class="tx-checkbox" data-tx-id="${tx.id}" ${isSelected ? 'checked' : ''} onclick="handleTxRowClick('${tx.id}', event)">`}</td>
       <td class="date-cell editable-cell" data-field="date" title="Click para editar">${formatDate(tx.date)}</td>
       <td class="col-account account-cell editable-cell" data-field="account_id" title="Click para editar">${acc ? acc.name : '—'}</td>
       <td class="payee-cell editable-cell" data-field="payee" title="Click para editar">${payeeCellHtml}</td>
-      <td class="cuota-cell">${cuotaCellHtml}</td>
-      <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">${notesHtml ? notesHtml + (tx.excluded ? ' <i data-lucide="eye-off" class="tx-excluded-icon" title="Excluido del total"></i>' : '') : (tx.excluded ? '<i data-lucide="eye-off" class="tx-excluded-icon" title="Excluido del total"></i>' : '<span style="color:var(--text-lo)">—</span>')}</td>
+      <td class="cuota-cell">${tx.installment_total ? `<span class="cuota-badge" title="Total: ${formatAccountCurrency(tx.installment_full_amount, accCurrency)}">${tx.installment_index}/${tx.installment_total}</span>` : ''}</td>
+      <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">${notesHtml}</td>
       <td class="tags-cell editable-cell" data-field="tags" title="Click para editar"><div class="tags-wrap">${tagsHtml}</div></td>
       <td class="category-cell editable-cell" data-field="category_name" title="Click para editar">${tx.category_name === 'Sin asignar' ? '<span style="color:var(--text-lo);font-style:italic;">Sin asignar</span>' : getCategoryIcon(tx.category_name) + ' ' + (tx.category_name || 'Otros')}</td>
       <td class="amount-cell ${amountClass} editable-cell" data-field="amount" title="${amountTooltip ? amountTooltip + ' — Click para editar' : 'Click para editar'}">${amountVal}</td>
@@ -1550,17 +2104,130 @@ function renderTransactions() {
     `;
     tbody.appendChild(tr);
 
+    if (tx.split_group && !tx.split_parent_id && isSplitChildrenOpen(tx.id)) {
+      const children = state.transactions.filter(t => t.split_parent_id === tx.id);
+      children.forEach((child, idx) => {
+        appendSplitChildRow(child, tx, idx === children.length - 1);
+      });
+    }
+
     if (!isFutureRow) {
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('.tx-checkbox, .editable-cell, .row-action-dropdown, button, a, select, .cuota-cell')) return;
+        handleTxRowClick(tx.id, e);
+      });
       tr.querySelectorAll('.editable-cell').forEach(cell => {
         cell.addEventListener('click', e => {
+          if (_ie && _ie.cell === cell) return;
           e.stopPropagation();
           const field = cell.dataset.field;
           const opts = getEditOptions(field, tx);
           if (!opts) return;
           startInlineEdit(cell, tx.id, field, opts.type, opts);
         });
+        cell.addEventListener('keydown', function _cellNavKeydown(e) {
+          if (_ie) return;
+          if (e.key !== 'Enter' && e.key !== 'Tab') return;
+          e.preventDefault();
+          const dirRow = e.key === 'Enter' ? (e.shiftKey ? -1 : 1) : 0;
+          const dirCol = e.key === 'Tab' ? (e.shiftKey ? -1 : 1) : 0;
+          _navigateFromInline(tx.id, cell.dataset.field, dirRow, dirCol);
+        });
       });
     }
+  };
+
+  const appendSplitChildRow = (child, parent, isLast) => {
+    const acc = state.accounts.find(a => a.id === child.account_id);
+    const isExpense = child.amount < 0;
+    const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+    const amtStyle = state.settings.amountStyle || 'default';
+    const showSign = amtStyle !== 'no-sign';
+    const showColor = amtStyle !== 'no-color';
+    const amountVal = isExpense
+      ? (showSign ? '-' : '') + formatAccountCurrency(Math.abs(child.amount), accCurrency)
+      : (showSign ? '+' : '') + formatAccountCurrency(child.amount, accCurrency);
+    const amountClass = showColor ? (isExpense ? 'expense' : 'income') : 'amount-no-color';
+
+    const tagPills = (child.tags || []).map(tag => {
+      const c = _tagColor(tag);
+      return `<span class="tag-pill" style="background:${c.bg};color:${c.text};">#${tag}</span>`;
+    }).join('');
+    const excludedPill = child.excluded ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
+    const notesHtml = child.notes || '';
+    const tagsHtml = (tagPills || '') + excludedPill;
+
+    let childActionsHtml = `
+      <div class="row-action-dropdown">
+        <button class="row-action" onclick="event.stopPropagation();toggleRowMenu(this)" title="Acciones">
+          <i data-lucide="more-horizontal"></i>
+        </button>
+        <div class="row-action-menu" style="display:none;">
+          <button class="ram-item" onclick="openTransactionModal('${child.id}');closeRowMenu(this)"><i data-lucide="pencil"></i> Editar</button>
+          <button class="ram-item danger" onclick="deleteTransaction('${child.id}')"><i data-lucide="trash-2"></i> Eliminar</button>
+        </div>
+      </div>
+    `;
+
+    const tr = document.createElement('tr');
+    tr.dataset.txId = child.id;
+    tr.classList.add('split-child-row');
+    if (isLast) tr.classList.add('split-child-last');
+
+    const isChildSelected = state.selectedTxIds.has(child.id);
+    if (isChildSelected) tr.classList.add('selected');
+
+    tr.innerHTML = `
+      <td class="tx-cell">
+        <input type="checkbox" class="tx-checkbox" data-tx-id="${child.id}"
+               ${isChildSelected ? 'checked' : ''}
+               onclick="handleTxRowClick('${child.id}', event)">
+      </td>
+      <td class="date-cell split-child-indent"></td>
+      ${isSingleAccount ? '' : `<td class="col-account account-cell editable-cell" data-field="account_id" title="Click para editar">${acc ? acc.name : '—'}</td>`}
+      <td class="payee-cell">
+        ${child.payee || parent.payee || ''}
+      </td>
+      <td class="cuota-cell"></td>
+      <td class="notes-cell editable-cell" data-field="notes" title="Click para editar">
+        ${notesHtml ? `<span class="split-child-note-text">${notesHtml}</span>` : ''}
+      </td>
+      <td class="tags-cell editable-cell" data-field="tags" title="Click para editar">
+        <div class="tags-wrap">${tagsHtml}</div>
+      </td>
+      <td class="category-cell editable-cell" data-field="category_name" title="Click para editar">
+        ${child.category_name === 'Sin asignar' ? '<span style="color:var(--text-lo);font-style:italic;">Sin asignar</span>' : getCategoryIcon(child.category_name) + ' ' + (child.category_name || 'Otros')}
+      </td>
+      <td class="amount-cell ${amountClass} editable-cell" data-field="amount" title="Click para editar">
+        ${amountVal}
+      </td>
+      <td class="actions-cell">${childActionsHtml}</td>
+    `;
+    tbody.appendChild(tr);
+
+    tr.addEventListener('click', e => {
+      if (e.target.closest('.tx-checkbox, .editable-cell, .row-action-dropdown, button, a, select, .cuota-cell')) return;
+      handleTxRowClick(child.id, e);
+    });
+
+    tr.querySelectorAll('.editable-cell').forEach(cell => {
+      cell.addEventListener('click', e => {
+        if (_ie && _ie.cell === cell) return;
+        e.stopPropagation();
+        const field = cell.dataset.field;
+        const opts = getEditOptions(field, child);
+        if (!opts) return;
+        startInlineEdit(cell, child.id, field, opts.type, opts);
+      });
+      cell.addEventListener('keydown', function _cellNavKeydown(e) {
+        if (_ie) return;
+        if (e.key !== 'Enter' && e.key !== 'Tab') return;
+        e.preventDefault();
+        const dirRow = e.key === 'Enter' ? (e.shiftKey ? -1 : 1) : 0;
+        const dirCol = e.key === 'Tab' ? (e.shiftKey ? -1 : 1) : 0;
+        _navigateFromInline(child.id, cell.dataset.field, dirRow, dirCol);
+      });
+    });
   };
 
   // Render future rows first (above header) so they expand upward
@@ -1583,7 +2250,7 @@ function renderTransactions() {
     headerDiv.innerHTML = `
       <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
       <span>Cuotas futuras</span>
-      <span class="future-group-count">${outOfPeriodFuture.length}</span>
+      <span class="future-group-count" style="margin-left:auto;">${outOfPeriodFuture.length}</span>
     `;
     headerDiv.addEventListener('click', () => {
       const nowOpen = sessionStorage.getItem(groupKey) === 'true';
@@ -1613,7 +2280,7 @@ function renderTransactions() {
     headerDiv.innerHTML = `
       <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
       <span>Fuera del período</span>
-      <span class="future-group-count">${outOfPeriodPresent.length}</span>
+      <span class="future-group-count" style="margin-left:auto;">${outOfPeriodPresent.length}</span>
     `;
     headerDiv.addEventListener('click', () => {
       const nowOpen = sessionStorage.getItem(groupKey) === 'true';
@@ -1660,4 +2327,288 @@ function updateSelectors() {
       importAcc.appendChild(opt);
     });
   }
+}
+
+// ── SPLIT TRANSACTIONS ────────────────────────────────────────
+let _splitTxId = null;
+
+const SPLIT_COLORS = ['#5b52f5','#e6b800','#22c55e','#ef4444','#06b6d4','#f472b6','#8b5cf6','#f97316'];
+
+function parseLocalNumber(val) {
+  return parseFloat((val || '').replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
+}
+
+function openSplitModal(txId) {
+  const tx = state.transactions.find(t => t.id === txId);
+  if (!tx) return;
+  _splitTxId = txId;
+
+  const totalAbs = Math.abs(tx.amount);
+  const acc = state.accounts.find(a => a.id === tx.account_id);
+  const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+  document.getElementById('split-total-val').textContent = formatAccountCurrency(totalAbs, accCurrency);
+
+  const existingChildren = state.transactions.filter(t => t.split_parent_id === txId);
+  const wrap = document.getElementById('split-rows-wrap');
+  wrap.innerHTML = '';
+
+  if (existingChildren.length > 0) {
+    existingChildren.forEach(child =>
+      addSplitRow(child.notes || '', Math.abs(child.amount), child.tags || [], child.category_name || '')
+    );
+  } else {
+    addSplitRow('', totalAbs, [], tx.category_name || '');
+    addSplitRow('', 0, [], '');
+  }
+
+  recalcSplitProgress();
+  document.getElementById('split-modal').classList.add('open');
+  lucide.createIcons();
+}
+
+function closeSplitModal() {
+  document.getElementById('split-modal').classList.remove('open');
+  _splitTxId = null;
+}
+
+function addSplitRow(notes = '', amount = 0, tags = [], categoryName = '') {
+  const wrap = document.getElementById('split-rows-wrap');
+  const idx = wrap.children.length + 1;
+
+  const row = document.createElement('div');
+  row.className = 'split-row';
+  row.dataset.idx = idx;
+
+  const amountVal = amount ? formatNoTrailingZeros(amount) : '';
+  const tagsVal = tags.join(', ');
+
+  const categories = [...new Set(state.transactions.map(t => t.category_name).filter(Boolean))].sort();
+  const catOptions = categories
+    .map(c => `<option value="${c}" ${c === categoryName ? 'selected' : ''}>${c}</option>`)
+    .join('');
+
+  row.innerHTML = `
+    <div class="split-row-main">
+      <span class="split-row-num">${idx}</span>
+      <input class="split-amount-input" type="text" inputmode="decimal"
+             placeholder="0,00" value="${amountVal}" oninput="onSplitAmountInput(this)">
+      <input class="split-notes-input" type="text" placeholder="Nota…" value="${notes}">
+      <input class="split-tags-input" type="text" placeholder="etiqueta…" value="${tagsVal}">
+      <select class="split-cat-select">
+        <option value="">—</option>
+        ${catOptions}
+      </select>
+      <button class="split-row-remove" onclick="removeSplitRow(this)" title="Quitar">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+  `;
+
+  wrap.appendChild(row);
+  recalcSplitProgress();
+  lucide.createIcons();
+}
+
+function removeSplitRow(btn) {
+  const wrap = document.getElementById('split-rows-wrap');
+  if (wrap.children.length <= 1) return;
+
+  const row = btn.closest('.split-row');
+  const removedAmount = parseLocalNumber(row.querySelector('.split-amount-input').value) || 0;
+  const isLastRow = row === wrap.lastElementChild;
+  row.remove();
+  renumberSplitRows();
+
+  if (!isLastRow && wrap.children.length > 0 && removedAmount > 0) {
+    const lastInput = wrap.lastElementChild.querySelector('.split-amount-input');
+    const currentLast = parseLocalNumber(lastInput.value) || 0;
+    lastInput.value = formatNoTrailingZeros(currentLast + removedAmount);
+  }
+  recalcSplitProgress();
+}
+
+function renumberSplitRows() {
+  [...document.getElementById('split-rows-wrap').children].forEach((row, i) => {
+    row.dataset.idx = i + 1;
+    const num = row.querySelector('.split-row-num');
+    if (num) num.textContent = i + 1;
+  });
+}
+
+function distributeEqually() {
+  const wrap = document.getElementById('split-rows-wrap');
+  const rows = [...wrap.children];
+  const tx = state.transactions.find(t => t.id === _splitTxId);
+  if (!tx || rows.length < 2) return;
+  const totalAbs = Math.abs(tx.amount);
+  const perPart = totalAbs / rows.length;
+  rows.forEach((row, i) => {
+    const input = row.querySelector('.split-amount-input');
+    input.value = (i < rows.length - 1)
+      ? formatNoTrailingZeros(perPart)
+      : formatNoTrailingZeros(totalAbs - perPart * (rows.length - 1));
+  });
+  recalcSplitProgress();
+}
+
+function onSplitAmountInput(changedInput) {
+  const wrap = document.getElementById('split-rows-wrap');
+  const rows = [...wrap.children];
+  if (rows.length < 2) return;
+  const tx = state.transactions.find(t => t.id === _splitTxId);
+  if (!tx) return;
+
+  const totalAbs = Math.abs(tx.amount);
+  const inputs = rows.map(r => r.querySelector('.split-amount-input'));
+  const changedIdx = inputs.indexOf(changedInput);
+  const lastIdx = rows.length - 1;
+
+  if (changedIdx !== lastIdx) {
+    const sumOthers = inputs
+      .filter((_, i) => i !== lastIdx)
+      .reduce((s, inp) => s + (parseLocalNumber(inp.value) || 0), 0);
+    inputs[lastIdx].value = formatNoTrailingZeros(Math.max(0, totalAbs - sumOthers));
+  }
+  recalcSplitProgress();
+}
+
+function recalcSplitProgress() {
+  const tx = state.transactions.find(t => t.id === _splitTxId);
+  if (!tx) return;
+  const acc = state.accounts.find(a => a.id === tx.account_id);
+  const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+  const totalAbs = Math.abs(tx.amount);
+
+  const rows = [...document.querySelectorAll('#split-rows-wrap .split-row')];
+  const amounts = rows.map(r => parseLocalNumber(r.querySelector('.split-amount-input').value) || 0);
+  const sum = amounts.reduce((s, v) => s + v, 0);
+  const remaining = totalAbs - sum;
+  const isOver = remaining < -0.01;
+
+  const segWrap = document.getElementById('split-progress-segments');
+  if (segWrap) {
+    segWrap.innerHTML = '';
+    rows.forEach((row, i) => {
+      if (amounts[i] <= 0) return;
+      const pct = totalAbs > 0 ? Math.min(100, (amounts[i] / totalAbs) * 100) : 0;
+      const seg = document.createElement('div');
+      seg.className = 'split-progress-segment' + (isOver ? ' over' : '');
+      seg.style.width = pct + '%';
+      if (!isOver) seg.style.background = SPLIT_COLORS[i % SPLIT_COLORS.length];
+      segWrap.appendChild(seg);
+      const num = row.querySelector('.split-row-num');
+      if (num) num.style.color = isOver ? 'var(--negative)' : SPLIT_COLORS[i % SPLIT_COLORS.length];
+    });
+  }
+
+  const el = document.getElementById('split-remaining');
+  if (Math.abs(remaining) < 0.01) {
+    el.textContent = '✓ Completo';
+    el.className = 'split-total-remaining zero';
+  } else if (remaining < -0.01) {
+    el.textContent = `Excedido: ${formatAccountCurrency(Math.abs(remaining), accCurrency)}`;
+    el.className = 'split-total-remaining excess';
+  } else {
+    el.textContent = `Falta: ${formatAccountCurrency(remaining, accCurrency)}`;
+    el.className = 'split-total-remaining nonzero';
+  }
+}
+
+function removeAllSplits() {
+  const wrap = document.getElementById('split-rows-wrap');
+  wrap.innerHTML = '';
+  const tx = state.transactions.find(t => t.id === _splitTxId);
+  if (!tx) return;
+  addSplitRow('', Math.abs(tx.amount), [], tx.category_name || '');
+  addSplitRow('', 0, [], '');
+}
+
+function saveSplits() {
+  if (!_splitTxId) return;
+  const tx = state.transactions.find(t => t.id === _splitTxId);
+  if (!tx) return;
+  const acc = state.accounts.find(a => a.id === tx.account_id);
+  const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+
+  const rows = [...document.querySelectorAll('#split-rows-wrap .split-row')];
+  const splits = rows.map(row => ({
+    amount:        parseLocalNumber(row.querySelector('.split-amount-input').value) || 0,
+    notes:         row.querySelector('.split-notes-input').value.trim(),
+    tags:          row.querySelector('.split-tags-input').value.trim()
+                      .split(',').map(t => t.trim()).filter(Boolean),
+    category_name: row.querySelector('.split-cat-select')?.value || ''
+  })).filter(s => s.amount > 0);
+
+  if (splits.length < 1) { closeSplitModal(); return; }
+
+  const totalAbs = Math.abs(tx.amount);
+  const sumAmounts = splits.reduce((s, sp) => s + sp.amount, 0);
+  const diff = sumAmounts - totalAbs;
+
+  if (Math.abs(diff) > 0.01) {
+    const msg = diff > 0
+      ? `La suma (${formatAccountCurrency(sumAmounts, accCurrency)}) supera el total por ${formatAccountCurrency(diff, accCurrency)}. ¿Guardar igual?`
+      : `Faltan ${formatAccountCurrency(Math.abs(diff), accCurrency)} por asignar. ¿Guardar igual?`;
+    showConfirm(msg, { title: 'Monto no coincide', confirmText: 'Guardar' })
+      .then(ok => { if (ok) _commitSplits(tx, splits); });
+  } else {
+    _commitSplits(tx, splits);
+  }
+}
+
+function _commitSplits(tx, splits) {
+  state.transactions = state.transactions.filter(t => t.split_parent_id !== tx.id);
+  tx.split_group = 'sg-' + tx.id;
+  const sign = tx.amount < 0 ? -1 : 1;
+
+  splits.forEach((sp, i) => {
+    state.transactions.push({
+      id:             'tx-' + Date.now() + '-s' + (i + 1),
+      date:           tx.date,
+      account_id:     tx.account_id,
+      payee:          tx.payee,
+      category_name:  sp.category_name || tx.category_name,
+      amount:         sign * sp.amount,
+      notes:          sp.notes,
+      tags:           sp.tags,
+      is_receivable:  false,
+      due_date:       '',
+      excluded:       false,
+      split_group:    tx.split_group,
+      split_parent_id: tx.id
+    });
+  });
+
+  saveData('transactions');
+  closeSplitModal();
+  renderAll();
+}
+
+async function mergeSplitChildren(txId) {
+  const childCount = state.transactions.filter(t => t.split_parent_id === txId).length;
+  if (childCount === 0) return;
+  const ok = await showConfirm(
+    `¿Eliminar las ${childCount} divisiones? La transacción volverá a ser una sola.`,
+    { title: 'Reunir divisiones', confirmText: 'Reunir' }
+  );
+  if (!ok) return;
+  deleteSplitChildren(txId);
+  saveData('transactions');
+  renderAll();
+}
+
+function deleteSplitChildren(txId) {
+  state.transactions = state.transactions.filter(t => t.split_parent_id !== txId);
+  const parent = state.transactions.find(t => t.id === txId);
+  if (parent) delete parent.split_group;
+}
+
+function toggleSplitChildren(txId) {
+  const key = 'split-open-' + txId;
+  sessionStorage.setItem(key, (sessionStorage.getItem(key) !== 'true').toString());
+  renderTransactions();
+}
+
+function isSplitChildrenOpen(txId) {
+  return sessionStorage.getItem('split-open-' + txId) === 'true';
 }

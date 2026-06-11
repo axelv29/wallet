@@ -29,13 +29,13 @@ function formatCurrency(value) {
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: cur,
-      minimumFractionDigits: decimals,
+      minimumFractionDigits: 0,
       maximumFractionDigits: decimals,
     }).format(value);
   } else {
     return new Intl.NumberFormat(locale, {
       style: 'decimal',
-      minimumFractionDigits: decimals,
+      minimumFractionDigits: 0,
       maximumFractionDigits: decimals,
     }).format(value);
   }
@@ -50,7 +50,7 @@ function formatAccountCurrency(value, currency) {
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: cur,
-    minimumFractionDigits: decimals,
+    minimumFractionDigits: 0,
     maximumFractionDigits: decimals,
   }).format(value);
 }

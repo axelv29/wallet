@@ -147,6 +147,37 @@
   transform: translate(-50%, -50%) rotate(45deg);
 }
 
+/* Settings radio */
+.settings-pane input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.settings-pane input[type="radio"]:checked {
+  background: var(--text-mid);
+  border-color: var(--text-mid);
+}
+
+.settings-pane input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+
 /* Accounts pane */
 .accounts-split {
   display: grid;

@@ -592,8 +592,14 @@ function buildTransactionsFromMapping() {
     results.forEach((tx, i) => {
       if (edits[i]) {
         if (edits[i].date !== undefined) tx.date = edits[i].date;
-        if (edits[i].payee !== undefined) tx.payee = toTitleCase(edits[i].payee);
-        if (edits[i].category_name !== undefined) tx.category_name = toTitleCase(edits[i].category_name);
+        if (edits[i].payee !== undefined) {
+          tx.payee = toTitleCase(edits[i].payee);
+          if (tx.payee === 'Sin Asignar') tx.payee = 'Sin asignar';
+        }
+        if (edits[i].category_name !== undefined) {
+          tx.category_name = toTitleCase(edits[i].category_name);
+          if (tx.category_name === 'Sin Asignar') tx.category_name = 'Sin asignar';
+        }
         if (edits[i].amount !== undefined) tx.amount = edits[i].amount;
       }
     });
@@ -778,6 +784,11 @@ function confirmCsvImport() {
   const importedIds = [];
 
   parsed.forEach(tx => {
+    tx.payee = toTitleCase(tx.payee);
+    tx.category_name = toTitleCase(tx.category_name);
+    if (tx.payee === 'Sin Asignar') tx.payee = 'Sin asignar';
+    if (tx.category_name === 'Sin Asignar') tx.category_name = 'Sin asignar';
+
     const inst = tx.installment_info;
 
     if (inst && inst.total >= 2) {
@@ -800,8 +811,8 @@ function confirmCsvImport() {
           id,
           date: instDate,
           account_id: tx.account_id,
-          payee: toTitleCase(tx.payee),
-          category_name: toTitleCase(tx.category_name) || 'Otros',
+          payee: tx.payee,
+          category_name: tx.category_name || 'Otros',
           amount: perCuota,
           notes: tx.notes || '',
           tags: tx.tags || [],
@@ -824,8 +835,8 @@ function confirmCsvImport() {
         id,
         date: tx.date,
         account_id: tx.account_id,
-        payee: toTitleCase(tx.payee),
-        category_name: toTitleCase(tx.category_name) || 'Otros',
+        payee: tx.payee,
+        category_name: tx.category_name || 'Otros',
         amount: tx.amount,
         notes: tx.notes || '',
         tags: tx.tags || [],
@@ -839,8 +850,8 @@ function confirmCsvImport() {
       });
     }
 
-    if (tx.payee && tx.payee !== 'Sin asignar' && !state.predefined.payees.includes(toTitleCase(tx.payee))) {
-      state.predefined.payees.push(toTitleCase(tx.payee));
+    if (tx.payee && tx.payee !== 'Sin asignar' && !state.predefined.payees.includes(tx.payee)) {
+      state.predefined.payees.push(tx.payee);
     }
     if (tx.category_name && tx.category_name !== 'Sin asignar') {
       const exists = state.predefined.categories.some(c =>

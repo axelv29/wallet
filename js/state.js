@@ -15,7 +15,7 @@ let state = {
       { id: 'credit_card', label: 'Tarjeta de crédito', isDefault: true },
     ],
     categories: [
-      { name: 'Saldo inicial', icon: 'banknote' },
+      { name: 'Ajuste de saldo', icon: 'banknote' },
       { name: 'Supermercado', icon: 'shopping-cart' },
       { name: 'Alimentos', icon: 'utensils-crossed' },
       { name: 'Compras', icon: 'package' },
@@ -35,7 +35,7 @@ let state = {
     ],
     tags: []
   },
-  settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'ARS', showSymbol: true, decimals: 2 },
+  settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'ARS', showSymbol: true, decimals: 2, amountStyle: 'default' },
   period: { type: 'all', startDate: null, endDate: null },
   currentTxSign: -1,
   importedTransactions: [],
@@ -72,11 +72,11 @@ function loadData() {
     state.transactions = JSON.parse(lsTx);
   } else {
     state.transactions = [
-      { id: 'tx-init-1', date: '2026-05-01', account_id: 'acc-1', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  1047.40, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-2', date: '2026-05-01', account_id: 'acc-2', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  1900.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-3', date: '2026-05-01', account_id: 'acc-3', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  1727.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-4', date: '2026-05-01', account_id: 'acc-4', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount: -10300.38, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-5', date: '2026-05-01', account_id: 'acc-5', payee: 'Saldo inicial', category_name: 'Saldo inicial', amount:  -460.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
+      { id: 'tx-init-1', date: '2026-05-01', account_id: 'acc-1', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  1047.40, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
+      { id: 'tx-init-2', date: '2026-05-01', account_id: 'acc-2', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  1900.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
+      { id: 'tx-init-3', date: '2026-05-01', account_id: 'acc-3', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  1727.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
+      { id: 'tx-init-4', date: '2026-05-01', account_id: 'acc-4', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount: -10300.38, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
+      { id: 'tx-init-5', date: '2026-05-01', account_id: 'acc-5', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  -460.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
       { id: 'tx-1',  date: '2026-06-01', account_id: 'acc-5', payee: 'Leo',            category_name: 'Fuera del presupuesto', amount:  5033.00, notes: 'Pasajes + Préstamo',    tags: [], is_receivable: true, excluded: false },
       { id: 'tx-2',  date: '2026-05-24', account_id: 'acc-4', payee: 'Escaramuza',     category_name: 'Entretenimiento',       amount:  -258.75, notes: 'Libro w/',              tags: ['Rocio'], is_receivable: false, excluded: false },
       { id: 'tx-3',  date: '2026-05-19', account_id: 'acc-5', payee: 'Rocío',          category_name: 'Fuera del presupuesto', amount:   700.00, notes: 'Comida + Regalo Jessi', tags: [], is_receivable: false, excluded: false },
@@ -127,12 +127,12 @@ function loadData() {
     saveData('predefined');
   }
 
-  // ── Migration: Convert account.balance to "Saldo inicial" transactions ──
+  // ── Migration: Convert account.balance to "Ajuste de saldo" transactions ──
   let migrated = false;
   state.accounts.forEach(acc => {
     const bal = Number(acc.balance) || 0;
     if (bal !== 0) {
-      const alreadyHas = state.transactions.some(t => t.account_id === acc.id && t.category_name === 'Saldo inicial');
+      const alreadyHas = state.transactions.some(t => t.account_id === acc.id && t.category_name === 'Ajuste de saldo');
       if (!alreadyHas) {
         const accTxs = state.transactions.filter(t => t.account_id === acc.id);
         const dates = accTxs.map(t => t.date).filter(Boolean).sort();
@@ -141,8 +141,8 @@ function loadData() {
           id: 'tx-init-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
           date,
           account_id: acc.id,
-          payee: 'Saldo inicial',
-          category_name: 'Saldo inicial',
+          payee: 'Ajuste de saldo',
+          category_name: 'Ajuste de saldo',
           amount: bal,
           notes: '',
           tags: [],

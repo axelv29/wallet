@@ -56,6 +56,9 @@
 - `tx-count-badge` — Contador de transacciones filtradas
 - `metric-liquid-val` / `metric-projected-val` — Valores de cobertura
 - `nav-main-btn` / `nav-settings-btn` — Botones de navegación en sidebar
+- `split-modal` — Modal de división de transacciones
+- `split-rows-wrap` — Contenedor de filas de división
+- `split-total-val` / `split-remaining` — Info de monto total y restante
 - `acc-name` / `acc-type` / `acc-balance` / `acc-close-day` / `acc-due-day` — Formulario de cuenta
 - `cc-closing-fields` — Campos extra de tarjeta de crédito
 - `accounts-scroll-container` — Lista de cuentas en settings
@@ -114,6 +117,13 @@
 - `predefined-item-left` / `predefined-name` / `predefined-icon-btn` / `predefined-rename-input` — Items editables en listas de settings
 - `tag-color-btn` / `tag-color-dot` / `tag-color-popover` / `tag-color-grid` / `tag-color-opt` — Color picker de etiquetas
 - `tag-check-dot` — Bola de color en checklist de etiquetas
+- `split-child-row` — Fila de hijo de división (indentada, fondo distinto)
+- `split-child-bullet` — Bullet circular alineado con beneficiario
+- `split-parent-badge` — Badge de división en fila padre
+- `split-toggle` — Botón de colapsar/expandir hijos
+- `split-total-header` / `split-progress-track` / `split-progress-bar` — Barra de progreso del modal
+- `split-rows-wrap` / `split-row` / `split-row-main` — Elementos del modal de división
+- `split-actions-row` — Botones de acción del modal (Agregar, Igualar, Eliminar)
 
 ### Tipos de cuenta (`acc.type`)
 - `'liquid'` — Cuenta líquida (efectivo/débito)
@@ -145,7 +155,10 @@
   notes: 'Libro w/',
   tags: ['Rocio'],
   is_receivable: false,
-  due_date: ''              // solo si is_receivable
+  due_date: '',             // solo si is_receivable
+  excluded: false,          // excluir del total
+  split_group: null,        // ID de grupo de división ('sg-...') si tiene hijos
+  split_parent_id: null     // ID del padre si es hijo de una división
 }
 ```
 
@@ -180,6 +193,19 @@
 - `buildCustomPalette(tableBase, sidebarBase, accentBase)` — Genera toda la paleta CSS desde 3 colores hex
 - `applyCustomTheme()` — Aplica las variables CSS del tema personalizado al body via style tag
 - `saveCustomThemeColors()` — Guarda los colores personalizados en localStorage y aplica el tema
+- `openSplitModal(txId)` — Abre modal de división para una transacción
+- `closeSplitModal()` — Cierra modal de división
+- `addSplitRow(notes, amount, tags)` — Agrega una fila de división al modal
+- `removeSplitRow(btn)` — Elimina una fila de división y redistribuye el monto al último
+- `removeAllSplits()` — Elimina todas las filas y deja 2 vacías
+- `distributeEqually()` — Reparte el total en partes iguales entre todas las filas
+- `onSplitAmountInput(changedInput)` — Recalcula el último split al editar uno
+- `recalcSplitProgress()` — Actualiza barra de progreso y monto restante
+- `saveSplits()` — Guarda las divisiones creando transacciones hijas
+- `mergeSplitChildren(txId)` — Elimina hijos y limpia split_group (reunir)
+- `deleteSplitChildren(txId)` — Elimina todos los hijos de un padre
+- `toggleSplitChildren(txId)` — Colapsa/expande hijos en la tabla
+- `isSplitChildrenOpen(txId)` — Verifica si los hijos están expandidos
 
 ### Predefinidos editables
 ```js
@@ -213,6 +239,7 @@ state.predefined = {
 - `handleTransactionSubmit` auto-agrega payees y categorías nuevos a `state.predefined`
 - Al marcar como cobrado un préstamo, se crea una transacción inversa (positiva) y se desmarca el original
 - El modal de importación usa Gemini API para parsear texto de extractos bancarios
+- **Divisiones de transacciones**: Una transacción puede dividirse en partes (hijos). El padre mantiene el monto total para totales. Los hijos son desglose informativo con notas y etiquetas propias. El último hijo siempre es "el resto" y se auto-calcula.
 
 ### Keys de localStorage
 - `wallet_accounts` — Array de cuentas

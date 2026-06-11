@@ -77,19 +77,24 @@
   margin-top: 1px;
 }
 
-/* ── Toolbar: month nav + toggle chips ── */
+/* ── Toolbar: period selector + toggle chips ── */
 .dash-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
+.dash-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .dash-toolbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.dash-month-nav {
+.dash-period-nav {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -112,14 +117,64 @@
 }
 .dash-month-btn:hover { background: var(--bg-raised); color: var(--text-hi); }
 .dash-month-btn svg { width: 13px; height: 13px; }
-.dash-month-label {
+
+/* ── Period dropdown ── */
+.dash-period-dropdown {
+  position: relative;
+}
+.dash-period-trigger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
   font-family: var(--font-ui);
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-hi);
-  padding: 0 8px;
-  min-width: 110px;
-  text-align: center;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.dash-period-trigger:hover { background: var(--bg-raised); }
+.dash-period-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--text-lo);
+  transition: transform 0.2s;
+}
+.dash-period-dropdown.open .dash-period-chevron {
+  transform: rotate(180deg);
+}
+.dash-period-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 170px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  display: none;
+  z-index: 50;
+  overflow: hidden;
+}
+.dash-period-dropdown.open .dash-period-menu {
+  display: block;
+}
+.dash-period-item {
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.dash-period-item:hover {
+  background: var(--bg-raised);
+  color: var(--text-hi);
 }
 
 /* ── Section dropdown ── */
@@ -526,7 +581,9 @@
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  color: var(--text-mid);
 }
+.dash-recent-amount.amount-no-color { opacity: 0.75; }
 .dash-recent-amount.income  { color: var(--positive); }
 .dash-recent-amount.expense { color: var(--negative); }
 
@@ -611,6 +668,49 @@
 .dash-cov-bar-fill.ok   { background: var(--positive); }
 .dash-cov-bar-fill.warn { background: var(--warn); }
 .dash-cov-bar-fill.bad  { background: var(--negative); }
+
+/* ── Donut legend ── */
+.dash-donut-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 8px 0 2px;
+}
+.dash-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--text-mid);
+  cursor: default;
+}
+.dash-donut-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dash-donut-legend-item:hover {
+  color: var(--text-hi);
+}
+
+/* ── Donut tooltip ── */
+.dash-donut-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text-hi);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  white-space: nowrap;
+  line-height: 1.4;
+}
 
 /* ── Empty state ── */
 .dash-empty {

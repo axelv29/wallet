@@ -7,7 +7,7 @@
 // ── CONFIRM MODAL ──────────────────────────────────────────────
 let _confirmResolve = null;
 
-function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', danger = false } = {}) {
+function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', cancelText = 'Cancelar', danger = false } = {}) {
   return new Promise(resolve => {
     _confirmResolve = resolve;
     document.getElementById('confirm-title').textContent = title;
@@ -15,6 +15,8 @@ function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', 
     const btn = document.getElementById('confirm-action-btn');
     btn.textContent = confirmText;
     btn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
+    if (cancelBtn) cancelBtn.textContent = cancelText;
     document.getElementById('confirm-modal').classList.add('open');
     lucide.createIcons();
   });

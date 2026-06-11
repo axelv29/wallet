@@ -67,6 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pdd && pdd.classList.contains('open') && !e.target.closest('.period-selector')) {
       pdd.classList.remove('open');
     }
+    const dashPeriod = document.getElementById('dash-period-dropdown');
+    if (dashPeriod && dashPeriod.classList.contains('open') && !dashPeriod.contains(e.target)) {
+      dashPeriod.classList.remove('open');
+    }
     const pcal = document.getElementById('period-calendar-popup');
     if (pcal && pcal.classList.contains('open') && !e.target.closest('.modal-card') && !e.target.closest('.period-option-custom')) {
       closePeriodCalendar();
@@ -125,6 +129,9 @@ function showView(name) {
     if (symCb) symCb.checked = state.settings.showSymbol !== false;
     const decSel = document.getElementById('set-decimals');
     if (decSel) decSel.value = String(state.settings.decimals ?? 2);
+    const amountStyle = state.settings.amountStyle || 'default';
+    const radio = document.querySelector(`input[name="amount-style"][value="${amountStyle}"]`);
+    if (radio) radio.checked = true;
     syncThemeUI();
   }
 }
@@ -202,7 +209,7 @@ function mixWithBlack(hex, t) {
   return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
 }
 
-function buildCustomPalette(tableBase, sidebarBase, accentBase) {
+function buildCustomPalette(tableBase, sidebarBase, accentBase, positiveBase, negativeBase) {
   const tb = hexToHsl(tableBase), sb = hexToHsl(sidebarBase), ab = hexToHsl(accentBase);
   const css = {};
   const set = (name, val) => { css[name] = val; };
@@ -231,11 +238,23 @@ function buildCustomPalette(tableBase, sidebarBase, accentBase) {
   set('--text-lo',  '#7c7c87');
   set('--text-inv', '#ffffff');
 
-  // Semantic colors from accent hue
-  set('--positive', hslToHex(145, 60, 35));
-  set('--positive-bg', hslToHex(145, 65, 93));
-  set('--negative', hslToHex(0, 70, 45));
-  set('--negative-bg', hslToHex(0, 75, 95));
+  // Semantic colors from accent hue (or custom overrides)
+  if (positiveBase) {
+    const pb = hexToHsl(positiveBase);
+    set('--positive', `#${positiveBase.replace('#','')}`);
+    set('--positive-bg', hslToHex(pb.h, Math.min(pb.s, 70), 93));
+  } else {
+    set('--positive', hslToHex(145, 60, 35));
+    set('--positive-bg', hslToHex(145, 65, 93));
+  }
+  if (negativeBase) {
+    const nb = hexToHsl(negativeBase);
+    set('--negative', `#${negativeBase.replace('#','')}`);
+    set('--negative-bg', hslToHex(nb.h, Math.min(nb.s, 70), 95));
+  } else {
+    set('--negative', hslToHex(0, 70, 45));
+    set('--negative-bg', hslToHex(0, 75, 95));
+  }
   set('--warn', hslToHex(40, 80, 40));
   set('--warn-bg', hslToHex(40, 80, 94));
 
@@ -259,7 +278,7 @@ let _customStyleEl = null;
 function applyCustomTheme() {
   const cc = state.settings.customColors;
   if (!cc) return;
-  const css = buildCustomPalette(cc.table, cc.sidebar, cc.button);
+  const css = buildCustomPalette(cc.table, cc.sidebar, cc.button, cc.positive, cc.negative);
   if (!_customStyleEl) {
     _customStyleEl = document.createElement('style');
     _customStyleEl.id = 'custom-theme-vars';
@@ -273,11 +292,15 @@ function saveCustomThemeColors() {
   const tableI = document.getElementById('custom-color-table');
   const sidebarI = document.getElementById('custom-color-sidebar');
   const buttonI = document.getElementById('custom-color-button');
+  const positiveI = document.getElementById('custom-color-positive');
+  const negativeI = document.getElementById('custom-color-negative');
   if (!tableI || !sidebarI || !buttonI) return;
   state.settings.customColors = {
     table: tableI.value,
     sidebar: sidebarI.value,
     button: buttonI.value,
+    positive: positiveI ? positiveI.value : null,
+    negative: negativeI ? negativeI.value : null,
   };
   localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
   applyCustomTheme();
@@ -297,6 +320,8 @@ function initCustomThemeUI() {
       <span class="scheme-dot-custom" id="custom-dot-table" style="background:#ffffff"></span>
       <span class="scheme-dot-custom" id="custom-dot-sidebar" style="background:#f0eeeb"></span>
       <span class="scheme-dot-custom" id="custom-dot-button" style="background:#5b52f5"></span>
+      <span class="scheme-dot-custom" id="custom-dot-positive" style="background:#16a34a"></span>
+      <span class="scheme-dot-custom" id="custom-dot-negative" style="background:#dc2626"></span>
     </div>
     <span class="scheme-name">Personalizado</span>`;
   grid.appendChild(card);
@@ -340,10 +365,30 @@ function initCustomThemeUI() {
         </div>
         <div class="custom-color-desc">Color de botones, links e interacciones</div>
       </div>
+      <div class="custom-color-item">
+        <div class="custom-color-top">
+          <input type="color" class="custom-color-input" id="custom-color-positive" value="#16a34a">
+          <div>
+            <div class="custom-color-label">Positivos</div>
+            <div class="custom-color-hex" id="custom-hex-positive">#16a34a</div>
+          </div>
+        </div>
+        <div class="custom-color-desc">Ingresos, cobros y montos a favor</div>
+      </div>
+      <div class="custom-color-item">
+        <div class="custom-color-top">
+          <input type="color" class="custom-color-input" id="custom-color-negative" value="#dc2626">
+          <div>
+            <div class="custom-color-label">Negativos</div>
+            <div class="custom-color-hex" id="custom-hex-negative">#dc2626</div>
+          </div>
+        </div>
+        <div class="custom-color-desc">Gastos, débitos y montos en rojo</div>
+      </div>
     </div>
     <div class="custom-theme-actions">
       <button class="btn btn-primary" onclick="saveCustomThemeColors()">Aplicar colores</button>
-      <span class="custom-theme-note">Los demás colores se generan automáticamente a partir de estos tres</span>
+      <span class="custom-theme-note">Los demás colores se generan automáticamente</span>
     </div>`;
   subsection.appendChild(section);
 
@@ -353,13 +398,17 @@ function initCustomThemeUI() {
     const t = document.getElementById('custom-color-table');
     const s = document.getElementById('custom-color-sidebar');
     const b = document.getElementById('custom-color-button');
+    const p = document.getElementById('custom-color-positive');
+    const n = document.getElementById('custom-color-negative');
     if (t) t.value = cc.table || '#ffffff';
     if (s) s.value = cc.sidebar || '#f0eeeb';
     if (b) b.value = cc.button || '#5b52f5';
+    if (p) p.value = cc.positive || '#16a34a';
+    if (n) n.value = cc.negative || '#dc2626';
   }
 
   // Live hex display + live preview
-  ['table', 'sidebar', 'button'].forEach(key => {
+  ['table', 'sidebar', 'button', 'positive', 'negative'].forEach(key => {
     const input = document.getElementById('custom-color-' + key);
     const hex = document.getElementById('custom-hex-' + key);
     const dot = document.getElementById('custom-dot-' + key);
@@ -616,6 +665,7 @@ window.onInstallmentCheck          = onInstallmentCheck;
 window.onAccountChangeInModal      = onAccountChangeInModal;
 window.updateInstallmentPreview    = updateInstallmentPreview;
 window.getInstallmentMonthOffset   = getInstallmentMonthOffset;
+window.onCuotaInput                = onCuotaInput;
 window.handleTransactionSubmit   = handleTransactionSubmit;
 window.deleteTransaction         = deleteTransaction;
 window.markAsCollected           = markAsCollected;
@@ -631,6 +681,7 @@ window.openWelcomeModal          = openWelcomeModal;
 window.closeWelcomeModal         = closeWelcomeModal;
 window.showWelcomeOnFirstVisit   = showWelcomeOnFirstVisit;
 window.resolveConfirm            = resolveConfirm;
+window.handleTxRowClick          = handleTxRowClick;
 window.toggleTxSelection         = toggleTxSelection;
 window.toggleSelectAll           = toggleSelectAll;
 window.clearTxSelection          = clearTxSelection;
@@ -650,7 +701,9 @@ window.dashCloseAccDropdown      = dashCloseAccDropdown;
 window.dashToggleAccountFilter   = dashToggleAccountFilter;
 window.dashToggleAccountSidebar  = dashToggleAccountSidebar;
 window.dashToggleAllAccounts     = dashToggleAllAccounts;
-window.dashCloseDropdown         = dashCloseDropdown;
+window.dashSetPeriod             = dashSetPeriod;
+window.dashTogglePeriodDropdown  = dashTogglePeriodDropdown;
+window.dashClosePeriodDropdown   = dashClosePeriodDropdown;
 window.onCsvFileSelected         = onCsvFileSelected;
 window.reparseCsv                = reparseCsv;
 window.onCsvMappingChange        = onCsvMappingChange;
@@ -683,3 +736,18 @@ window.toggleSearchBox          = toggleSearchBox;
 window.collapseSearchBox        = collapseSearchBox;
 window.toggleSort               = toggleSort;
 window.saveCustomThemeColors    = saveCustomThemeColors;
+window.openBalanceModal         = openBalanceModal;
+window.closeBalanceModal        = closeBalanceModal;
+window.updateBalanceDiff        = updateBalanceDiff;
+window.confirmBalanceAdjustment = confirmBalanceAdjustment;
+window.openBalanceFromEditModal = openBalanceFromEditModal;
+window.openSplitModal         = openSplitModal;
+window.closeSplitModal        = closeSplitModal;
+window.addSplitRow            = addSplitRow;
+window.removeSplitRow         = removeSplitRow;
+window.onSplitAmountInput     = onSplitAmountInput;
+window.saveSplits             = saveSplits;
+window.toggleSplitChildren    = toggleSplitChildren;
+window.mergeSplitChildren     = mergeSplitChildren;
+window.distributeEqually      = distributeEqually;
+window.removeAllSplits        = removeAllSplits;
