@@ -57,40 +57,10 @@ function loadData() {
 
   if (lsAcc) {
     state.accounts = JSON.parse(lsAcc);
-  } else {
-    state.accounts = [
-      { id: 'acc-1', name: 'Itaú Débito',  type: 'liquid',      balance: 0 },
-      { id: 'acc-2', name: 'Brou',          type: 'liquid',      balance: 0 },
-      { id: 'acc-3', name: 'Efectivo',      type: 'liquid',      balance: 0 },
-      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: 0, card_closing_day: 20, card_due_day: 30 },
-      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: 0,   card_closing_day: 15, card_due_day: 25 }
-    ];
-    saveData('accounts');
   }
 
   if (lsTx) {
     state.transactions = JSON.parse(lsTx);
-  } else {
-    state.transactions = [
-      { id: 'tx-init-1', date: '2026-05-01', account_id: 'acc-1', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  1047.40, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-2', date: '2026-05-01', account_id: 'acc-2', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  1900.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-3', date: '2026-05-01', account_id: 'acc-3', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  1727.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-4', date: '2026-05-01', account_id: 'acc-4', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount: -10300.38, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-init-5', date: '2026-05-01', account_id: 'acc-5', payee: 'Ajuste de saldo', category_name: 'Ajuste de saldo', amount:  -460.00, notes: '', tags: [], is_receivable: false, due_date: '', excluded: false },
-      { id: 'tx-1',  date: '2026-06-01', account_id: 'acc-5', payee: 'Leo',            category_name: 'Fuera del presupuesto', amount:  5033.00, notes: 'Pasajes + Préstamo',    tags: [], is_receivable: true, excluded: false },
-      { id: 'tx-2',  date: '2026-05-24', account_id: 'acc-4', payee: 'Escaramuza',     category_name: 'Entretenimiento',       amount:  -258.75, notes: 'Libro w/',              tags: ['Rocio'], is_receivable: false, excluded: false },
-      { id: 'tx-3',  date: '2026-05-19', account_id: 'acc-5', payee: 'Rocío',          category_name: 'Fuera del presupuesto', amount:   700.00, notes: 'Comida + Regalo Jessi', tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-4',  date: '2026-05-18', account_id: 'acc-5', payee: 'Leo',            category_name: 'Fuera del presupuesto', amount:  -141.00, notes: 'Compras finde',         tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-5',  date: '2026-05-18', account_id: 'acc-5', payee: 'Leo',            category_name: 'Fuera del presupuesto', amount:  -250.00, notes: 'Limpieza heladera',     tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-6',  date: '2026-05-18', account_id: 'acc-5', payee: 'Nati',           category_name: 'Fuera del presupuesto', amount: -1000.00, notes: 'Limpieza + Alfombra',   tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-7',  date: '2026-05-18', account_id: 'acc-5', payee: 'Nati',           category_name: 'Fuera del presupuesto', amount:  -400.00, notes: 'Limpieza Sillas',       tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-8',  date: '2026-05-17', account_id: 'acc-3', payee: 'Tienda Inglesa', category_name: 'Supermercado',          amount:   -53.00, notes: 'Bicarbonato',           tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-9',  date: '2026-05-17', account_id: 'acc-4', payee: 'Tienda Inglesa', category_name: 'Supermercado',          amount:  -373.00, notes: 'Galletitas w/',         tags: ['Rocio'], is_receivable: false, excluded: false },
-      { id: 'tx-10', date: '2026-05-16', account_id: 'acc-4', payee: 'El Tío',         category_name: 'Supermercado',          amount:  -744.64, notes: 'Compras hamburguesas',  tags: [], is_receivable: false, excluded: false },
-      { id: 'tx-11', date: '2026-05-16', account_id: 'acc-4', payee: 'El Tío',         category_name: 'Supermercado',          amount:  -141.00, notes: 'Aceite y Pan',          tags: ['NyL'], is_receivable: false, excluded: false },
-      { id: 'tx-12', date: '2026-05-16', account_id: 'acc-4', payee: 'El Tío',         category_name: 'Supermercado',          amount:  -603.64, notes: 'Merienda y cena w/',    tags: [], is_receivable: false, excluded: false }
-    ];
-    saveData('transactions');
   }
 
   if (lsPre) {
