@@ -17,7 +17,7 @@
 - `css/helpers.css` — Import modal, help, CSV, installment
 - `js/state.js` — Estado global y persistencia
 - `js/currency.js` — Cotizaciones en línea, conversión de monedas (open.er-api.com)
-- `js/utils.js` — formatCurrency, formatDate, calculateBalances, helpers
+- `js/utils.js` — formatCurrency, formatDate, calculateBalances, helpers, evaluateExpression, isPlainNumber
 - `js/modals.js` — Help modal, confirm modal
 - `js/sidebar.js` — Sidebar, filtros, métricas de cobertura
 - `js/transactions.js` — CRUD, tabla, batch ops, inline editing, selectores
@@ -51,6 +51,7 @@
 - `dropdown-payee` / `dropdown-category` — Dropdowns buscables
 - `btn-sign-expense` / `btn-sign-income` — Botones de signo
 - `tx-tags-checklist` — Checklist de etiquetas en el modal
+- `tx-amount-error` — Mensaje de error de calculadora en modal de monto
 - `tx-is-receivable` — Checkbox de préstamo a cobrar
 - `tx-due-date` — Fecha de cobro estimada
 - `tx-count-badge` — Contador de transacciones filtradas
@@ -124,6 +125,8 @@
 - `split-total-header` / `split-progress-track` / `split-progress-bar` — Barra de progreso del modal
 - `split-rows-wrap` / `split-row` / `split-row-main` — Elementos del modal de división
 - `split-actions-row` — Botones de acción del modal (Agregar, Igualar, Eliminar)
+- `calc-error` — Mensaje de error de calculadora en editor inline de monto
+- `calc-error-modal` — Mensaje de error de calculadora en input de monto del modal
 
 ### Tipos de cuenta (`acc.type`)
 - `'liquid'` — Cuenta líquida (efectivo/débito)
@@ -158,7 +161,8 @@
   due_date: '',             // solo si is_receivable
   excluded: false,          // excluir del total
   split_group: null,        // ID de grupo de división ('sg-...') si tiene hijos
-  split_parent_id: null     // ID del padre si es hijo de una división
+  split_parent_id: null,    // ID del padre si es hijo de una división
+  amount_expression: null   // expresión original del calculador (ej: '345+100'), null si es número simple
 }
 ```
 
@@ -206,6 +210,8 @@
 - `deleteSplitChildren(txId)` — Elimina todos los hijos de un padre
 - `toggleSplitChildren(txId)` — Colapsa/expande hijos en la tabla
 - `isSplitChildrenOpen(txId)` — Verifica si los hijos están expandidos
+- `evaluateExpression(expr, decimals)` — Evalúa expresión aritmética, devuelve `{ value, error }` o `null`
+- `isPlainNumber(str)` — Detecta si un string es un número simple (no expresión)
 
 ### Predefinidos editables
 ```js
@@ -240,6 +246,7 @@ state.predefined = {
 - Al marcar como cobrado un préstamo, se crea una transacción inversa (positiva) y se desmarca el original
 - El modal de importación usa Gemini API para parsear texto de extractos bancarios
 - **Divisiones de transacciones**: Una transacción puede dividirse en partes (hijos). El padre mantiene el monto total para totales. Los hijos son desglose informativo con notas y etiquetas propias. El último hijo siempre es "el resto" y se auto-calcula.
+- **Calculadora de monto**: El campo de monto acepta expresiones aritméticas (`+`, `-`, `*`, `/`, paréntesis). Se evalúa al confirmar (Enter/Tab/blurred). La expresión original se guarda en `amount_expression` y se muestra al re-editar. Límite: 15 dígitos (>= 1e15 muestra error).
 
 ### Keys de localStorage
 - `wallet_accounts` — Array de cuentas
@@ -373,7 +380,7 @@ state.predefined = {
 - [x] Tema claro/oscuro con esquemas de color (default, ocean, forest, lavender, default-dark, midnight, ember)
 - [x] Tema personalizado: generador de paleta completa desde 3 colores base (tabla, sidebar, botones)
 - [x] Selectores buscables (payee, categoría)
-- [x] Atajo de teclado: `+`/`-` en campo de monto
+- [x] Calculadora en campo de monto (expresiones: `+`, `-`, `*`, `/`, paréntesis) con validación y límite de 15 dígitos
 - [x] Importación de extractos con Gemini AI
 - [x] Persistencia con localStorage
 - [x] Dashboard con resumen mensual, categorías y cobertura

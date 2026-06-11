@@ -186,7 +186,7 @@ function openTransactionModal(txId) {
     document.getElementById('tx-account').value = tx.account_id;
     document.getElementById('tx-payee-search').value = tx.payee;
     document.getElementById('tx-category-search').value = tx.category_name || '';
-    document.getElementById('tx-amount').value = formatNoTrailingZeros(Math.abs(tx.amount));
+    document.getElementById('tx-amount').value = tx.amount_expression || formatNoTrailingZeros(Math.abs(tx.amount));
     document.getElementById('tx-notes').value = tx.notes || '';
 
     setTxSign(tx.amount < 0 ? -1 : 1);
@@ -253,6 +253,9 @@ function closeTransactionModal() {
   document.getElementById('tx-form').reset();
   state.editingTxId = null;
   state._batchEditIds = null;
+
+  const amtErr = document.getElementById('tx-amount-error');
+  if (amtErr) amtErr.style.display = 'none';
 
   const modalTitle = document.querySelector('#tx-modal .modal-title');
   const submitBtn  = document.querySelector('#tx-form button[type="submit"]');
@@ -358,8 +361,14 @@ function formatNoTrailingZeros(num) {
 
 function updateInstallmentPreview() {
   const total   = parseInt(document.getElementById('tx-installment-count').value) || 0;
-  const raw = document.getElementById('tx-amount').value.replace(/[^\d,.\-]/g, '').replace(',', '.');
-  const rawAmt  = parseFloat(raw) || 0;
+  const rawInput = document.getElementById('tx-amount').value.trim();
+  let rawAmt;
+  if (isPlainNumber(rawInput)) {
+    rawAmt = parseFloat(rawInput.replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
+  } else {
+    const res = evaluateExpression(rawInput, state.settings.decimals);
+    rawAmt = (res && res.value !== null) ? Math.abs(res.value) : 0;
+  }
   const cuotaInput = document.getElementById('inst-cuota-input');
 
   const indexInput = document.getElementById('tx-installment-index');
@@ -396,7 +405,15 @@ async function handleTransactionSubmit(event) {
   const accountId   = document.getElementById('tx-account').value;
   const payee       = document.getElementById('tx-payee-search').value.trim();
   const categoryName = document.getElementById('tx-category-search').value.trim();
-  const rawAmount   = parseFloat(document.getElementById('tx-amount').value.replace(/[^\d,.\-]/g, '').replace(',', '.'));
+  const rawAmountInput = document.getElementById('tx-amount').value.trim();
+  let rawAmount;
+  if (isPlainNumber(rawAmountInput)) {
+    rawAmount = parseFloat(rawAmountInput.replace(/[^\d,.\-]/g, '').replace(',', '.'));
+  } else {
+    const evalRes = evaluateExpression(rawAmountInput, state.settings.decimals);
+    rawAmount = (evalRes && evalRes.value !== null) ? evalRes.value : NaN;
+  }
+  const amountExpression = (rawAmountInput && !isPlainNumber(rawAmountInput)) ? rawAmountInput : null;
   const notes       = document.getElementById('tx-notes').value.trim();
   const isReceivable = document.getElementById('tx-is-receivable').checked;
   const dueDate     = document.getElementById('tx-due-date').value;
@@ -429,7 +446,16 @@ async function handleTransactionSubmit(event) {
     return;
   }
 
-  if (!accountId || isNaN(rawAmount)) return;
+  if (!accountId || isNaN(rawAmount)) {
+    if (rawAmountInput && !isPlainNumber(rawAmountInput)) {
+      const res = evaluateExpression(rawAmountInput, state.settings.decimals);
+      if (res && res.error === 'too_large') {
+        const amtErr = document.getElementById('tx-amount-error');
+        if (amtErr) { amtErr.textContent = 'Número demasiado grande'; amtErr.style.display = ''; }
+      }
+    }
+    return;
+  }
 
   if (payee && !state.predefined.payees.includes(payee)) { state.predefined.payees.push(payee); saveData('predefined'); }
   const catNames = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name);
@@ -506,6 +532,7 @@ async function handleTransactionSubmit(event) {
         tx.payee = payee;
         tx.category_name = categoryName;
         tx.amount = amount;
+        tx.amount_expression = amountExpression;
         tx.notes = notes;
         tx.tags = activeTags;
         tx.is_receivable = isReceivable;
@@ -518,6 +545,7 @@ async function handleTransactionSubmit(event) {
         tx.payee = payee;
         tx.category_name = categoryName;
         tx.amount = amount;
+        tx.amount_expression = amountExpression;
         tx.notes = notes;
         tx.tags = activeTags;
         tx.is_receivable = isReceivable;
@@ -574,6 +602,7 @@ async function handleTransactionSubmit(event) {
         payee,
         category_name: categoryName,
         amount,
+        amount_expression: amountExpression,
         notes,
         tags: activeTags,
         is_receivable: isReceivable,
@@ -610,9 +639,28 @@ async function deleteTransaction(txId) {
     state.selectedTxIds.delete(txId);
   } else if (tx.split_parent_id) {
     const parent = state.transactions.find(t => t.id === tx.split_parent_id);
-    if (parent && !await showConfirm('¿Eliminar esta división? El monto restante se redistribuirá.', { title: 'Eliminar división', confirmText: 'Eliminar', danger: true })) return;
-    state.transactions = state.transactions.filter(t => t.id !== txId);
-    state.selectedTxIds.delete(txId);
+    if (!parent) return;
+    const childCount = state.transactions.filter(t => t.split_parent_id === parent.id).length;
+    const acc = state.accounts.find(a => a.id === parent.account_id);
+    const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+    const removedAbs = Math.abs(tx.amount);
+    if (childCount <= 1) {
+      if (!await showConfirm(`Esta es la única división. Al eliminarla, la transacción volverá a ser única.`, { title: 'Eliminar única división', confirmText: 'Eliminar' })) return;
+      state.transactions = state.transactions.filter(t => t.id !== txId);
+      state.selectedTxIds.delete(txId);
+      delete parent.split_group;
+    } else {
+      const msg = `Al eliminar esta división de ${formatAccountCurrency(removedAbs, accCurrency)}, el monto quedará sin asignar dentro de la transacción dividida. ¿Deseas ir al editor de divisiones para redistribuirlo?`;
+      if (!await showConfirm(msg, { title: 'División sin asignar', confirmText: 'Ir al editor', cancelText: 'Eliminar de todas formas' })) {
+        state.transactions = state.transactions.filter(t => t.id !== txId);
+        state.selectedTxIds.delete(txId);
+        const remainingChildren = state.transactions.filter(t => t.split_parent_id === parent.id).length;
+        if (remainingChildren === 0) delete parent.split_group;
+      } else {
+        openSplitModal(parent.id);
+        return;
+      }
+    }
   } else {
     if (!await showConfirm('¿Seguro que deseas eliminar esta transacción?', { title: 'Eliminar transacción', confirmText: 'Eliminar', danger: true })) return;
     state.transactions = state.transactions.filter(t => t.id !== txId);
@@ -979,17 +1027,33 @@ function updateSelectionBar() {
 
   const settingsCur = state.settings.currency || 'ARS';
   let total = 0;
-  state.selectedTxIds.forEach(id => {
+  const selectedIds = [...state.selectedTxIds];
+
+  const selectedParents = new Set();
+  selectedIds.forEach(id => {
     const tx = state.transactions.find(t => t.id === id);
-    if (tx) {
-      const acc = state.accounts.find(a => a.id === tx.account_id);
-      const accCur = acc?.currency || settingsCur;
-      const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
-      total += (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+    if (tx && tx.split_group && !tx.split_parent_id) selectedParents.add(id);
+  });
+
+  const childOfSelectedParent = new Set();
+  selectedIds.forEach(id => {
+    const tx = state.transactions.find(t => t.id === id);
+    if (tx && tx.split_parent_id && selectedParents.has(tx.split_parent_id)) {
+      childOfSelectedParent.add(id);
     }
   });
 
-  const count = state.selectedTxIds.size;
+  selectedIds.forEach(id => {
+    if (childOfSelectedParent.has(id)) return;
+    const tx = state.transactions.find(t => t.id === id);
+    if (!tx) return;
+    const acc = state.accounts.find(a => a.id === tx.account_id);
+    const accCur = acc?.currency || settingsCur;
+    const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
+    total += (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+  });
+
+  const count = selectedIds.length - childOfSelectedParent.size;
   const countStr = count === 1 ? '1 seleccionado' : `${count} seleccionados`;
   const totalStr = formatCurrency(Math.abs(total));
   const sign = total < 0 ? '−' : total > 0 ? '+' : '';
@@ -1232,7 +1296,7 @@ function _closeDD() {
 // ── cerrar el editor completo ─────────────────────────────────
 function closeInlineEditor(commit) {
   if (!_ie) return;
-  const { cell, txId, field, originalValue, getValue, parser } = _ie;
+  const { cell, txId, field, originalValue, getValue, parser, getRawText } = _ie;
 
   _closeDD();
   cell.classList.remove('editing');
@@ -1247,7 +1311,7 @@ function closeInlineEditor(commit) {
 
   if (commit) {
     const rawVal = getValue();
-    let parsed = parser ? parser(rawVal) : rawVal;
+    let parsed = parser ? parser(rawVal, getRawText ? getRawText() : null) : rawVal;
     // Si el campo de texto queda vacío, asignar "Sin asignar"
     if ((field === 'payee' || field === 'category_name') && (!parsed || !parsed.trim())) {
       parsed = 'Sin asignar';
@@ -1261,6 +1325,10 @@ function closeInlineEditor(commit) {
       const tx = state.transactions.find(t => t.id === txId);
       if (tx && parsed !== null && parsed !== undefined) {
         tx[field] = parsed;
+        if (field === 'amount') {
+          const rawText = getRawText ? getRawText() : null;
+          tx.amount_expression = (rawText && !isPlainNumber(rawText)) ? rawText : null;
+        }
         saveData('transactions');
         // Auto-agregar a predefinidos si es nuevo
         if (field === 'payee' && parsed !== 'Sin asignar' && !state.predefined.payees.includes(parsed)) {
@@ -1381,6 +1449,7 @@ function startInlineEdit(cell, txId, field, type, options) {
     cell, txId, field, originalValue,
     dd: null,
     getValue: () => originalValue,
+    getRawText: null,
     parser: options.parser || null
   };
 
@@ -1390,17 +1459,38 @@ function startInlineEdit(cell, txId, field, type, options) {
     const span = document.createElement('span');
     span.className = 'inline-editor-span';
     span.contentEditable = 'plaintext-only';
-    const displayVal = type === 'number' ? String(Math.abs(originalValue)) : (originalValue || '').trim();
+    const displayVal = type === 'number'
+      ? (tx.amount_expression || String(Math.abs(originalValue)))
+      : (originalValue || '').trim();
     span.textContent = displayVal;
     cell.appendChild(span);
+
+    if (type === 'number') {
+      const errEl = document.createElement('span');
+      errEl.className = 'calc-error';
+      errEl.style.display = 'none';
+      cell.appendChild(errEl);
+      _ie._errEl = errEl;
+    }
 
     _ie.getValue = () => {
       let v = span.textContent.trim();
       if (type === 'number') {
         if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
-        return parseFloat(v) || 0;
+        const evalResult = evaluateExpression(v, state.settings.decimals);
+        if (evalResult && evalResult.error) return 0;
+        return evalResult ? evalResult.value : (parseFloat(v) || 0);
       }
       return v;
+    };
+
+    _ie.getRawText = () => {
+      if (type === 'number') {
+        let v = span.textContent.trim();
+        if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+        return v;
+      }
+      return null;
     };
 
     const _getDDItemText = (el) => {
@@ -1440,6 +1530,26 @@ function startInlineEdit(cell, txId, field, type, options) {
         ddItems[idx]?.scrollIntoView({ block: 'nearest' });
       }
     });
+
+    if (type === 'number') {
+      span.addEventListener('input', () => {
+        if (!_ie || _ie.cell !== cell) return;
+        const errEl = _ie._errEl;
+        if (!errEl) return;
+        let v = span.textContent.trim();
+        if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+        const res = evaluateExpression(v, state.settings.decimals);
+        if (res && res.error === 'too_large') {
+          errEl.textContent = 'Número demasiado grande';
+          errEl.style.display = '';
+        } else if (res && (res.error === 'syntax' || res.error === 'invalid')) {
+          errEl.textContent = 'Expresión inválida';
+          errEl.style.display = '';
+        } else {
+          errEl.style.display = 'none';
+        }
+      });
+    }
 
     if (type === 'text' && options.suggestions) {
       let _lastSuggestKey = '';
@@ -2357,8 +2467,10 @@ function openSplitModal(txId) {
       addSplitRow(child.notes || '', Math.abs(child.amount), child.tags || [], child.category_name || '')
     );
   } else {
-    addSplitRow('', totalAbs, [], tx.category_name || '');
-    addSplitRow('', 0, [], '');
+    const parentTags = tx.tags || [];
+    const parentCat = tx.category_name || '';
+    addSplitRow('', totalAbs, [...parentTags], parentCat);
+    addSplitRow('', 0, [...parentTags], parentCat);
   }
 
   recalcSplitProgress();
@@ -2369,6 +2481,9 @@ function openSplitModal(txId) {
 function closeSplitModal() {
   document.getElementById('split-modal').classList.remove('open');
   _splitTxId = null;
+  _closeDD();
+  const catDD = document.getElementById('wallet-split-cat-dd');
+  if (catDD) catDD.remove();
 }
 
 function addSplitRow(notes = '', amount = 0, tags = [], categoryName = '') {
@@ -2380,12 +2495,6 @@ function addSplitRow(notes = '', amount = 0, tags = [], categoryName = '') {
   row.dataset.idx = idx;
 
   const amountVal = amount ? formatNoTrailingZeros(amount) : '';
-  const tagsVal = tags.join(', ');
-
-  const categories = [...new Set(state.transactions.map(t => t.category_name).filter(Boolean))].sort();
-  const catOptions = categories
-    .map(c => `<option value="${c}" ${c === categoryName ? 'selected' : ''}>${c}</option>`)
-    .join('');
 
   row.innerHTML = `
     <div class="split-row-main">
@@ -2393,11 +2502,10 @@ function addSplitRow(notes = '', amount = 0, tags = [], categoryName = '') {
       <input class="split-amount-input" type="text" inputmode="decimal"
              placeholder="0,00" value="${amountVal}" oninput="onSplitAmountInput(this)">
       <input class="split-notes-input" type="text" placeholder="Nota…" value="${notes}">
-      <input class="split-tags-input" type="text" placeholder="etiqueta…" value="${tagsVal}">
-      <select class="split-cat-select">
-        <option value="">—</option>
-        ${catOptions}
-      </select>
+      <div class="split-tags-cell" data-tags='${JSON.stringify(tags)}'></div>
+      <div class="split-cat-wrap">
+        <input class="split-cat-input" type="text" placeholder="Categoría…" value="${categoryName}" autocomplete="off">
+      </div>
       <button class="split-row-remove" onclick="removeSplitRow(this)" title="Quitar">
         <i data-lucide="x"></i>
       </button>
@@ -2405,8 +2513,235 @@ function addSplitRow(notes = '', amount = 0, tags = [], categoryName = '') {
   `;
 
   wrap.appendChild(row);
+  initSplitTags(row.querySelector('.split-tags-cell'));
+  initSplitCategory(row);
   recalcSplitProgress();
   lucide.createIcons();
+}
+
+function initSplitTags(cell) {
+  renderSplitTagPills(cell);
+  cell.addEventListener('click', e => {
+    const removeBtn = e.target.closest('.remove-split-tag');
+    if (removeBtn) {
+      const tag = removeBtn.dataset.tag;
+      const tags = JSON.parse(cell.dataset.tags || '[]');
+      cell.dataset.tags = JSON.stringify(tags.filter(t => t !== tag));
+      renderSplitTagPills(cell);
+      return;
+    }
+    if (e.target.closest('.split-tag-add')) {
+      openSplitTagDD(cell);
+    }
+  });
+}
+
+function renderSplitTagPills(cell) {
+  const tags = JSON.parse(cell.dataset.tags || '[]');
+  cell.innerHTML = '';
+  tags.forEach(tag => {
+    const c = _tagColor(tag);
+    const pill = document.createElement('span');
+    pill.className = 'split-tag-pill';
+    pill.style.background = c.bg;
+    pill.style.color = c.text;
+    pill.innerHTML = `#${tag}<span class="remove-split-tag" data-tag="${tag}">\u00d7</span>`;
+    cell.appendChild(pill);
+  });
+  const addBtn = document.createElement('span');
+  addBtn.className = 'split-tag-add';
+  addBtn.innerHTML = '<i data-lucide="plus"></i>';
+  cell.appendChild(addBtn);
+  lucide.createIcons();
+}
+
+function openSplitTagDD(cell) {
+  const current = new Set(JSON.parse(cell.dataset.tags || '[]'));
+  const allTags = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+  const available = allTags.filter(t => !current.has(t));
+
+  _closeDD();
+  const dd = document.createElement('div');
+  dd.className = 'comfy-dropdown open';
+  dd.style.position = 'fixed';
+  dd.style.zIndex = '9999';
+
+  const inputRow = document.createElement('div');
+  inputRow.className = 'comfy-dropdown-input-row';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'comfy-dropdown-input';
+  input.placeholder = 'nueva etiqueta\u2026';
+  inputRow.appendChild(input);
+  dd.appendChild(inputRow);
+
+  const listWrap = document.createElement('div');
+  listWrap.className = 'comfy-dropdown-list';
+  dd.appendChild(listWrap);
+
+  const renderList = (filter = '') => {
+    listWrap.innerHTML = '';
+    const q = filter.toLowerCase();
+    const filtered = available.filter(t => !current.has(t) && t.toLowerCase().includes(q));
+
+    if (filter) {
+      const exact = available.find(t => t.toLowerCase() === q);
+      const createRow = document.createElement('div');
+      createRow.className = 'comfy-dropdown-item';
+      createRow.innerHTML = `<span>+ "${exact || filter}"</span><span class="check">\u21b5</span>`;
+      createRow.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const name = filter.trim();
+        if (name && !current.has(name)) {
+          const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+          if (!tagNames.includes(name)) {
+            state.predefined.tags.push({ name, color: getRandomTagColor() });
+            saveData('predefined');
+          }
+          current.add(name);
+          cell.dataset.tags = JSON.stringify([...current]);
+          renderSplitTagPills(cell);
+          _closeDD();
+        }
+      });
+      listWrap.appendChild(createRow);
+    }
+
+    if (!filtered.length && !filter) {
+      const empty = document.createElement('div');
+      empty.className = 'comfy-dropdown-empty';
+      empty.textContent = 'Sin sugerencias';
+      listWrap.appendChild(empty);
+    } else {
+      filtered.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'comfy-dropdown-item';
+        row.innerHTML = `<span>#${item}</span><span class="check">\u2713</span>`;
+        row.addEventListener('mousedown', e => {
+          e.preventDefault();
+          current.add(item);
+          cell.dataset.tags = JSON.stringify([...current]);
+          renderSplitTagPills(cell);
+          _closeDD();
+        });
+        listWrap.appendChild(row);
+      });
+    }
+  };
+
+  renderList();
+
+  input.addEventListener('input', () => renderList(input.value.trim()));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { _closeDD(); return; }
+    const items = [...listWrap.querySelectorAll('.comfy-dropdown-item')];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      let idx = items.findIndex(el => el.classList.contains('active'));
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      idx = idx === -1 ? (dir > 0 ? 0 : items.length - 1) : Math.max(0, Math.min(idx + dir, items.length - 1));
+      items.forEach((el, i) => el.classList.toggle('active', i === idx));
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const active = items.find(el => el.classList.contains('active'));
+      if (active) { active.click(); return; }
+      const name = input.value.trim();
+      if (name && !current.has(name)) {
+        const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+        if (!tagNames.includes(name)) {
+          state.predefined.tags.push({ name, color: getRandomTagColor() });
+          saveData('predefined');
+        }
+        current.add(name);
+        cell.dataset.tags = JSON.stringify([...current]);
+        renderSplitTagPills(cell);
+      }
+      _closeDD();
+    }
+  });
+
+  document.body.appendChild(dd);
+  dd.id = 'wallet-dd';
+  _positionDD(dd, cell);
+  input.focus();
+}
+
+function initSplitCategory(row) {
+  const input = row.querySelector('.split-cat-input');
+  if (!input) return;
+
+  const categories = state.predefined.categories;
+
+  const renderDD = (filter = '') => {
+    let dd = document.getElementById('wallet-split-cat-dd');
+    if (!dd) {
+      dd = document.createElement('div');
+      dd.className = 'searchable-dropdown open';
+      dd.id = 'wallet-split-cat-dd';
+      dd.style.position = 'fixed';
+      dd.style.zIndex = '9999';
+      const ul = document.createElement('ul');
+      dd.appendChild(ul);
+      document.body.appendChild(dd);
+    }
+    const ul = dd.querySelector('ul');
+    ul.innerHTML = '';
+    const q = filter.toLowerCase();
+    categories.filter(c => {
+      const name = typeof c === 'string' ? c : c.name;
+      return name.toLowerCase().includes(q);
+    }).forEach(c => {
+      const name = typeof c === 'string' ? c : c.name;
+      const icon = typeof c === 'string' ? null : c.icon;
+      const li = document.createElement('li');
+      li.innerHTML = icon ? `<span class="cat-icon"><i data-lucide="${icon}"></i></span>${name}` : name;
+      li.addEventListener('mousedown', e => {
+        e.preventDefault();
+        input.value = name;
+        dd.remove();
+      });
+      ul.appendChild(li);
+    });
+    if (!ul.children.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Sin resultados';
+      ul.appendChild(li);
+    }
+    _positionDD(dd, input);
+    lucide.createIcons();
+  };
+
+  input.addEventListener('focus', () => renderDD(input.value));
+  input.addEventListener('blur', () => setTimeout(() => {
+    const dd = document.getElementById('wallet-split-cat-dd');
+    if (dd) dd.remove();
+  }, 150));
+  input.addEventListener('input', () => renderDD(input.value));
+  input.addEventListener('keydown', e => {
+    const dd = document.getElementById('wallet-split-cat-dd');
+    if (!dd) return;
+    const items = [...dd.querySelectorAll('li:not(.empty)')];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      let idx = items.findIndex(el => el.classList.contains('active'));
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      idx = idx === -1 ? (dir > 0 ? 0 : items.length - 1) : Math.max(0, Math.min(idx + dir, items.length - 1));
+      items.forEach((el, i) => el.classList.toggle('active', i === idx));
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const active = items.find(el => el.classList.contains('active'));
+      if (active) { active.click(); return; }
+      dd.remove();
+    }
+    if (e.key === 'Escape') {
+      dd.remove();
+    }
+  });
 }
 
 function removeSplitRow(btn) {
@@ -2534,9 +2869,8 @@ function saveSplits() {
   const splits = rows.map(row => ({
     amount:        parseLocalNumber(row.querySelector('.split-amount-input').value) || 0,
     notes:         row.querySelector('.split-notes-input').value.trim(),
-    tags:          row.querySelector('.split-tags-input').value.trim()
-                      .split(',').map(t => t.trim()).filter(Boolean),
-    category_name: row.querySelector('.split-cat-select')?.value || ''
+    tags:          JSON.parse(row.querySelector('.split-tags-cell')?.dataset.tags || '[]'),
+    category_name: row.querySelector('.split-cat-input')?.value || ''
   })).filter(s => s.amount > 0);
 
   if (splits.length < 1) { closeSplitModal(); return; }

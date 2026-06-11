@@ -281,7 +281,7 @@ let balanceModalState = { accountId: null };
 function calculateAccountBalance(accountId) {
   let balance = 0;
   state.transactions.forEach(tx => {
-    if (tx.account_id === accountId && !tx.is_future && !tx.excluded && isTxInPeriod(tx)) {
+    if (tx.account_id === accountId && !tx.is_future && !tx.excluded && !tx.split_parent_id && isTxInPeriod(tx)) {
       balance += Number(tx.amount) || 0;
     }
   });
@@ -464,6 +464,39 @@ function renderPredefinedLists() {
   renderListItems('payees',     allPayees);
   renderListItems('categories', state.predefined.categories);
   renderListItems('tags',       state.predefined.tags);
+}
+
+function filterPredefinedList(type) {
+  const ids = { payees: 'add-payee-val', categories: 'add-category-val', tags: 'add-tag-val' };
+  const input = document.getElementById(ids[type]);
+  const val = input.value.trim().replace(/#/g, '').toLowerCase();
+  const ul = document.getElementById('predefined-' + type + '-list');
+  if (!ul) return;
+  const items = ul.querySelectorAll('li');
+  let exactFound = false;
+  items.forEach(li => {
+    const nameSpan = li.querySelector('.predefined-name');
+    if (!nameSpan) return;
+    const name = nameSpan.textContent.replace(/^#/, '').toLowerCase();
+    if (!val) {
+      li.style.display = '';
+    } else if (name.includes(val)) {
+      li.style.display = '';
+      if (name === val) exactFound = true;
+    } else {
+      li.style.display = 'none';
+    }
+  });
+  const msg = document.getElementById('predefined-dup-' + type);
+  if (msg) {
+    if (val && exactFound) {
+      msg.style.display = '';
+      const displayName = type === 'tags' ? '#' + input.value.trim().replace(/#/g, '') : input.value.trim();
+      msg.textContent = '"' + displayName + '" ya existe en la lista';
+    } else {
+      msg.style.display = 'none';
+    }
+  }
 }
 
 function renderListItems(type, list) {

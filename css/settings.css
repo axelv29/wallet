@@ -340,6 +340,17 @@
 
 .predefined-scroll li:last-child { border-bottom: none; }
 
+.predefined-dup-msg {
+  display: none;
+  font-size: 11px;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border-radius: var(--r-xs);
+  padding: 3px 8px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 /* Account types */
 .acc-type-badge {
   display: inline-block;

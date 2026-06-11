@@ -50,6 +50,7 @@ function renderSidebar() {
   state.transactions.forEach(tx => {
     if (tx.is_future) return;
     if (tx.excluded) return;
+    if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
     if (accBalances[tx.account_id] !== undefined) {
       accBalances[tx.account_id] += Number(tx.amount) || 0;
@@ -242,7 +243,7 @@ function renderHeaderAndMetrics() {
     const totalBal = selAccs.reduce((sum, a) => {
       let bal = 0;
       state.transactions.forEach(tx => {
-        if (tx.account_id === a.id && !tx.is_future && !tx.excluded && isTxInPeriod(tx)) bal += Number(tx.amount) || 0;
+        if (tx.account_id === a.id && !tx.is_future && !tx.excluded && !tx.split_parent_id && isTxInPeriod(tx)) bal += Number(tx.amount) || 0;
       });
       return sum + bal;
     }, 0);

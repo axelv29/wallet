@@ -519,17 +519,32 @@ function setupKeyboardShortcuts() {
       toggleSearchBox();
       return;
     }
-    if (document.activeElement.id === 'tx-amount') {
-      if (e.key === '-') { e.preventDefault(); setTxSign(-1); }
-      if (e.key === '+') { e.preventDefault(); setTxSign(1); }
-    }
   });
 
   // Live preview when amount or date changes
   const amtInput  = document.getElementById('tx-amount');
   const dateInput = document.getElementById('tx-date');
+  const amtError  = document.getElementById('tx-amount-error');
   if (amtInput)  amtInput.addEventListener('input', () => {
     if (document.getElementById('tx-is-installment')?.checked) updateInstallmentPreview();
+    if (amtError) {
+      const v = amtInput.value.trim();
+      if (!v || isPlainNumber(v)) {
+        amtError.style.display = 'none';
+      } else {
+        let nv = v.replace(/,/g, '.');
+        const res = evaluateExpression(nv, state.settings.decimals);
+        if (res && res.error === 'too_large') {
+          amtError.textContent = 'Número demasiado grande';
+          amtError.style.display = '';
+        } else if (res && (res.error === 'syntax' || res.error === 'invalid')) {
+          amtError.textContent = 'Expresión inválida';
+          amtError.style.display = '';
+        } else {
+          amtError.style.display = 'none';
+        }
+      }
+    }
   });
   if (dateInput) dateInput.addEventListener('change', () => {
     if (document.getElementById('tx-is-installment')?.checked) updateInstallmentPreview();
@@ -649,6 +664,7 @@ window.toggleAccountClosingFieldsEdit = toggleAccountClosingFieldsEdit;
 window.saveAccountEdit            = saveAccountEdit;
 window.addPredefined             = addPredefined;
 window.removePredefined          = removePredefined;
+window.filterPredefinedList      = filterPredefinedList;
 window.addAccountType           = addAccountType;
 window.removeAccountType        = removeAccountType;
 window.editAccountType          = editAccountType;

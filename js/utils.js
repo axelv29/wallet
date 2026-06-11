@@ -83,6 +83,7 @@ function calculateBalances(accountIds) {
   state.transactions.forEach(tx => {
     if (tx.is_future) return;
     if (tx.excluded) return;
+    if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
     if (accFilter && !accFilter.has(tx.account_id)) return;
     const acc = state.accounts.find(a => a.id === tx.account_id);
@@ -190,6 +191,39 @@ function _tagColor(tag) {
   return { bg: `hsl(${hue}, 55%, 88%)`, text: `hsl(${hue}, 50%, 30%)` };
 }
 
+// ── CALCULADORA DE EXPRESIONES ─────────────────────────────
+function isPlainNumber(str) {
+  if (!str) return false;
+  return /^-?\d+([.,]\d+)?$/.test(str.trim());
+}
+
+function evaluateExpression(expr, decimals) {
+  if (!expr || typeof expr !== 'string') return null;
+  expr = expr.trim();
+  if (!expr) return null;
+
+  const normalized = expr.replace(/,/g, '.');
+  if (!/^[\d+\-*/().\s]+$/.test(normalized)) return null;
+
+  const numbers = normalized.match(/\d+\.?\d*/g);
+  if (numbers) {
+    for (const num of numbers) {
+      if (parseFloat(num) >= 1e15) return { value: null, error: 'too_large' };
+    }
+  }
+
+  try {
+    const result = Function('"use strict"; return (' + normalized + ')')();
+    if (typeof result !== 'number' || !isFinite(result)) return { value: null, error: 'invalid' };
+    if (Math.abs(result) >= 1e15) return { value: null, error: 'too_large' };
+
+    const d = decimals ?? 2;
+    return { value: parseFloat(result.toFixed(d)), error: null };
+  } catch (e) {
+    return { value: null, error: 'syntax' };
+  }
+}
+
 // ── opciones de edición por campo ────────────────────────────
 function getEditOptions(field, tx) {
   switch (field) {
@@ -242,9 +276,17 @@ function getEditOptions(field, tx) {
       const sign = tx.amount < 0 ? -1 : 1;
       return {
         type: 'number',
-        parser: v => {
-          const n = parseFloat(v);
-          return isNaN(n) ? null : sign * Math.abs(n);
+        parser: (v, rawText) => {
+          let n;
+          if (rawText && !isPlainNumber(rawText)) {
+            const res = evaluateExpression(rawText, state.settings.decimals);
+            if (!res || res.error) return null;
+            n = res.value;
+          } else {
+            n = parseFloat(v);
+            if (isNaN(n)) return null;
+          }
+          return sign * Math.abs(n);
         }
       };
     }

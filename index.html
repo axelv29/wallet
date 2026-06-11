@@ -724,10 +724,13 @@
               <div class="list-subsection">
                 <div class="list-subsection-title">Beneficiarios</div>
                 <div class="predefined-add-row" style="margin-bottom:6px;">
-                  <input type="text" id="add-payee-val" placeholder="Nuevo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('payees')}">
+                  <input type="text" id="add-payee-val" placeholder="Nuevo…"
+                    oninput="filterPredefinedList('payees')"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('payees')}">
                   <button class="btn btn-primary" onclick="addPredefined('payees')"><i data-lucide="plus"></i></button>
                 </div>
                 <ul class="predefined-scroll" id="predefined-payees-list"></ul>
+                <div class="predefined-dup-msg" id="predefined-dup-payees"></div>
               </div>
 
               <div class="list-subsection">
@@ -739,19 +742,25 @@
                       <div class="cat-picker-grid" id="cat-picker-grid"></div>
                     </div>
                   </div>
-                  <input type="text" id="add-category-val" placeholder="Nueva…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
+                  <input type="text" id="add-category-val" placeholder="Nueva…"
+                    oninput="filterPredefinedList('categories')"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
                   <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i></button>
                 </div>
                 <ul class="predefined-scroll" id="predefined-categories-list"></ul>
+                <div class="predefined-dup-msg" id="predefined-dup-categories"></div>
               </div>
 
               <div class="list-subsection">
                 <div class="list-subsection-title">Etiquetas</div>
                 <div class="predefined-add-row" style="margin-bottom:6px;">
-                  <input type="text" id="add-tag-val" placeholder="Nueva…" onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('tags')}">
+                  <input type="text" id="add-tag-val" placeholder="Nueva…"
+                    oninput="filterPredefinedList('tags')"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('tags')}">
                   <button class="btn btn-primary" onclick="addPredefined('tags')"><i data-lucide="plus"></i></button>
                 </div>
                 <ul class="predefined-scroll" id="predefined-tags-list"></ul>
+                <div class="predefined-dup-msg" id="predefined-dup-tags"></div>
               </div>
             </div>
           </div>
@@ -885,7 +894,10 @@
               <button type="button" class="sign-btn active-expense" id="btn-sign-expense" onclick="setTxSign(-1)">Gasto</button>
               <button type="button" class="sign-btn" id="btn-sign-income" onclick="setTxSign(1)">Ingreso</button>
             </div>
-            <input type="text" id="tx-amount" inputmode="decimal" placeholder="0" required>
+            <div style="position:relative;">
+              <input type="text" id="tx-amount" inputmode="decimal" placeholder="0" required>
+              <span id="tx-amount-error" class="calc-error-modal" style="display:none;"></span>
+            </div>
           </div>
         </div>
 

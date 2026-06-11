@@ -67,17 +67,22 @@ function dashGetTxForPeriod() {
   if (period.range && (period.range.start || period.range.end)) {
     txs = state.transactions.filter(tx => {
       if (tx.excluded) return false;
+      if (tx.split_parent_id) return false;
       if (period.range.start && tx.date < period.range.start) return false;
       if (period.range.end && tx.date > period.range.end) return false;
       return true;
     });
   } else if (period.year != null) {
     txs = state.transactions.filter(tx => {
+      if (tx.split_parent_id) return false;
       const d = new Date(tx.date + 'T00:00:00');
       return !tx.excluded && d.getMonth() === period.month && d.getFullYear() === period.year;
     });
   } else {
-    txs = state.transactions.filter(tx => !tx.excluded);
+    txs = state.transactions.filter(tx => {
+      if (tx.split_parent_id) return false;
+      return !tx.excluded;
+    });
   }
   if (dashState.accounts !== null) {
     const accSet = new Set(dashState.accounts);
@@ -819,7 +824,7 @@ function renderDashCharts() {
       const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
       state.transactions.forEach(tx => {
         const td = new Date(tx.date + 'T00:00:00');
-        if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded) {
+        if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded && !tx.split_parent_id) {
           if (accFilter && !accFilter.has(tx.account_id)) return;
           if (tx.amount > 0) inc += tx.amount;
           else exp += Math.abs(tx.amount);
