@@ -76,9 +76,106 @@ function getCategoryIcon(catName) {
   return `<span class="cat-icon"><i data-lucide="${icon}"></i></span>`;
 }
 
+// ── CREDIT CARD CYCLE HELPERS ───────────────────────────
+function getCurrentYearMonth() {
+  const now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+}
+
+function getCardSchedule(accountId, yearMonth) {
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc || acc.type !== 'credit_card' || !acc.card_schedule) return null;
+  return acc.card_schedule[yearMonth] || null;
+}
+
+function getCardScheduleMonths(accountId) {
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc || !acc.card_schedule) return [];
+  return Object.keys(acc.card_schedule).sort();
+}
+
+function yearMonthToDate(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1);
+}
+
+function dateToYearMonth(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function addMonths(ym, n) {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return dateToYearMonth(d);
+}
+
+function getCycleStartDate(accountId) {
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc || acc.type !== 'credit_card' || !acc.card_schedule) return null;
+
+  const now = new Date();
+  const today = now.getDate();
+  const currentYM = dateToYearMonth(now);
+  const prevYM = addMonths(currentYM, -1);
+
+  const currentSchedule = acc.card_schedule[currentYM];
+  const prevSchedule = acc.card_schedule[prevYM];
+
+  if (currentSchedule) {
+    if (today >= currentSchedule.closing) {
+      // After this month's closing → cycle started day after closing
+      const cycleStart = new Date(now.getFullYear(), now.getMonth(), currentSchedule.closing + 1);
+      return cycleStart;
+    } else {
+      // Before this month's closing → cycle started day after last month's closing
+      if (prevSchedule) {
+        const prevMonthDate = yearMonthToDate(currentYM);
+        const cycleStart = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), prevSchedule.closing + 1);
+        return cycleStart;
+      }
+      // No prev schedule → can't determine cycle start
+      return null;
+    }
+  }
+
+  // No current month schedule → try previous
+  if (prevSchedule) {
+    const prevMonthDate = yearMonthToDate(currentYM);
+    const cycleStart = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), prevSchedule.closing + 1);
+    return cycleStart;
+  }
+
+  return null;
+}
+
+function calculateCycleBalance(accountId) {
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc || acc.type !== 'credit_card') return 0;
+
+  const cycleStart = getCycleStartDate(accountId);
+  if (!cycleStart) return 0;
+
+  const settingsCur = state.settings.currency || 'ARS';
+  const accCur = acc.currency || settingsCur;
+  let total = 0;
+  const startStr = cycleStart.toISOString().split('T')[0];
+
+  state.transactions.forEach(tx => {
+    if (tx.account_id !== accountId) return;
+    if (tx.is_future) return;
+    if (tx.excluded) return;
+    if (tx.split_parent_id) return;
+    if (tx.date < startStr) return;
+    const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
+    total += (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+  });
+
+  return total;
+}
+
 function calculateBalances(accountIds) {
   const settingsCur = state.settings.currency || 'ARS';
-  const balances = { liquid: 0, credit_card: 0, receivables: 0 };
+  const balances = { liquid: 0, credit_card: 0, credit_card_cycle: 0, receivables: 0 };
   const accFilter = accountIds ? new Set(accountIds) : null;
   state.transactions.forEach(tx => {
     if (tx.is_future) return;
@@ -106,6 +203,21 @@ function calculateBalances(accountIds) {
       balances.receivables += (converted !== null && converted !== undefined) ? converted : absAmt;
     }
   });
+
+  // Calculate cycle balance for all credit card accounts
+  if (!accFilter) {
+    state.accounts.filter(a => a.type === 'credit_card').forEach(acc => {
+      balances.credit_card_cycle += calculateCycleBalance(acc.id);
+    });
+  } else {
+    accFilter.forEach(id => {
+      const acc = state.accounts.find(a => a.id === id);
+      if (acc && acc.type === 'credit_card') {
+        balances.credit_card_cycle += calculateCycleBalance(id);
+      }
+    });
+  }
+
   return balances;
 }
 

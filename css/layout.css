@@ -250,6 +250,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px 6px;
+  -webkit-user-select: none;
   user-select: none;
   border-bottom: 1px solid var(--border);
   margin: 0 14px 2px;
@@ -281,15 +282,15 @@
 
 .account-item-sidebar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: baseline;
   padding: 5px 14px 5px 18px;
   font-size: 13px;
   color: var(--text-mid);
   cursor: pointer;
   border-radius: 0;
   transition: background 0.08s, color 0.08s;
-  gap: 8px;
+  gap: 2px 8px;
 }
 
 .account-item-sidebar:hover {
@@ -316,6 +317,7 @@
   font-weight: 400;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 4px;

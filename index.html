@@ -8,17 +8,46 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/settings.css">
-  <link rel="stylesheet" href="css/dashboard.css">
-  <link rel="stylesheet" href="css/helpers.css">
-  <link rel="stylesheet" href="css/period.css">
+  <script src="vendor/lucide.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="css/base.css?v=4">
+  <link rel="stylesheet" href="css/layout.css?v=4">
+  <link rel="stylesheet" href="css/components.css?v=4">
+  <link rel="stylesheet" href="css/settings.css?v=4">
+  <link rel="stylesheet" href="css/dashboard.css?v=4">
+  <link rel="stylesheet" href="css/helpers.css?v=4">
+  <link rel="stylesheet" href="css/period.css?v=4">
+  <script>
+    (function() {
+      try {
+        var s = JSON.parse(localStorage.getItem('wallet_settings'));
+        if (s) {
+          var html = document.documentElement;
+          var scheme = s.colorScheme || 'default';
+          if (s.theme === 'dark') {
+            html.classList.add('theme-dark');
+          } else {
+            html.classList.add('theme-light');
+          }
+          if (scheme === 'custom') {
+            if (s.customColors && s.customGeneratedVars) {
+              var style = document.createElement('style');
+              style.textContent = ':root {\n' + s.customGeneratedVars + '\n}';
+              document.head.appendChild(style);
+            }
+          } else if (scheme !== 'default') {
+            html.classList.add('scheme-' + scheme);
+          }
+        } else {
+          document.documentElement.classList.add('theme-light');
+        }
+      } catch(e) {
+        document.documentElement.classList.add('theme-light');
+      }
+    })();
+  </script>
 </head>
-<body class="theme-light">
+<body>
 
 <div class="app-container">
 
@@ -128,9 +157,19 @@
 
       <div class="toolbar">
         <div class="toolbar-left">
-          <button class="btn btn-primary" onclick="openTransactionModal()">
-            <i data-lucide="plus"></i> Nueva transacción
-          </button>
+          <div class="split-btn" id="new-tx-split">
+            <button class="btn btn-primary split-btn-main" onclick="openTransactionModal()">
+              <i data-lucide="plus"></i> Nueva transacción
+            </button>
+            <button class="btn btn-primary split-btn-arrow" onclick="toggleSplitDropdown(event)" title="Más opciones">
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="split-dropdown" id="split-dropdown">
+              <button class="split-dropdown-item" onclick="openTransferModal();closeSplitDropdown()">
+                <i data-lucide="arrow-left-right"></i> Transferencia
+              </button>
+            </div>
+          </div>
           <button class="btn" onclick="openImportModal()">
             <i data-lucide="file-spreadsheet"></i> Importar
           </button>
@@ -157,7 +196,7 @@
               <i data-lucide="search"></i>
             </button>
             <div class="search-input-wrap">
-              <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" oninput="renderTransactions()">
+              <input type="text" id="tx-search-input" placeholder="Buscar movimientos…" aria-label="Buscar movimientos" oninput="renderTransactions()">
             </div>
           </div>
         </div>
@@ -179,7 +218,7 @@
           <table class="ledger">
             <thead>
               <tr>
-                <th class="c" style="width:36px; min-width:36px;"><input type="checkbox" class="tx-select-all" id="tx-select-all" onchange="toggleSelectAll()"></th>
+                <th class="c" style="width:36px; min-width:36px;"><input type="checkbox" class="tx-select-all" id="tx-select-all" aria-label="Seleccionar todo" onchange="toggleSelectAll()"></th>
                 <th class="col-resizable col-sortable" data-sort="date" onclick="toggleSort('date')" style="min-width:95px; width:95px;"><span class="col-sort-label">Fecha</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-account col-sortable" data-sort="account" onclick="toggleSort('account')" style="min-width:115px; width:130px;"><span class="col-sort-label">Cuenta</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-sortable" data-sort="payee" onclick="toggleSort('payee')" style="min-width:150px; width:160px;"><span class="col-sort-label">Beneficiario</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
@@ -495,7 +534,7 @@
               <div class="pane-subsection-title">Moneda</div>
               <form onsubmit="saveCurrencySettings(event)">
                 <div class="form-group">
-                  <label class="form-label">Divisa</label>
+                  <label class="form-label" for="set-currency">Divisa</label>
                   <select id="set-currency" class="sel-fit">
                     <option value="ARS">ARS Peso argentino</option>
                     <option value="USD">USD Dólar</option>
@@ -511,7 +550,7 @@
                   </label>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Decimales</label>
+                  <label class="form-label" for="set-decimals">Decimales</label>
                   <select id="set-decimals" class="sel-fit">
                     <option value="0">0</option>
                     <option value="1">1</option>
@@ -546,7 +585,7 @@
         <div class="pane-subsection-title">API</div>
               <form onsubmit="saveGeneralSettings(event)">
                 <div class="form-group">
-                  <label class="form-label">Gemini API Key</label>
+                  <label class="form-label" for="set-gemini-key">Gemini API Key</label>
                   <input type="password" id="set-gemini-key" placeholder="AIzaSy…" style="max-width:380px;">
                   <span class="help-note">Se almacena solo en localStorage.</span>
                 </div>
@@ -660,21 +699,21 @@
                 <div class="pane-subsection-title">Nueva cuenta</div>
                 <form onsubmit="createNewAccount(event)">
                   <div class="form-group">
-                    <label class="form-label">Nombre</label>
+                    <label class="form-label" for="acc-name">Nombre</label>
                     <input type="text" id="acc-name" placeholder="Ej. Visa Santander, Efectivo" required>
                   </div>
                   <div class="form-row">
                     <div class="form-group">
-                      <label class="form-label">Tipo</label>
+                      <label class="form-label" for="acc-type">Tipo</label>
                       <select id="acc-type" onchange="toggleAccountClosingFields(this.value)" required></select>
                     </div>
                     <div class="form-group">
-                      <label class="form-label">Ajuste de saldo</label>
+                      <label class="form-label" for="acc-balance">Ajuste de saldo</label>
                       <input type="number" step="0.01" id="acc-balance" value="0.00" required>
                     </div>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Moneda</label>
+                    <label class="form-label" for="acc-currency">Moneda</label>
                     <select id="acc-currency" required>
                       <option value="ARS">ARS Peso argentino</option>
                       <option value="USD">USD Dólar</option>
@@ -685,11 +724,11 @@
                   <div class="closing-fields" id="cc-closing-fields" style="display:none;">
                     <div class="form-row">
                       <div class="form-group">
-                        <label class="form-label">Día de cierre</label>
+                        <label class="form-label" for="acc-close-day">Día de cierre</label>
                         <input type="number" id="acc-close-day" min="1" max="31" placeholder="20">
                       </div>
                       <div class="form-group">
-                        <label class="form-label">Día de vencimiento</label>
+                        <label class="form-label" for="acc-due-day">Día de vencimiento</label>
                         <input type="number" id="acc-due-day" min="1" max="31" placeholder="30">
                       </div>
                     </div>
@@ -708,7 +747,7 @@
               <div class="pane-subsection-title">Tipos de cuenta</div>
               <div style="max-width:340px;">
                 <div class="predefined-add-row" style="margin-bottom:10px;">
-                  <input type="text" id="add-acc-type-val" placeholder="Nuevo tipo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addAccountType()}">
+                  <input type="text" id="add-acc-type-val" aria-label="Nuevo tipo de cuenta" placeholder="Nuevo tipo…" onkeydown="if(event.key==='Enter'){event.preventDefault();addAccountType()}">
                   <button class="btn btn-primary" onclick="addAccountType()"><i data-lucide="plus"></i></button>
                 </div>
                 <ul class="predefined-scroll" id="predefined-account-types-list"></ul>
@@ -724,7 +763,7 @@
               <div class="list-subsection">
                 <div class="list-subsection-title">Beneficiarios</div>
                 <div class="predefined-add-row" style="margin-bottom:6px;">
-                  <input type="text" id="add-payee-val" placeholder="Nuevo…"
+                  <input type="text" id="add-payee-val" aria-label="Nuevo beneficiario" placeholder="Nuevo…"
                     oninput="filterPredefinedList('payees')"
                     onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('payees')}">
                   <button class="btn btn-primary" onclick="addPredefined('payees')"><i data-lucide="plus"></i></button>
@@ -742,7 +781,7 @@
                       <div class="cat-picker-grid" id="cat-picker-grid"></div>
                     </div>
                   </div>
-                  <input type="text" id="add-category-val" placeholder="Nueva…"
+                  <input type="text" id="add-category-val" aria-label="Nueva categoría" placeholder="Nueva…"
                     oninput="filterPredefinedList('categories')"
                     onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('categories')}">
                   <button class="btn btn-primary" onclick="addPredefined('categories')"><i data-lucide="plus"></i></button>
@@ -754,7 +793,7 @@
               <div class="list-subsection">
                 <div class="list-subsection-title">Etiquetas</div>
                 <div class="predefined-add-row" style="margin-bottom:6px;">
-                  <input type="text" id="add-tag-val" placeholder="Nueva…"
+                  <input type="text" id="add-tag-val" aria-label="Nueva etiqueta" placeholder="Nueva…"
                     oninput="filterPredefinedList('tags')"
                     onkeydown="if(event.key==='Enter'){event.preventDefault();addPredefined('tags')}">
                   <button class="btn btn-primary" onclick="addPredefined('tags')"><i data-lucide="plus"></i></button>
@@ -775,11 +814,11 @@
               <div class="backup-export-row">
                 <div class="form-row" style="align-items:end;">
                   <div class="form-group">
-                    <label class="form-label">Desde</label>
+                    <label class="form-label" for="backup-date-from">Desde</label>
                     <input type="date" id="backup-date-from">
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Hasta</label>
+                    <label class="form-label" for="backup-date-to">Hasta</label>
                     <input type="date" id="backup-date-to">
                   </div>
                   <div class="form-group">
@@ -862,17 +901,17 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Fecha</label>
+            <label class="form-label" for="tx-date">Fecha</label>
             <input type="date" id="tx-date">
           </div>
           <div class="form-group">
-            <label class="form-label">Cuenta</label>
+            <label class="form-label" for="tx-account">Cuenta</label>
             <select id="tx-account" required onchange="onAccountChangeInModal()"></select>
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Beneficiario</label>
+          <label class="form-label" for="tx-payee-search">Beneficiario</label>
           <div class="searchable-wrap">
             <input type="text" id="tx-payee-search" placeholder="Nombre de quien envía o recibe…" autocomplete="off">
             <div class="searchable-dropdown" id="dropdown-payee"><ul id="dropdown-payee-list"></ul></div>
@@ -880,7 +919,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Categoría</label>
+          <label class="form-label" for="tx-category-search">Categoría</label>
           <div class="searchable-wrap">
             <input type="text" id="tx-category-search" placeholder="Buscar o crear categoría…" autocomplete="off" required>
             <div class="searchable-dropdown" id="dropdown-category"><ul id="dropdown-category-list"></ul></div>
@@ -888,7 +927,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Monto</label>
+          <label class="form-label" for="tx-amount">Monto</label>
           <div class="amount-row">
             <div class="sign-toggle">
               <button type="button" class="sign-btn active-expense" id="btn-sign-expense" onclick="setTxSign(-1)">Gasto</button>
@@ -913,15 +952,15 @@
           <div id="tx-installment-editor" style="display:none;">
             <div class="installment-editor-body">
               <div class="form-group" style="flex:1; margin-bottom:0;">
-                <label class="form-label">Número de cuotas</label>
+                <label class="form-label" for="tx-installment-count">Número de cuotas</label>
                 <div class="compound-input">
-                  <input type="number" id="tx-installment-index" min="1" max="48" value="1" oninput="updateInstallmentPreview()">
+                  <input type="number" id="tx-installment-index" aria-label="Índice de cuota" min="1" max="48" value="1" oninput="updateInstallmentPreview()">
                   <span class="compound-sep">/</span>
                   <input type="number" id="tx-installment-count" min="2" max="48" value="3" oninput="updateInstallmentPreview()">
                 </div>
               </div>
               <div class="form-group" style="flex:1; margin-bottom:0;">
-                <label class="form-label">Por cuota</label>
+                <label class="form-label" for="inst-cuota-input">Por cuota</label>
                 <div class="compound-input">
                   <input type="text" id="inst-cuota-input" class="inst-cuota-input" inputmode="decimal" placeholder="0" oninput="onCuotaInput()">
                 </div>
@@ -944,7 +983,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Notas</label>
+          <label class="form-label" for="tx-notes">Notas</label>
           <input type="text" id="tx-notes" placeholder="Comentario opcional…">
         </div>
 
@@ -961,11 +1000,11 @@
         <div id="tx-receivable-details" class="receivable-section" style="display:none;">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Persona / Deudor</label>
+              <label class="form-label" for="tx-debtor">Persona / Deudor</label>
               <input type="text" id="tx-debtor" placeholder="Nombre del deudor">
             </div>
             <div class="form-group">
-              <label class="form-label">Fecha de cobro estimada</label>
+              <label class="form-label" for="tx-due-date">Fecha de cobro estimada</label>
               <input type="date" id="tx-due-date">
             </div>
           </div>
@@ -975,6 +1014,67 @@
       <div class="modal-foot">
         <button type="button" class="btn" onclick="closeTransactionModal()">Cancelar</button>
         <button type="submit" class="btn btn-primary">Guardar transacción</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Transferencia entre cuentas ══════════════ -->
+<div class="modal-overlay" id="transfer-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="modal-title">Transferencia entre cuentas</span>
+      <button class="modal-close" onclick="closeTransferModal()"><i data-lucide="x"></i></button>
+    </div>
+    <form id="transfer-form" onsubmit="handleTransferSubmit(event)" novalidate>
+      <div class="modal-body">
+
+        <!-- Date -->
+        <div class="form-group">
+          <label class="form-label" for="tf-date">Fecha</label>
+          <input type="date" id="tf-date">
+        </div>
+
+        <!-- Origin + Destination accounts -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="tf-account-from">Desde</label>
+            <select id="tf-account-from" required onchange="onTransferAccountChange()"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tf-account-to">Hacia</label>
+            <select id="tf-account-to" required onchange="updateTransferConvertedNote()"></select>
+          </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="form-group">
+          <label class="form-label" for="tf-amount">Monto</label>
+          <div class="tf-amount-wrap">
+            <input type="text" id="tf-amount" inputmode="decimal" placeholder="0" required>
+            <span class="tf-amount-currency" id="tf-amount-currency"></span>
+          </div>
+          <div class="tf-converted-note" id="tf-converted-note" style="display:none;"></div>
+        </div>
+
+        <!-- Tags -->
+        <div class="form-group">
+          <label class="form-label">Etiquetas</label>
+          <div class="tags-wrapper">
+            <div class="tags-box" id="tf-tags-checklist"></div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group">
+          <label class="form-label" for="tf-notes">Nota</label>
+          <input type="text" id="tf-notes" placeholder="Comentario opcional...">
+        </div>
+
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" onclick="closeTransferModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Transferir</button>
       </div>
     </form>
   </div>
@@ -997,7 +1097,7 @@
             <span class="csv-dropzone-title">Arrastrá tu archivo acá</span>
             <span class="csv-dropzone-sub">o hacé clic para seleccionar · CSV, XLS o XLSX</span>
           </div>
-          <input type="file" id="csv-file-input" accept=".csv,.xls,.xlsx" style="display:none;" onchange="onCsvFileSelected(event)">
+          <input type="file" id="csv-file-input" aria-label="Subir archivo CSV o XLS" accept=".csv,.xls,.xlsx" style="display:none;" onchange="onCsvFileSelected(event)">
         </div>
         <div class="csv-samples">
           <span class="csv-samples-label">O probá con un archivo de ejemplo:</span>
@@ -1009,7 +1109,7 @@
           <button class="btn csv-ai-btn" onclick="document.getElementById('csv-ai-file-input').click()">
             <i data-lucide="sparkles"></i> Importar con IA
           </button>
-          <input type="file" id="csv-ai-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp" style="display:none;" onchange="onAiFileSelected(event)">
+          <input type="file" id="csv-ai-file-input" aria-label="Subir PDF o imagen para importación con IA" accept=".pdf,.png,.jpg,.jpeg,.webp" style="display:none;" onchange="onAiFileSelected(event)">
         </div>
       </div>
 
@@ -1031,11 +1131,11 @@
         <!-- Settings row -->
         <div class="csv-settings">
           <div class="form-group">
-            <label class="form-label">Cuenta destino</label>
+            <label class="form-label" for="csv-target-account">Cuenta destino</label>
             <select id="csv-target-account"></select>
           </div>
           <div class="form-group">
-            <label class="form-label">Separador</label>
+            <label class="form-label" for="csv-separator">Separador</label>
             <select id="csv-separator" onchange="reparseCsv()">
               <option value="auto">Auto-detectar</option>
               <option value=";">Punto y coma (;)</option>
@@ -1044,7 +1144,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Formato fecha</label>
+            <label class="form-label" for="csv-date-format">Formato fecha</label>
             <select id="csv-date-format" onchange="onCsvMappingChange()">
               <option value="auto">Auto-detectar</option>
               <option value="dd/mm/yyyy">DD/MM/YYYY</option>
@@ -1054,7 +1154,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Formato números</label>
+            <label class="form-label" for="csv-number-format">Formato números</label>
             <select id="csv-number-format" onchange="reparseCsv()">
               <option value="auto">Auto-detectar</option>
               <option value="eu">1.234,56 (Argentina/Europa)</option>
@@ -1191,23 +1291,23 @@
     <div class="modal-body" style="padding:16px;">
       <form onsubmit="createAccountFromFloating(event)">
         <div class="form-group">
-          <label class="form-label">Nombre</label>
+          <label class="form-label" for="acc-f-name">Nombre</label>
           <input type="text" id="acc-f-name" placeholder="Ej. Visa Santander, Efectivo" required>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Tipo</label>
+            <label class="form-label" for="acc-f-type">Tipo</label>
             <select id="acc-f-type" onchange="toggleAccountClosingFieldsFloating(this.value)" required style="padding-right:28px;">
               <option value="">Tipo de cuenta</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Ajuste de saldo</label>
+            <label class="form-label" for="acc-f-balance">Ajuste de saldo</label>
             <input type="number" step="0.01" id="acc-f-balance" value="0.00" required>
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Moneda</label>
+          <label class="form-label" for="acc-f-currency">Moneda</label>
           <select id="acc-f-currency" required style="padding-right:28px;">
             <option value="UYU">UYU Peso uruguayo</option>
             <option value="ARS">ARS Peso argentino</option>
@@ -1218,11 +1318,11 @@
         <div class="closing-fields" id="cc-f-closing-fields" style="display:none;">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Día de cierre</label>
+              <label class="form-label" for="acc-f-close-day">Día de cierre</label>
               <input type="number" id="acc-f-close-day" min="1" max="31" placeholder="20">
             </div>
             <div class="form-group">
-              <label class="form-label">Día de vencimiento</label>
+              <label class="form-label" for="acc-f-due-day">Día de vencimiento</label>
               <input type="number" id="acc-f-due-day" min="1" max="31" placeholder="30">
             </div>
           </div>
@@ -1245,16 +1345,16 @@
       <form onsubmit="saveAccountEdit(event)">
         <input type="hidden" id="acc-edit-id">
         <div class="form-group">
-          <label class="form-label">Nombre</label>
+          <label class="form-label" for="acc-edit-name">Nombre</label>
           <input type="text" id="acc-edit-name" placeholder="Nombre de la cuenta" required>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Tipo</label>
+            <label class="form-label" for="acc-edit-type">Tipo</label>
             <select id="acc-edit-type" onchange="toggleAccountClosingFieldsEdit(this.value)" required style="padding-right:28px;"></select>
           </div>
           <div class="form-group">
-            <label class="form-label">Moneda</label>
+            <label class="form-label" for="acc-edit-currency">Moneda</label>
             <select id="acc-edit-currency" required style="padding-right:28px;">
               <option value="ARS">ARS Peso argentino</option>
               <option value="USD">USD Dólar</option>
@@ -1264,24 +1364,16 @@
           </div>
         </div>
         <div class="closing-fields" id="cc-edit-closing-fields" style="display:none;">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Día de cierre</label>
-              <input type="number" id="acc-edit-close-day" min="1" max="31" placeholder="20">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Día de vencimiento</label>
-              <input type="number" id="acc-edit-due-day" min="1" max="31" placeholder="30">
-            </div>
-          </div>
-          <div class="cc-note">Los días de cierre y vencimiento se usan para calcular la deuda del período activo.</div>
+          <button type="button" class="btn" onclick="openCcScheduleModal(document.getElementById('acc-edit-id').value)" style="width:100%;justify-content:center;">
+            <i data-lucide="calendar"></i> Calendario de cierre
+          </button>
         </div>
         <div style="margin-top:10px;">
           <button type="button" class="btn" onclick="openBalanceFromEditModal()" style="width:100%;justify-content:center;">
             <i data-lucide="scale"></i> Ajustar saldo
           </button>
         </div>
-        <div class="modal-foot" style="padding:12px 0 0; border-top:1px solid var(--border); margin-top:8px;">
+        <div class="modal-foot" style="padding:12px 16px 0; border-top:1px solid var(--border); margin-top:12px; display:flex; justify-content:flex-end; gap:8px;">
           <button type="button" class="btn" onclick="closeEditAccountModal()">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar cambios</button>
         </div>
@@ -1290,30 +1382,64 @@
   </div>
 </div>
 
-<!-- ══════════════ MODAL: Ajustar saldo ══════════════ -->
-<div class="modal-overlay" id="balance-modal">
-  <div class="modal-card" style="max-width:320px;">
+<!-- ══════════════ MODAL: Calendario de cierre ══════════════ -->
+<div class="modal-overlay" id="cc-schedule-modal">
+  <div class="modal-card" style="max-width:340px;">
     <div class="modal-head">
-      <span class="modal-title">Ajustar saldo</span>
-      <button class="modal-close" onclick="closeBalanceModal()"><i data-lucide="x"></i></button>
+      <span class="modal-title" id="cc-schedule-title">Calendario de cierre</span>
+      <button class="modal-close" onclick="closeCcScheduleModal()"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body" style="padding:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--r-sm);background:var(--bg-sunken);border:1px solid var(--border);margin-bottom:12px;">
-        <span id="balance-account-name" style="color:var(--text-mid);font-size:12px;">—</span>
-        <span id="balance-current" style="color:var(--text-lo);font-size:12px;">—</span>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="cc-schedule-month">Mes</label>
+          <select id="cc-schedule-month" class="form-select"></select>
+        </div>
       </div>
-      <div style="text-align:center;margin-bottom:8px;">
-        <i data-lucide="arrow-down" style="width:14px;height:14px;color:var(--text-lo);"></i>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="cc-schedule-closing">Cierre</label>
+          <input id="cc-schedule-closing" type="number" min="1" max="31" class="form-input" placeholder="día">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="cc-schedule-due">Vencimiento</label>
+          <input id="cc-schedule-due" type="number" min="1" max="31" class="form-input" placeholder="día">
+        </div>
       </div>
-      <div class="form-group">
-        <input type="number" step="0.01" id="balance-target" style="text-align:center;font-size:15px;border-bottom-width:2px;border-radius:var(--r-sm) var(--r-sm) 0 0;" oninput="updateBalanceDiff()">
-      </div>
-      <div id="balance-diff-wrap" style="text-align:center;padding:8px 0 2px;">
-        <span id="balance-diff" style="color:var(--text-mid);font-size:12px;">—</span>
-      </div>
+      <div class="cc-note" style="margin-top:8px;">Al cambiar de mes se guarda automáticamente.</div>
     </div>
     <div class="modal-foot" style="padding:12px 16px; border-top:1px solid var(--border);">
-      <button type="button" class="btn" onclick="closeBalanceModal()">Cancelar</button>
+      <button type="button" class="btn" onclick="closeCcScheduleModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Ajustar saldo ══════════════ -->
+<div class="modal-overlay" id="balance-modal">
+  <div class="modal-card balance-modal-card">
+    <div class="balance-modal-header">
+      <button class="modal-close balance-modal-close" onclick="closeBalanceModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="balance-modal-body">
+      <div class="balance-modal-icon">
+        <i data-lucide="wallet" style="width:22px;height:22px;color:var(--accent);"></i>
+      </div>
+      <span class="balance-modal-title">Ajustar saldo</span>
+      <div class="balance-modal-account">
+        <span id="balance-account-name" class="balance-account-name">—</span>
+        <span id="balance-current" class="balance-current-val">—</span>
+      </div>
+      <div class="balance-input-wrap">
+        <label for="balance-target" class="sr-only">Nuevo saldo</label>
+        <input type="number" step="0.01" id="balance-target" aria-label="Nuevo saldo" class="balance-target-input" oninput="updateBalanceDiff()">
+      </div>
+      <div id="balance-diff-wrap" class="balance-diff-wrap">
+        <i data-lucide="arrow-down" class="balance-diff-arrow" style="width:12px;height:12px;"></i>
+        <span id="balance-diff" class="balance-diff-val">—</span>
+      </div>
+    </div>
+    <div class="balance-modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeBalanceModal()">Cancelar</button>
       <button type="button" class="btn btn-primary" onclick="confirmBalanceAdjustment()">Aplicar</button>
     </div>
   </div>
@@ -1414,7 +1540,7 @@
             <span class="csv-dropzone-title">Seleccioná tu archivo de backup</span>
             <span class="csv-dropzone-sub">o arrastralo acá · Archivo .json</span>
           </div>
-          <input type="file" id="import-backup-input" accept=".json" style="display:none;" onchange="onImportBackupFile(event)">
+          <input type="file" id="import-backup-input" aria-label="Seleccionar archivo de backup" accept=".json" style="display:none;" onchange="onImportBackupFile(event)">
         </div>
       </div>
       <div id="import-backup-preview" style="display:none;">

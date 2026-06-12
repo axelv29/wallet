@@ -93,8 +93,11 @@ function createAccountFromFloating(event) {
 
   const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
   if (type === 'credit_card') {
-    newAcc.card_closing_day = parseInt(document.getElementById('acc-f-close-day').value) || 1;
-    newAcc.card_due_day     = parseInt(document.getElementById('acc-f-due-day').value)   || 10;
+    const closing = parseInt(document.getElementById('acc-f-close-day').value) || 1;
+    const due = parseInt(document.getElementById('acc-f-due-day').value) || 10;
+    const ym = getCurrentYearMonth();
+    newAcc.card_schedule = {};
+    newAcc.card_schedule[ym] = { closing, due };
   }
 
   state.accounts.push(newAcc);
@@ -140,8 +143,11 @@ function createNewAccount(event) {
 
   const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
   if (type === 'credit_card') {
-    newAcc.card_closing_day = parseInt(document.getElementById('acc-close-day').value) || 1;
-    newAcc.card_due_day     = parseInt(document.getElementById('acc-due-day').value)   || 10;
+    const closing = parseInt(document.getElementById('acc-close-day').value) || 1;
+    const due = parseInt(document.getElementById('acc-due-day').value) || 10;
+    const ym = getCurrentYearMonth();
+    newAcc.card_schedule = {};
+    newAcc.card_schedule[ym] = { closing, due };
   }
 
   state.accounts.push(newAcc);
@@ -195,13 +201,21 @@ function renderSettingsAccountsList() {
     const accCur = acc.currency || settingsCur;
     const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
     const typeLabel = getAccountTypeLabel(acc.type);
+    let scheduleInfo = '';
+    if (acc.type === 'credit_card' && acc.card_schedule) {
+      const ym = getCurrentYearMonth();
+      const sch = acc.card_schedule[ym];
+      if (sch) {
+        scheduleInfo = ' · cierre ' + sch.closing;
+      }
+    }
     const item = document.createElement('div');
     item.className = 'account-list-item';
     item.style.cursor = 'pointer';
     item.innerHTML = `
       <div class="acc-list-info">
         <span class="acc-list-name">${acc.name}</span>
-        <span class="acc-list-type">${typeLabel}${acc.card_closing_day ? ' · cierra día ' + acc.card_closing_day : ''}${curLabel}</span>
+        <span class="acc-list-type">${typeLabel}${scheduleInfo}${curLabel}</span>
       </div>
       <span class="acc-list-actions">
         <button class="delete-btn" onclick="event.stopPropagation();openEditAccountModal('${acc.id}')" title="Editar"><i data-lucide="pencil"></i></button>
@@ -226,8 +240,6 @@ function openEditAccountModal(accId) {
   document.getElementById('acc-edit-id').value = acc.id;
   document.getElementById('acc-edit-name').value = acc.name;
   document.getElementById('acc-edit-currency').value = acc.currency || state.settings.currency || 'ARS';
-  document.getElementById('acc-edit-close-day').value = acc.card_closing_day || '';
-  document.getElementById('acc-edit-due-day').value = acc.card_due_day || '';
   // Populate type select
   const typeEl = document.getElementById('acc-edit-type');
   const types = state.predefined.account_types || [];
@@ -254,6 +266,72 @@ function toggleAccountClosingFieldsEdit(type) {
   if (el) el.style.display = type === 'credit_card' ? 'block' : 'none';
 }
 
+function openCcScheduleModal(accId) {
+  const acc = state.accounts.find(a => a.id === accId);
+  if (!acc) return;
+  ccScheduleAccountId = accId;
+
+  document.getElementById('cc-schedule-title').textContent = 'Calendario — ' + acc.name;
+
+  const monthSelect = document.getElementById('cc-schedule-month');
+  monthSelect.innerHTML = '';
+  const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  for (let i = 0; i < 12; i++) {
+    const ym = addMonths(getCurrentYearMonth(), i);
+    const [y, m] = ym.split('-').map(Number);
+    const opt = document.createElement('option');
+    opt.value = ym;
+    opt.textContent = monthNamesShort[m] + ' ' + y;
+    monthSelect.appendChild(opt);
+  }
+
+  let currentYm = monthSelect.value;
+  ccSchedulePrevYm = currentYm;
+  loadScheduleForMonth(acc, currentYm);
+
+  monthSelect.addEventListener('change', () => {
+    saveCurrentMonthSchedule(acc, ccSchedulePrevYm);
+    ccSchedulePrevYm = monthSelect.value;
+    loadScheduleForMonth(acc, monthSelect.value);
+    saveData('accounts');
+  });
+
+  document.getElementById('cc-schedule-modal').classList.add('open');
+  lucide.createIcons();
+}
+
+function loadScheduleForMonth(acc, ym) {
+  const sch = acc.card_schedule ? acc.card_schedule[ym] : null;
+  document.getElementById('cc-schedule-closing').value = sch ? sch.closing : '';
+  document.getElementById('cc-schedule-due').value = sch ? sch.due : '';
+}
+
+function saveCurrentMonthSchedule(acc, ym) {
+  if (!ym) return;
+  const closing = parseInt(document.getElementById('cc-schedule-closing').value);
+  const due = parseInt(document.getElementById('cc-schedule-due').value);
+  if (!acc.card_schedule) acc.card_schedule = {};
+  if (closing && due && closing >= 1 && closing <= 31 && due >= 1 && due <= 31) {
+    acc.card_schedule[ym] = { closing, due };
+  } else {
+    delete acc.card_schedule[ym];
+    if (Object.keys(acc.card_schedule).length === 0) delete acc.card_schedule;
+  }
+}
+
+function closeCcScheduleModal() {
+  const acc = state.accounts.find(a => a.id === ccScheduleAccountId);
+  if (acc) {
+    saveCurrentMonthSchedule(acc, ccSchedulePrevYm);
+    saveData('accounts');
+  }
+  document.getElementById('cc-schedule-modal').classList.remove('open');
+  ccScheduleAccountId = null;
+  ccSchedulePrevYm = null;
+  renderSettingsAccountsList();
+  renderAll();
+}
+
 function saveAccountEdit(event) {
   event.preventDefault();
   const id = document.getElementById('acc-edit-id').value;
@@ -262,12 +340,8 @@ function saveAccountEdit(event) {
   acc.name = document.getElementById('acc-edit-name').value.trim();
   acc.type = document.getElementById('acc-edit-type').value;
   acc.currency = document.getElementById('acc-edit-currency').value;
-  if (acc.type === 'credit_card') {
-    acc.card_closing_day = parseInt(document.getElementById('acc-edit-close-day').value) || null;
-    acc.card_due_day = parseInt(document.getElementById('acc-edit-due-day').value) || null;
-  } else {
-    delete acc.card_closing_day;
-    delete acc.card_due_day;
+  if (acc.type !== 'credit_card') {
+    delete acc.card_schedule;
   }
   saveData('accounts');
   closeEditAccountModal();
@@ -576,6 +650,7 @@ function startRename(type, item, targetEl) {
   input.className = 'predefined-rename-input';
   input.value = name;
   input.setAttribute('autocomplete', 'off');
+  input.setAttribute('aria-label', 'Renombrar ' + name);
 
   const finish = save => {
     const val = input.value.trim().replace(/#/g, '');

@@ -57,6 +57,8 @@ function renderSidebar() {
     }
   });
 
+  const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
   const makeItem = (acc) => {
     const li = document.createElement('li');
     const isActive = state.selectedAccounts.length > 0
@@ -79,8 +81,15 @@ function renderSidebar() {
     const accCurrency = acc.currency || settingsCur;
     const tooltip = getConvertedTooltip(val, accCurrency);
     const showCurrencyCode = accCurrency !== settingsCur;
+
+    // Credit card schedule info (removed as per request)
+    let scheduleHtml = '';
+
+
+
     li.innerHTML = `
       <span class="acc-name-sidebar">${acc.name}${showCurrencyCode ? ' <span class="acc-currency-code">' + accCurrency + '</span>' : ''}</span>
+      ${scheduleHtml ? scheduleHtml : ''}
       <span class="acc-balance-sidebar ${val < 0 ? 'negative' : ''}" ${tooltip ? 'title="' + tooltip + '"' : ''}>${formatAccountCurrency(val, accCurrency)}</span>
     `;
     return li;
@@ -217,6 +226,7 @@ function renderHeaderAndMetrics() {
 
   let title    = 'Todas las cuentas';
   let subtitle = 'Resumen general de movimientos';
+  state._subtitleHtml = false;
 
   if (state.currentView === 'receivables') {
     title    = 'Préstamos a cobrar';
@@ -256,9 +266,21 @@ function renderHeaderAndMetrics() {
       const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
       const accBal = calculateAccountBalance(acc.id);
       title = acc.name;
-      subtitle = acc.type === 'credit_card'
-        ? `Tarjeta · cierre día ${acc.card_closing_day || '—'} · vencimiento día ${acc.card_due_day || '—'}${curLabel}`
-        : getAccountTypeLabel(acc.type) + curLabel;
+      if (acc.type === 'credit_card') {
+        const ym = getCurrentYearMonth();
+        const sch = getCardSchedule(acc.id, ym);
+        if (sch) {
+          const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+          const [, m] = ym.split('-').map(Number);
+          subtitle = `Tarjeta · cierre ${sch.closing} ${monthNamesShort[m]} · vence ${sch.due} ${monthNamesShort[m]}${curLabel} <i data-lucide="calendar-check" class="schedule-icon" onclick="event.preventDefault();openCcScheduleModal('${acc.id}')"></i>`;
+        } else {
+          subtitle = `Tarjeta · Configurar cierre y vencimiento${curLabel} <i data-lucide="calendar-check" class="schedule-icon" onclick="event.preventDefault();openCcScheduleModal('${acc.id}')"></i>`;
+        }
+        state._subtitleHtml = true;
+      } else {
+        subtitle = getAccountTypeLabel(acc.type) + curLabel;
+        state._subtitleHtml = false;
+      }
     }
   }
 
@@ -282,7 +304,13 @@ function renderHeaderAndMetrics() {
   }
   const subtitleTextEl = document.getElementById('view-subtitle-text');
   const addBtn = document.getElementById('subtitle-add-btn');
-  if (subtitleTextEl) subtitleTextEl.textContent = subtitle;
+  if (subtitleTextEl) {
+    if (state._subtitleHtml) {
+      subtitleTextEl.innerHTML = subtitle;
+    } else {
+      subtitleTextEl.textContent = subtitle;
+    }
+  }
 
   // Show/hide and configure the "+" button for adding accounts
   if (addBtn) {

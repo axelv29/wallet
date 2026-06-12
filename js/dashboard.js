@@ -280,7 +280,7 @@ function drawLineChart(canvas, labels, incomeData, expenseData) {
   const chartH = H - padT - padB;
   const n = labels.length;
 
-  const isDark = document.body.classList.contains('theme-dark');
+  const isDark = document.documentElement.classList.contains('theme-dark');
   const textColor = isDark ? '#a1a1aa' : '#71717a';
   const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
   const incomeColor = '#22c55e';
@@ -434,7 +434,7 @@ function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
 
   const total = values.reduce((a, b) => a + b, 0);
   if (total === 0) {
-    const isDark = document.body.classList.contains('theme-dark');
+    const isDark = document.documentElement.classList.contains('theme-dark');
     ctx.strokeStyle = isDark ? '#303036' : '#e3e0db';
     ctx.lineWidth = lineW;
     ctx.beginPath();

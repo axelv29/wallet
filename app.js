@@ -176,15 +176,35 @@ function loadData() {
   if (lsAcc) {
     state.accounts = JSON.parse(lsAcc);
   } else {
+    const ym = getCurrentYearMonth();
     state.accounts = [
       { id: 'acc-1', name: 'Itaú Débito',  type: 'liquid',      balance: 1047.40 },
       { id: 'acc-2', name: 'Brou',          type: 'liquid',      balance: 1900.00 },
       { id: 'acc-3', name: 'Efectivo',      type: 'liquid',      balance: 1727.00 },
-      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: -10300.38, card_closing_day: 20, card_due_day: 30 },
-      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: -460.00,   card_closing_day: 15, card_due_day: 25 }
+      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: -10300.38, card_schedule: { [ym]: { closing: 20, due: 30 } } },
+      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: -460.00,   card_schedule: { [ym]: { closing: 15, due: 25 } } }
     ];
     saveData('accounts');
   }
+
+  // ── Migration: card_closing_day/card_due_day → card_schedule ──
+  let scheduleMigrated = false;
+  state.accounts.forEach(acc => {
+    if (acc.type === 'credit_card' && !acc.card_schedule) {
+      const closing = acc.card_closing_day || null;
+      const due = acc.card_due_day || null;
+      acc.card_schedule = {};
+      if (closing || due) {
+        const now = new Date();
+        const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        acc.card_schedule[ym] = { closing: closing || 1, due: due || 10 };
+      }
+      delete acc.card_closing_day;
+      delete acc.card_due_day;
+      scheduleMigrated = true;
+    }
+  });
+  if (scheduleMigrated) saveData('accounts');
 
   if (lsTx) {
     state.transactions = JSON.parse(lsTx);
@@ -437,8 +457,11 @@ function createAccountFromFloating(event) {
 
   const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
   if (type === 'credit_card') {
-    newAcc.card_closing_day = parseInt(document.getElementById('acc-f-close-day').value) || 1;
-    newAcc.card_due_day     = parseInt(document.getElementById('acc-f-due-day').value)   || 10;
+    const closing = parseInt(document.getElementById('acc-f-close-day').value) || 1;
+    const due = parseInt(document.getElementById('acc-f-due-day').value) || 10;
+    const ym = getCurrentYearMonth();
+    newAcc.card_schedule = {};
+    newAcc.card_schedule[ym] = { closing, due };
   }
 
   state.accounts.push(newAcc);
@@ -483,8 +506,11 @@ function createNewAccount(event) {
 
   const newAcc = { id: 'acc-' + Date.now(), name, type, balance };
   if (type === 'credit_card') {
-    newAcc.card_closing_day = parseInt(document.getElementById('acc-close-day').value) || 1;
-    newAcc.card_due_day     = parseInt(document.getElementById('acc-due-day').value)   || 10;
+    const closing = parseInt(document.getElementById('acc-close-day').value) || 1;
+    const due = parseInt(document.getElementById('acc-due-day').value) || 10;
+    const ym = getCurrentYearMonth();
+    newAcc.card_schedule = {};
+    newAcc.card_schedule[ym] = { closing, due };
   }
 
   state.accounts.push(newAcc);
@@ -517,16 +543,31 @@ function renderSettingsAccountsList() {
   const container = document.getElementById('accounts-scroll-container');
   if (!container) return;
   container.innerHTML = '';
+  const settingsCur = state.settings.currency || 'ARS';
   state.accounts.forEach(acc => {
+    const accCur = acc.currency || settingsCur;
+    const curLabel = accCur !== settingsCur ? ' · ' + accCur : '';
+    const typeLabel = getAccountTypeLabel(acc.type);
+    let scheduleInfo = '';
+    if (acc.type === 'credit_card' && acc.card_schedule) {
+      const ym = getCurrentYearMonth();
+      const sch = acc.card_schedule[ym];
+      if (sch) {
+        scheduleInfo = ' · cierre ' + sch.closing;
+      }
+    }
     const item = document.createElement('div');
     item.className = 'account-list-item';
     item.style.cursor = 'pointer';
     item.innerHTML = `
       <div class="acc-list-info">
         <span class="acc-list-name">${acc.name}</span>
-        <span class="acc-list-type">${acc.type === 'credit_card' ? 'Tarjeta de crédito' : 'Cuenta líquida'}${acc.card_closing_day ? ' · cierra día ' + acc.card_closing_day : ''}</span>
+        <span class="acc-list-type">${typeLabel}${scheduleInfo}${curLabel}</span>
       </div>
-      <button class="delete-btn" onclick="event.stopPropagation();removeAccount('${acc.id}')"><i data-lucide="trash-2"></i></button>
+      <span class="acc-list-actions">
+        <button class="delete-btn" onclick="event.stopPropagation();openEditAccountModal('${acc.id}')" title="Editar"><i data-lucide="pencil"></i></button>
+        <button class="delete-btn" onclick="event.stopPropagation();removeAccount('${acc.id}')" title="Eliminar"><i data-lucide="trash-2"></i></button>
+      </span>
     `;
     item.addEventListener('click', () => filterTransactions(acc.id));
     container.appendChild(item);
@@ -982,8 +1023,23 @@ function renderSidebar() {
     li.className = 'account-item-sidebar' + (isActive ? ' active' : '');
     li.onclick = () => filterTransactions(acc.id);
     const val = accBalances[acc.id];
+
+    let scheduleHtml = '';
+    if (acc.type === 'credit_card') {
+      const ym = getCurrentYearMonth();
+      const sch = getCardSchedule(acc.id, ym);
+      if (sch) {
+        const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const [, m] = ym.split('-').map(Number);
+        scheduleHtml = '<span class="acc-schedule-sidebar">cierre ' + sch.closing + ' ' + monthNamesShort[m] + ' · vence ' + sch.due + ' ' + monthNamesShort[m] + '</span>';
+      } else {
+        scheduleHtml = '<span class="acc-schedule-sidebar acc-schedule-pending">Configurar cierre y vencimiento</span>';
+      }
+    }
+
     li.innerHTML = `
       <span class="acc-name-sidebar">${acc.name}</span>
+      ${scheduleHtml}
       <span class="acc-balance-sidebar ${val < 0 ? 'negative' : ''}">${formatCurrency(val)}</span>
     `;
     return li;
@@ -1034,16 +1090,34 @@ function renderHeaderAndMetrics() {
     const acc = state.accounts.find(a => a.id === state.currentView);
     if (acc) {
       title    = acc.name;
-      subtitle = acc.type === 'credit_card'
-        ? `Tarjeta · cierre día ${acc.card_closing_day || '—'} · vencimiento día ${acc.card_due_day || '—'}`
-        : 'Cuenta líquida';
+      if (acc.type === 'credit_card') {
+        const ym = getCurrentYearMonth();
+        const sch = getCardSchedule(acc.id, ym);
+        if (sch) {
+          const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+          const [, m] = ym.split('-').map(Number);
+          subtitle = `Tarjeta · cierre ${sch.closing} ${monthNamesShort[m]} · vence ${sch.due} ${monthNamesShort[m]}`;
+        } else {
+          subtitle = `Tarjeta · Configurar cierre y vencimiento`;
+        }
+        state._subtitleHtml = !!sch ? false : true;
+      } else {
+        subtitle = 'Cuenta líquida';
+        state._subtitleHtml = false;
+      }
     }
   }
 
   if (titleEl)    titleEl.textContent    = title;
   const subtitleTextEl = document.getElementById('view-subtitle-text');
   const addBtn = document.getElementById('subtitle-add-btn');
-  if (subtitleTextEl) subtitleTextEl.textContent = subtitle;
+  if (subtitleTextEl) {
+    if (state._subtitleHtml) {
+      subtitleTextEl.innerHTML = subtitle;
+    } else {
+      subtitleTextEl.textContent = subtitle;
+    }
+  }
 
   // Show/hide and configure the "+" button for adding accounts
   if (addBtn) {

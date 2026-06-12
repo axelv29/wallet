@@ -267,6 +267,7 @@ function renderCsvMapping() {
     th.appendChild(label);
 
     const sel = document.createElement('select');
+    sel.setAttribute('aria-label', 'Mapeo de columna ' + (i + 1));
     CSV_FIELD_OPTIONS.forEach(opt => {
       const o = document.createElement('option');
       o.value = opt.value;
@@ -380,6 +381,7 @@ function onCsvMappingChange() {
     const inpDate = document.createElement('input');
     inpDate.type = 'date';
     inpDate.value = tx.date;
+    inpDate.setAttribute('aria-label', 'Fecha');
     inpDate.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
     inpDate.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].date = inpDate.value; };
     tdDate.appendChild(inpDate);
@@ -394,6 +396,7 @@ function onCsvMappingChange() {
         inp.type = 'text';
         inp.value = '';
         inp.placeholder = 'Beneficiario…';
+        inp.setAttribute('aria-label', 'Beneficiario');
         inp.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
         inp.onchange = () => {
           const val = inp.value.trim();
@@ -426,6 +429,7 @@ function onCsvMappingChange() {
       const inpPayee = document.createElement('input');
       inpPayee.type = 'text';
       inpPayee.value = tx.payee;
+      inpPayee.setAttribute('aria-label', 'Beneficiario');
       inpPayee.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
       inpPayee.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].payee = inpPayee.value; };
       tdPayee.appendChild(inpPayee);
@@ -438,6 +442,7 @@ function onCsvMappingChange() {
       span.style.cssText = 'color:var(--text-lo);font-style:italic;font-size:11.5px;cursor:pointer;';
       span.onclick = () => {
         const sel = document.createElement('select');
+        sel.setAttribute('aria-label', 'Categoría');
         sel.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
         cats.forEach(c => {
           const opt = document.createElement('option');
@@ -457,6 +462,7 @@ function onCsvMappingChange() {
             newInp.type = 'text';
             newInp.readOnly = true;
             newInp.value = val;
+            newInp.setAttribute('aria-label', 'Categoría');
             newInp.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
             tdCat.appendChild(newInp);
           } else {
@@ -477,6 +483,7 @@ function onCsvMappingChange() {
       inpCat.type = 'text';
       inpCat.readOnly = true;
       inpCat.value = tx.category_name;
+      inpCat.setAttribute('aria-label', 'Categoría');
       inpCat.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;';
       tdCat.appendChild(inpCat);
     }
@@ -487,6 +494,7 @@ function onCsvMappingChange() {
     inpAmt.type = 'number';
     inpAmt.step = '0.01';
     inpAmt.value = tx.amount;
+    inpAmt.setAttribute('aria-label', 'Monto');
     inpAmt.style.cssText = 'width:100%;height:26px;font-size:11.5px;padding:2px 4px;text-align:right;';
     inpAmt.onchange = () => { csvImportState.previewEdits = csvImportState.previewEdits || {}; csvImportState.previewEdits[idx] = csvImportState.previewEdits[idx] || {}; csvImportState.previewEdits[idx].amount = parseFloat(inpAmt.value); };
     tdAmt.appendChild(inpAmt);

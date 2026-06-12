@@ -16,6 +16,7 @@ let state = {
     ],
     categories: [
       { name: 'Ajuste de saldo', icon: 'banknote' },
+      { name: 'Transferencias', icon: 'arrow-left-right' },
       { name: 'Supermercado', icon: 'shopping-cart' },
       { name: 'Alimentos', icon: 'utensils-crossed' },
       { name: 'Compras', icon: 'package' },
@@ -85,6 +86,12 @@ function loadData() {
       state.predefined.categories.push({ name: 'Sin asignar', icon: 'circle-dashed' });
       saveData('predefined');
     }
+    // Ensure 'Transferencias' category exists
+    const hasTransferencias = state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === 'Transferencias');
+    if (!hasTransferencias) {
+      state.predefined.categories.push({ name: 'Transferencias', icon: 'arrow-left-right' });
+      saveData('predefined');
+    }
     // Ensure account_types exists (migration for older presets)
     if (!state.predefined.account_types) {
       state.predefined.account_types = [
@@ -96,6 +103,25 @@ function loadData() {
   } else {
     saveData('predefined');
   }
+
+  // ── Migration: card_closing_day/card_due_day → card_schedule ──
+  let scheduleMigrated = false;
+  state.accounts.forEach(acc => {
+    if (acc.type === 'credit_card' && !acc.card_schedule) {
+      const closing = acc.card_closing_day || null;
+      const due = acc.card_due_day || null;
+      acc.card_schedule = {};
+      if (closing || due) {
+        const now = new Date();
+        const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        acc.card_schedule[ym] = { closing: closing || 1, due: due || 10 };
+      }
+      delete acc.card_closing_day;
+      delete acc.card_due_day;
+      scheduleMigrated = true;
+    }
+  });
+  if (scheduleMigrated) saveData('accounts');
 
   // ── Migration: Convert account.balance to "Ajuste de saldo" transactions ──
   let migrated = false;

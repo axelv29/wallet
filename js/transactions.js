@@ -140,6 +140,7 @@ function createTagInput() {
   const input = document.createElement('input');
   input.type = 'text';
   input.placeholder = 'nueva…';
+  input.setAttribute('aria-label', 'Nueva etiqueta');
   const resize = () => { input.style.width = Math.max(5, input.value.length + 1) + 'ch'; };
   input.addEventListener('input', resize);
   wrap.appendChild(input);
@@ -316,9 +317,12 @@ function onInstallmentCheck(checked) {
 function getInstallmentMonthOffset(dateVal, accountId) {
   if (!dateVal || !accountId) return 0;
   const acc = state.accounts.find(a => a.id === accountId);
-  if (!acc || acc.type !== 'credit_card' || !acc.card_closing_day) return 0;
+  if (!acc || acc.type !== 'credit_card' || !acc.card_schedule) return 0;
   const txDay = new Date(dateVal + 'T12:00:00').getDate();
-  return acc.card_closing_day < txDay ? 1 : 0;
+  const txYM = dateVal.substring(0, 7);
+  const sch = acc.card_schedule[txYM];
+  if (!sch) return 0;
+  return sch.closing < txDay ? 1 : 0;
 }
 
 function buildInstallmentTimeline() {
@@ -357,6 +361,10 @@ function buildInstallmentTimeline() {
 
 function formatNoTrailingZeros(num) {
   return parseFloat(num.toFixed(2)).toString().replace('.', ',');
+}
+
+function toggleInstallmentFields(checked) {
+  onAccountChangeInModal();
 }
 
 function updateInstallmentPreview() {
@@ -877,6 +885,7 @@ function appendFilterRowEl(container, filter) {
 
   const colSel = document.createElement('select');
   colSel.className = 'filter-col-sel';
+  colSel.setAttribute('aria-label', 'Columna de filtro');
   FILTER_COLUMNS.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.value;
@@ -908,6 +917,7 @@ function appendFilterRowEl(container, filter) {
 
   const opSel = document.createElement('select');
   opSel.className = 'filter-op-sel';
+  opSel.setAttribute('aria-label', 'Operador de filtro');
   const ops = getOperatorsForColumn(filter.column);
   ops.forEach(o => {
     const opt = document.createElement('option');
@@ -923,6 +933,7 @@ function appendFilterRowEl(container, filter) {
 
   const valInput = document.createElement('input');
   valInput.className = 'filter-val-input';
+  valInput.setAttribute('aria-label', 'Valor de filtro');
   const colDef = FILTER_COLUMNS.find(c => c.value === filter.column);
   if (colDef && colDef.type === 'number') { valInput.type = 'number'; valInput.step = '0.01'; }
   else if (colDef && colDef.type === 'date') valInput.type = 'date';
@@ -1617,6 +1628,7 @@ function startInlineEdit(cell, txId, field, type, options) {
     input.className = 'inline-input-ghost';
     input.type = 'date';
     input.value = plainText;
+    input.setAttribute('aria-label', 'Fecha');
     cell.appendChild(input);
 
     const syncDisplay = () => {
@@ -1738,6 +1750,7 @@ function startInlineEdit(cell, txId, field, type, options) {
       input.type = 'text';
       input.className = 'comfy-dropdown-input';
       input.placeholder = 'nueva etiqueta…';
+      input.setAttribute('aria-label', 'Nueva etiqueta');
       inputRow.appendChild(input);
       dd.appendChild(inputRow);
 
@@ -2500,11 +2513,11 @@ function addSplitRow(notes = '', amount = 0, tags = [], categoryName = '') {
     <div class="split-row-main">
       <span class="split-row-num">${idx}</span>
       <input class="split-amount-input" type="text" inputmode="decimal"
-             placeholder="0,00" value="${amountVal}" oninput="onSplitAmountInput(this)">
-      <input class="split-notes-input" type="text" placeholder="Nota…" value="${notes}">
+             placeholder="0,00" value="${amountVal}" aria-label="Monto" oninput="onSplitAmountInput(this)">
+      <input class="split-notes-input" type="text" placeholder="Nota…" value="${notes}" aria-label="Nota">
       <div class="split-tags-cell" data-tags='${JSON.stringify(tags)}'></div>
       <div class="split-cat-wrap">
-        <input class="split-cat-input" type="text" placeholder="Categoría…" value="${categoryName}" autocomplete="off">
+        <input class="split-cat-input" type="text" placeholder="Categoría…" value="${categoryName}" aria-label="Categoría" autocomplete="off">
       </div>
       <button class="split-row-remove" onclick="removeSplitRow(this)" title="Quitar">
         <i data-lucide="x"></i>
@@ -2568,10 +2581,11 @@ function openSplitTagDD(cell) {
 
   const inputRow = document.createElement('div');
   inputRow.className = 'comfy-dropdown-input-row';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'comfy-dropdown-input';
-  input.placeholder = 'nueva etiqueta\u2026';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'comfy-dropdown-input';
+      input.placeholder = 'nueva etiqueta…';
+      input.setAttribute('aria-label', 'Nueva etiqueta');
   inputRow.appendChild(input);
   dd.appendChild(inputRow);
 
@@ -2945,4 +2959,269 @@ function toggleSplitChildren(txId) {
 
 function isSplitChildrenOpen(txId) {
   return sessionStorage.getItem('split-open-' + txId) === 'true';
+}
+
+// ── TRANSFER BETWEEN ACCOUNTS ──────────────────────────────────
+
+function openTransferModal() {
+  const fromSelect = document.getElementById('tf-account-from');
+  const toSelect   = document.getElementById('tf-account-to');
+
+  fromSelect.innerHTML = '';
+  toSelect.innerHTML   = '';
+
+  state.accounts.forEach(acc => {
+    const opt1 = document.createElement('option');
+    opt1.value = acc.id;
+    opt1.textContent = acc.name;
+    fromSelect.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = acc.id;
+    opt2.textContent = acc.name;
+    toSelect.appendChild(opt2);
+  });
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Seleccionar cuenta...';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  toSelect.insertBefore(placeholder, toSelect.firstChild);
+
+  const defaultFrom = (state.currentView && state.currentView !== 'all' && state.currentView !== 'multi' && state.currentView !== 'receivables' && state.accounts.some(a => a.id === state.currentView))
+    ? state.currentView
+    : state.accounts[0]?.id;
+  if (defaultFrom) fromSelect.value = defaultFrom;
+
+  document.getElementById('tf-date').valueAsDate = new Date();
+  document.getElementById('tf-amount').value = '';
+  document.getElementById('tf-notes').value = '';
+  document.getElementById('tf-converted-note').style.display = 'none';
+
+  renderTransferTagsChecklist();
+  onTransferAccountChange();
+
+  document.getElementById('transfer-modal').classList.add('open');
+}
+
+function renderTransferTagsChecklist(selectedTags) {
+  const checklist = document.getElementById('tf-tags-checklist');
+  const checked = selectedTags || [];
+  checklist.innerHTML = '';
+  state.predefined.tags.forEach(tag => {
+    const tagName = typeof tag === 'string' ? tag : tag.name;
+    const tagColor = typeof tag === 'string' ? null : (tag.color || null);
+    const isChecked = checked.includes(tagName);
+    const label = document.createElement('label');
+    label.className = 'tag-check-label';
+    const dotHtml = tagColor ? `<span class="tag-check-dot" style="background:${tagColor}"></span>` : '';
+    label.innerHTML = `<input type="checkbox" name="tf-tags" value="${tagName}" ${isChecked ? 'checked' : ''}>${dotHtml}<span>#${tagName}</span>`;
+    checklist.appendChild(label);
+  });
+
+  const addBtn = document.createElement('span');
+  addBtn.className = 'tag-add-btn';
+  addBtn.innerHTML = `<i data-lucide="plus"></i>Nueva`;
+  addBtn.onclick = () => {
+    const input = createTransferTagInput();
+    addBtn.replaceWith(input);
+    lucide.createIcons();
+    input.querySelector('input').focus();
+  };
+  checklist.appendChild(addBtn);
+  lucide.createIcons();
+}
+
+function getCheckedTransferTags() {
+  return Array.from(document.querySelectorAll('input[name="tf-tags"]:checked')).map(c => c.value);
+}
+
+function createTransferTagInput() {
+  const wrap = document.createElement('span');
+  wrap.className = 'tag-add-input';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'nueva…';
+  input.setAttribute('aria-label', 'Nueva etiqueta');
+  const resize = () => { input.style.width = Math.max(5, input.value.length + 1) + 'ch'; };
+  input.addEventListener('input', resize);
+  wrap.appendChild(input);
+
+  const commit = () => {
+    const name = input.value.trim();
+    const tagNames = state.predefined.tags.map(t => typeof t === 'string' ? t : t.name);
+    if (name && !tagNames.includes(name)) {
+      state.predefined.tags.push({ name, color: getRandomTagColor() });
+      saveData('predefined');
+    }
+    const checked = getCheckedTransferTags();
+    if (name && !checked.includes(name)) checked.push(name);
+    renderTransferTagsChecklist(checked);
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') renderTransferTagsChecklist(getCheckedTransferTags());
+  });
+  input.addEventListener('blur', commit);
+
+  return wrap;
+}
+
+function onTransferAccountChange() {
+  const fromId    = document.getElementById('tf-account-from').value;
+  const toSelect  = document.getElementById('tf-account-to');
+
+  const prevTo = toSelect.value;
+  toSelect.innerHTML = '';
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Seleccionar cuenta...';
+  placeholder.disabled = true;
+  toSelect.appendChild(placeholder);
+
+  state.accounts.forEach(acc => {
+    if (acc.id === fromId) return;
+    const opt = document.createElement('option');
+    opt.value = acc.id;
+    opt.textContent = acc.name;
+    toSelect.appendChild(opt);
+  });
+
+  if (prevTo && prevTo !== fromId && toSelect.querySelector(`option[value="${prevTo}"]`)) {
+    toSelect.value = prevTo;
+  } else {
+    toSelect.value = '';
+  }
+
+  updateTransferConvertedNote();
+}
+
+function updateTransferConvertedNote() {
+  const fromId  = document.getElementById('tf-account-from').value;
+  const toId    = document.getElementById('tf-account-to').value;
+  const fromAcc = state.accounts.find(a => a.id === fromId);
+  const toAcc   = state.accounts.find(a => a.id === toId);
+  const noteEl  = document.getElementById('tf-converted-note');
+  const curEl   = document.getElementById('tf-amount-currency');
+
+  if (!fromAcc || !toAcc) { noteEl.style.display = 'none'; return; }
+
+  curEl.textContent = fromAcc.currency || state.settings.currency;
+
+  if (fromAcc.currency === toAcc.currency || !fromAcc.currency || !toAcc.currency) {
+    noteEl.style.display = 'none';
+    return;
+  }
+
+  const rate = getExchangeRate(fromAcc.currency, toAcc.currency);
+  if (rate === null) {
+    noteEl.textContent = `No hay cotización disponible (${fromAcc.currency} → ${toAcc.currency})`;
+    noteEl.style.display = 'block';
+    return;
+  }
+
+  noteEl.textContent = `1 ${fromAcc.currency} ≈ ${rate.toFixed(4)} ${toAcc.currency}`;
+  noteEl.style.display = 'block';
+}
+
+function closeTransferModal() {
+  document.getElementById('transfer-modal').classList.remove('open');
+  document.getElementById('transfer-form').reset();
+}
+
+async function handleTransferSubmit(event) {
+  event.preventDefault();
+
+  const fromId   = document.getElementById('tf-account-from').value;
+  const toId     = document.getElementById('tf-account-to').value;
+  const dateVal  = document.getElementById('tf-date').value;
+  const rawInput = document.getElementById('tf-amount').value.trim();
+  const notes    = document.getElementById('tf-notes').value.trim();
+
+  if (!fromId || !toId) return;
+
+  let rawAmount;
+  if (isPlainNumber(rawInput)) {
+    rawAmount = parseFloat(rawInput.replace(/[^\d,.\-]/g, '').replace(',', '.'));
+  } else {
+    const evalRes = evaluateExpression(rawInput, state.settings.decimals);
+    rawAmount = (evalRes && evalRes.value !== null) ? evalRes.value : NaN;
+  }
+
+  if (isNaN(rawAmount) || rawAmount <= 0) return;
+
+  const fromAcc = state.accounts.find(a => a.id === fromId);
+  const toAcc   = state.accounts.find(a => a.id === toId);
+  if (!fromAcc || !toAcc) return;
+
+  const fromCurrency = fromAcc.currency || state.settings.currency;
+  const toCurrency   = toAcc.currency   || state.settings.currency;
+
+  const activeTags = [];
+  document.querySelectorAll('input[name="tf-tags"]:checked').forEach(c => activeTags.push(c.value));
+
+  const fromAmount = -Math.abs(rawAmount);
+  const convertedAmount = convertCurrency(Math.abs(rawAmount), fromCurrency, toCurrency);
+
+  const baseId = Date.now();
+  const fromName = fromAcc.name;
+
+  state.transactions.unshift({
+    id: 'tx-' + baseId,
+    date: dateVal,
+    account_id: fromId,
+    payee: fromName,
+    category_name: 'Transferencias',
+    amount: fromAmount,
+    amount_expression: null,
+    notes: notes,
+    tags: activeTags,
+    is_receivable: false,
+    due_date: '',
+    excluded: false
+  });
+
+  state.transactions.unshift({
+    id: 'tx-' + baseId + '-t',
+    date: dateVal,
+    account_id: toId,
+    payee: fromName,
+    category_name: 'Transferencias',
+    amount: convertedAmount,
+    amount_expression: null,
+    notes: notes,
+    tags: activeTags,
+    is_receivable: false,
+    due_date: '',
+    excluded: false
+  });
+
+  saveData('transactions');
+  closeTransferModal();
+  renderAll();
+}
+
+// ── SPLIT BUTTON DROPDOWN ──────────────────────────────────────
+
+function toggleSplitDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('split-dropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) {
+    document.addEventListener('click', closeSplitDropdownOnClickOutside);
+  }
+}
+
+function closeSplitDropdown() {
+  document.getElementById('split-dropdown').classList.remove('open');
+  document.removeEventListener('click', closeSplitDropdownOnClickOutside);
+}
+
+function closeSplitDropdownOnClickOutside(e) {
+  const wrap = document.getElementById('new-tx-split');
+  if (wrap && !wrap.contains(e.target)) {
+    closeSplitDropdown();
+  }
 }

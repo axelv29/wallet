@@ -54,7 +54,7 @@
 }
 
 /* ── DARK THEME ─────────────────────────────────────────── */
-.theme-dark {
+:root.theme-dark {
   --bg-root:    #111113;
   --bg-surface: #18181b;
   --bg-raised:  #1f1f23;
@@ -91,7 +91,7 @@
 
 /* ── COLOR SCHEMES — LIGHT ──────────────────────────────── */
 
-.scheme-ocean {
+:root.scheme-ocean {
   --bg-root:      #f0f7ff;
   --bg-surface:   #ffffff;
   --bg-raised:    #e6f1fb;
@@ -114,7 +114,7 @@
   --shadow-pop:   0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
 }
 
-.scheme-forest {
+:root.scheme-forest {
   --bg-root:      #f0faf4;
   --bg-surface:   #ffffff;
   --bg-raised:    #e6f5ec;
@@ -137,7 +137,7 @@
   --shadow-pop:   0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
 }
 
-.scheme-lavender {
+:root.scheme-lavender {
   --bg-root:      #f5f0ff;
   --bg-surface:   #ffffff;
   --bg-raised:    #ede5ff;
@@ -160,7 +160,7 @@
   --shadow-pop:   0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
 }
 
-.scheme-slate {
+:root.scheme-slate {
   --bg-root:      #ffffff;
   --bg-surface:   #f0eeeb;
   --bg-raised:    #e6e4e0;
@@ -186,7 +186,7 @@
 
 /* ── COLOR SCHEMES — DARK ───────────────────────────────── */
 
-.scheme-default-dark {
+:root.scheme-default-dark {
   --bg-root:    #111113;
   --bg-surface: #18181b;
   --bg-raised:  #1f1f23;
@@ -213,7 +213,7 @@
   --shadow-pop:  0 10px 30px rgba(0,0,0,0.5);
 }
 
-.scheme-midnight {
+:root.scheme-midnight {
   --bg-root:      #0c1222;
   --bg-surface:   #131b2e;
   --bg-raised:    #1a2540;
@@ -236,7 +236,7 @@
   --shadow-pop:   0 10px 30px rgba(0,0,0,0.6);
 }
 
-.scheme-ember {
+:root.scheme-ember {
   --bg-root:      #1a1410;
   --bg-surface:   #211c16;
   --bg-raised:    #2c2519;

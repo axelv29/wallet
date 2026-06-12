@@ -8,7 +8,24 @@
 // ── INIT ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
-  applyTheme();
+  try {
+    // Migration: generate cached custom vars for blocking script
+    if (state.settings.colorScheme === 'custom' && state.settings.customColors && !state.settings.customGeneratedVars) {
+      const cc = state.settings.customColors;
+      if (cc.table && cc.sidebar && cc.button) {
+        const css = buildCustomPalette(cc.table, cc.sidebar, cc.button, cc.positive, cc.negative);
+        const vars = Object.entries(css).map(([k, v]) => `  ${k}: ${v};`).join('\n');
+        if (vars) {
+          state.settings.customGeneratedVars = vars;
+          localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
+        }
+      }
+    }
+    applyTheme();
+  } catch(e) {
+    // Ensure page works even if theme application fails
+    document.documentElement.classList.add('theme-light');
+  }
   loadData();
   setupSearchableSelects();
   setupKeyboardShortcuts();
@@ -210,6 +227,7 @@ function mixWithBlack(hex, t) {
 }
 
 function buildCustomPalette(tableBase, sidebarBase, accentBase, positiveBase, negativeBase) {
+  if (!tableBase || !sidebarBase || !accentBase) return {};
   const tb = hexToHsl(tableBase), sb = hexToHsl(sidebarBase), ab = hexToHsl(accentBase);
   const css = {};
   const set = (name, val) => { css[name] = val; };
@@ -279,13 +297,16 @@ function applyCustomTheme() {
   const cc = state.settings.customColors;
   if (!cc) return;
   const css = buildCustomPalette(cc.table, cc.sidebar, cc.button, cc.positive, cc.negative);
+  const vars = Object.entries(css).map(([k, v]) => `  ${k}: ${v};`).join('\n');
   if (!_customStyleEl) {
     _customStyleEl = document.createElement('style');
     _customStyleEl.id = 'custom-theme-vars';
     document.head.appendChild(_customStyleEl);
   }
-  const vars = Object.entries(css).map(([k, v]) => `  ${k}: ${v};`).join('\n');
-  _customStyleEl.textContent = `body {\n${vars}\n}`;
+  _customStyleEl.textContent = `:root {\n${vars}\n}`;
+  // Cache for blocking script
+  state.settings.customGeneratedVars = vars;
+  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
 }
 
 function saveCustomThemeColors() {
@@ -302,8 +323,10 @@ function saveCustomThemeColors() {
     positive: positiveI ? positiveI.value : null,
     negative: negativeI ? negativeI.value : null,
   };
-  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
+  state.settings.colorScheme = 'custom';
+  state.settings.theme = 'light';
   applyCustomTheme();
+  syncThemeUI();
 }
 
 function initCustomThemeUI() {
@@ -337,7 +360,7 @@ function initCustomThemeUI() {
     <div class="custom-theme-colors">
       <div class="custom-color-item">
         <div class="custom-color-top">
-          <input type="color" class="custom-color-input" id="custom-color-table" value="#ffffff">
+          <input type="color" class="custom-color-input" id="custom-color-table" aria-label="Tabla / Fondo" value="#ffffff">
           <div>
             <div class="custom-color-label">Tabla / Fondo</div>
             <div class="custom-color-hex" id="custom-hex-table">#ffffff</div>
@@ -347,7 +370,7 @@ function initCustomThemeUI() {
       </div>
       <div class="custom-color-item">
         <div class="custom-color-top">
-          <input type="color" class="custom-color-input" id="custom-color-sidebar" value="#f0eeeb">
+          <input type="color" class="custom-color-input" id="custom-color-sidebar" aria-label="Barra lateral" value="#f0eeeb">
           <div>
             <div class="custom-color-label">Barra lateral</div>
             <div class="custom-color-hex" id="custom-hex-sidebar">#f0eeeb</div>
@@ -357,7 +380,7 @@ function initCustomThemeUI() {
       </div>
       <div class="custom-color-item">
         <div class="custom-color-top">
-          <input type="color" class="custom-color-input" id="custom-color-button" value="#5b52f5">
+          <input type="color" class="custom-color-input" id="custom-color-button" aria-label="Botones / Acento" value="#5b52f5">
           <div>
             <div class="custom-color-label">Botones / Acento</div>
             <div class="custom-color-hex" id="custom-hex-button">#5b52f5</div>
@@ -367,7 +390,7 @@ function initCustomThemeUI() {
       </div>
       <div class="custom-color-item">
         <div class="custom-color-top">
-          <input type="color" class="custom-color-input" id="custom-color-positive" value="#16a34a">
+          <input type="color" class="custom-color-input" id="custom-color-positive" aria-label="Positivos" value="#16a34a">
           <div>
             <div class="custom-color-label">Positivos</div>
             <div class="custom-color-hex" id="custom-hex-positive">#16a34a</div>
@@ -377,7 +400,7 @@ function initCustomThemeUI() {
       </div>
       <div class="custom-color-item">
         <div class="custom-color-top">
-          <input type="color" class="custom-color-input" id="custom-color-negative" value="#dc2626">
+          <input type="color" class="custom-color-input" id="custom-color-negative" aria-label="Negativos" value="#dc2626">
           <div>
             <div class="custom-color-label">Negativos</div>
             <div class="custom-color-hex" id="custom-hex-negative">#dc2626</div>
@@ -445,15 +468,15 @@ function setColorScheme(name) {
 
 function applyTheme() {
   const isDark = state.settings.theme === 'dark';
-  document.body.classList.toggle('theme-dark', isDark);
-  document.body.classList.toggle('theme-light', !isDark);
+  document.documentElement.classList.toggle('theme-dark', isDark);
+  document.documentElement.classList.toggle('theme-light', !isDark);
 
   // Remove all scheme classes, then apply current
-  Object.keys(SCHEMES).forEach(s => document.body.classList.remove('scheme-' + s));
-  document.body.classList.remove('scheme-custom');
+  Object.keys(SCHEMES).forEach(s => document.documentElement.classList.remove('scheme-' + s));
+  document.documentElement.classList.remove('scheme-custom');
   const scheme = state.settings.colorScheme || 'default';
-  if (scheme !== 'default') {
-    document.body.classList.add('scheme-' + scheme);
+  if (scheme !== 'default' && scheme !== 'custom') {
+    document.documentElement.classList.add('scheme-' + scheme);
   }
 
   // Apply custom theme CSS variables
@@ -757,6 +780,16 @@ window.closeBalanceModal        = closeBalanceModal;
 window.updateBalanceDiff        = updateBalanceDiff;
 window.confirmBalanceAdjustment = confirmBalanceAdjustment;
 window.openBalanceFromEditModal = openBalanceFromEditModal;
+window.getCardSchedule         = getCardSchedule;
+window.getCardScheduleMonths   = getCardScheduleMonths;
+window.getCurrentYearMonth     = getCurrentYearMonth;
+window.getCycleStartDate       = getCycleStartDate;
+window.calculateCycleBalance   = calculateCycleBalance;
+window.addMonths               = addMonths;
+window.openCcScheduleModal     = openCcScheduleModal;
+window.closeCcScheduleModal    = closeCcScheduleModal;
+window.addCcScheduleRow        = addCcScheduleRow;
+window.saveCcSchedule          = saveCcSchedule;
 window.openSplitModal         = openSplitModal;
 window.closeSplitModal        = closeSplitModal;
 window.addSplitRow            = addSplitRow;
@@ -767,3 +800,11 @@ window.toggleSplitChildren    = toggleSplitChildren;
 window.mergeSplitChildren     = mergeSplitChildren;
 window.distributeEqually      = distributeEqually;
 window.removeAllSplits        = removeAllSplits;
+
+window.openTransferModal            = openTransferModal;
+window.handleTransferSubmit         = handleTransferSubmit;
+window.closeTransferModal           = closeTransferModal;
+window.onTransferAccountChange      = onTransferAccountChange;
+window.updateTransferConvertedNote  = updateTransferConvertedNote;
+window.toggleSplitDropdown          = toggleSplitDropdown;
+window.closeSplitDropdown           = closeSplitDropdown;
