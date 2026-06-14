@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSearchableSelects();
   setupKeyboardShortcuts();
   initCustomThemeUI();
+  try { initSidebarCollapse(); } catch(e) { console.warn('sidebar collapse init failed', e); }
   const lastView = localStorage.getItem('wallet_last_view') || 'dashboard';
   const lastFilter = localStorage.getItem('wallet_last_filter');
 
@@ -107,6 +108,72 @@ function renderAll() {
   renderDashboard();
   updateSelectors();
   updateFilterBadge();
+}
+
+// ── SIDEBAR COLLAPSE / EXPAND ────────────────────────────────
+let _sidebarHoverTimeout = null;
+let _sidebarHoverActive = false;
+
+function toggleSidebar() {
+  const container = document.getElementById('app-container');
+  const trigger = document.getElementById('sidebar-hover-trigger');
+  const isCollapsed = container.classList.contains('sidebar-collapsed');
+
+  if (isCollapsed) {
+    container.classList.remove('sidebar-collapsed');
+    if (trigger) trigger.classList.remove('visible');
+    localStorage.setItem('wallet_sidebar_collapsed', 'false');
+  } else {
+    container.classList.add('sidebar-collapsed');
+    if (trigger) trigger.classList.add('visible');
+    localStorage.setItem('wallet_sidebar_collapsed', 'true');
+  }
+}
+
+function pinSidebar() {
+  const container = document.getElementById('app-container');
+  const trigger = document.getElementById('sidebar-hover-trigger');
+  container.classList.remove('sidebar-collapsed');
+  container.classList.remove('sidebar-hover-active');
+  if (trigger) trigger.classList.remove('visible');
+  localStorage.setItem('wallet_sidebar_collapsed', 'false');
+}
+
+function initSidebarCollapse() {
+  const collapsed = localStorage.getItem('wallet_sidebar_collapsed') === 'true';
+  const container = document.getElementById('app-container');
+  const trigger = document.getElementById('sidebar-hover-trigger');
+  const sidebar = document.querySelector('.sidebar');
+
+  if (collapsed) {
+    container.classList.add('sidebar-collapsed');
+    if (trigger) trigger.classList.add('visible');
+  }
+
+  if (!trigger || !sidebar) return;
+
+  function showOverlay() {
+    if (!container.classList.contains('sidebar-collapsed')) return;
+    clearTimeout(_sidebarHoverTimeout);
+    _sidebarHoverActive = true;
+    container.classList.add('sidebar-hover-active');
+  }
+
+  function hideOverlay() {
+    _sidebarHoverTimeout = setTimeout(() => {
+      _sidebarHoverActive = false;
+      container.classList.remove('sidebar-hover-active');
+    }, 250);
+  }
+
+  trigger.addEventListener('mouseenter', showOverlay);
+  trigger.addEventListener('mouseleave', hideOverlay);
+
+  sidebar.addEventListener('mouseenter', () => {
+    clearTimeout(_sidebarHoverTimeout);
+  });
+
+  sidebar.addEventListener('mouseleave', hideOverlay);
 }
 
 // ── VIEW SWITCHING ────────────────────────────────────────────
@@ -808,3 +875,5 @@ window.onTransferAccountChange      = onTransferAccountChange;
 window.updateTransferConvertedNote  = updateTransferConvertedNote;
 window.toggleSplitDropdown          = toggleSplitDropdown;
 window.closeSplitDropdown           = closeSplitDropdown;
+window.toggleSidebar                = toggleSidebar;
+window.pinSidebar                  = pinSidebar;

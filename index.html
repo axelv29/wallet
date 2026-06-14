@@ -49,7 +49,8 @@
 </head>
 <body>
 
-<div class="app-container">
+<div class="sidebar-hover-trigger" id="sidebar-hover-trigger"></div>
+<div class="app-container" id="app-container">
 
   <!-- ══════════════ SIDEBAR ══════════════ -->
   <aside class="sidebar">
@@ -59,6 +60,12 @@
       </div>
       <span class="sidebar-brand-name">Wallet</span>
     </div>
+    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Colapsar sidebar">
+      <i data-lucide="panel-left-close"></i>
+    </button>
+    <button class="sidebar-pin-btn" onclick="pinSidebar()" title="Fijar sidebar">
+      <i data-lucide="pin"></i>
+    </button>
 
     <div class="sidebar-primary">
       <div class="sidebar-label-sm">Patrimonio neto</div>
