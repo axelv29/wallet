@@ -78,6 +78,85 @@
 
 .closing-fields { margin-top: 4px; }
 
+/* ── CLOSING GROUP ROWS ──────────────────────────────────── */
+.closing-group-row {
+  cursor: pointer;
+}
+
+.closing-group-row td {
+  padding: 0 !important;
+}
+
+.closing-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 16px;
+  background: var(--bg-raised);
+  font-size: 12px;
+  color: var(--text-mid);
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.closing-group-header:hover {
+  background: var(--bg-sunken);
+}
+
+.closing-group-arrow {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 14px;
+  color: var(--text-lo);
+}
+
+.closing-group-arrow.open {
+  transform: rotate(90deg);
+}
+
+.closing-group-label {
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.closing-group-count {
+  font-size: 11px;
+  color: var(--text-lo);
+}
+
+.closing-group-total {
+  margin-left: auto;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.closing-paid-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-lo);
+  cursor: pointer;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.closing-paid-btn:hover {
+  color: var(--positive);
+}
+
+.closing-paid-btn.paid {
+  color: var(--positive);
+}
+
+.closing-paid-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .cc-note {
   font-size: 10.5px;
   color: var(--text-lo);
@@ -645,7 +724,7 @@
 
 /* ── Tabla: filas de cuotas futuras ───────────────────── */
 tr.tx-future td:not(.actions-cell) {
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 tr.tx-future td {
@@ -653,48 +732,51 @@ tr.tx-future td {
 }
 
 tr.tx-future:hover td:not(.actions-cell) {
-  opacity: 0.75;
+  opacity: 0.85;
 }
 
-/* Separador "Cuotas futuras" colapsable */
+/* ── FUTURE GROUP ROWS (mismo estilo que closing) ─────── */
 .future-group-row td {
   padding: 0 !important;
-  border-bottom: none !important;
-  border-top: none !important;
 }
 
 .future-group-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  line-height: 1;
-  cursor: pointer;
-  -webkit-user-select: none;
+  gap: 10px;
+  padding: 5px 16px;
+  background: var(--bg-raised);
+  font-size: 12px;
+  color: var(--text-mid);
   user-select: none;
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--text-lo);
-  transition: color 0.1s;
+  transition: background 0.1s;
+  cursor: pointer;
 }
 
-.future-group-header:hover { color: var(--text-mid); }
+.future-group-header:hover {
+  background: var(--bg-sunken);
+}
 
 .future-group-arrow {
-  font-size: 13px;
+  display: inline-block;
   transition: transform 0.15s;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
+  font-size: 14px;
+  color: var(--text-lo);
 }
 
-.future-group-arrow.open { transform: rotate(-90deg); }
+.future-group-arrow.open {
+  transform: rotate(90deg);
+}
+
+.future-group-label {
+  font-weight: 600;
+  color: var(--text-mid);
+}
 
 .future-group-count {
-  font-size: 10px;
-  font-weight: 500;
-  padding: 1px 6px;
-  border-radius: 20px;
+  font-size: 11px;
+  color: var(--text-lo);
+  margin-left: auto;
 }
 
 /* ── CSV / XLS IMPORT MODAL ────────────────────────────── */

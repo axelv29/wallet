@@ -5,6 +5,8 @@
 //  isTxInPeriod(), _tagColor(), getEditOptions().
 // ═══════════════════════════════════════════════════════════════════════
 
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
 // ── ACCOUNT TYPE HELPERS ──────────────────────────────────
 function getAccountTypeLabel(typeId) {
   const types = state.predefined?.account_types || [];
@@ -107,6 +109,117 @@ function addMonths(ym, n) {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(y, m - 1 + n, 1);
   return dateToYearMonth(d);
+}
+
+// ── CLOSING PERIOD HELPERS ──────────────────────────────────
+function getClosingPeriodKey(dateStr, closingDay) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return dateToYearMonth(d);
+}
+
+function getClosingPeriodMonthLabel(periodKey) {
+  const [y, m] = periodKey.split('-').map(Number);
+  return (MONTH_NAMES[m - 1] || '') + ' ' + y;
+}
+
+function getBillingPeriodTxs(accountId, transactions) {
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc || acc.type !== 'credit_card' || !acc.card_schedule) return [];
+
+  const settingsCur = state.settings.currency || 'ARS';
+  const accCur = acc.currency || settingsCur;
+
+  const groups = {};
+  transactions.forEach(tx => {
+    if (tx.account_id !== accountId) return;
+    if (tx.is_future) return;
+    if (tx.split_parent_id) return;
+    const sch = acc.card_schedule[tx.date ? tx.date.substring(0, 7) : ''];
+    const closingDay = sch ? sch.closing : 20;
+    const key = getClosingPeriodKey(tx.date, closingDay);
+    if (!groups[key]) groups[key] = { key, txs: [], total: 0, label: getClosingPeriodMonthLabel(key) };
+    groups[key].txs.push(tx);
+    const isPayment = (tx.tags || []).includes('Pago de tarjeta');
+    if (!isPayment && !tx.excluded) {
+      groups[key].total += Number(convertCurrency(Number(tx.amount) || 0, accCur, settingsCur)) || Number(tx.amount) || 0;
+    }
+  });
+
+  return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
+}
+
+function toggleClosingGroup(key) {
+  const groupKey = 'closing-group-' + key;
+  const isOpen = sessionStorage.getItem(groupKey) === 'true';
+  sessionStorage.setItem(groupKey, (!isOpen).toString());
+}
+
+function isClosingGroupOpen(key) {
+  return sessionStorage.getItem('closing-group-' + key) === 'true';
+}
+
+function toggleClosingPaid(key, groupTotal, accountId) {
+  const parts = key.split('|');
+  const periodKey = parts[0];
+  const accId = accountId || parts[1];
+  if (!accId) return;
+
+  const paid = isClosingPaid(key, groupTotal, accId);
+  if (paid) {
+    // Delete payment txs for this CC in this period
+    state.transactions = state.transactions.filter(tx => {
+      if (tx.account_id !== accId) return true;
+      if (tx.date.substring(0, 7) !== periodKey) return true;
+      if (!(tx.tags || []).includes('Pago de tarjeta')) return true;
+      return false;
+    });
+  } else {
+    // Create positive payment tx on CC
+    const today = new Date().toISOString().split('T')[0];
+    state.transactions.push({
+      id: 'tx-' + Date.now(),
+      date: today,
+      account_id: accId,
+      payee: 'Pago TC',
+      category_name: 'Sin asignar',
+      amount: Math.abs(groupTotal),
+      notes: 'Pago automático de cierre',
+      tags: ['Pago de tarjeta'],
+      is_receivable: false,
+      due_date: '',
+      excluded: false,
+      split_group: null,
+      split_parent_id: null,
+      amount_expression: null
+    });
+  }
+  saveData('transactions');
+}
+
+function getPaymentSum(accountId, periodKey) {
+  const settingsCur = state.settings.currency || 'ARS';
+  const acc = state.accounts.find(a => a.id === accountId);
+  if (!acc) return 0;
+  const accCur = acc.currency || settingsCur;
+  return state.transactions
+    .filter(tx => {
+      if (tx.account_id !== accountId) return false;
+      if (tx.is_future) return false;
+      if (!(tx.tags || []).includes('Pago de tarjeta')) return false;
+      return tx.date.substring(0, 7) === periodKey;
+    })
+    .reduce((sum, tx) => {
+      const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
+      return sum + (converted !== null ? converted : (Number(tx.amount) || 0));
+    }, 0);
+}
+
+function isClosingPaid(key, groupTotal, groupAccountId) {
+  const parts = key.split('|');
+  const periodKey = parts[0];
+  const accountId = groupAccountId || parts[1];
+  if (!accountId) return false;
+  return getPaymentSum(accountId, periodKey) >= Math.abs(groupTotal);
 }
 
 function getCycleStartDate(accountId) {

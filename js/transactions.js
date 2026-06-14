@@ -54,7 +54,19 @@ function renderTagsChecklist(selectedTags) {
   const checklist = document.getElementById('tx-tags-checklist');
   const checked = selectedTags || [];
   checklist.innerHTML = '';
-  state.predefined.tags.forEach(tag => {
+
+  const SPECIAL_TAGS = [
+    { name: 'Pago de tarjeta', icon: 'credit-card', color: '#22c55e' },
+    { name: 'Oculto', icon: 'eye-off', color: '#94a3b8' }
+  ];
+  const specialNames = SPECIAL_TAGS.map(t => t.name);
+
+  // Regular tags
+  const regularTags = state.predefined.tags.filter(t => {
+    const n = typeof t === 'string' ? t : t.name;
+    return !specialNames.includes(n) && !t.isSystem;
+  });
+  regularTags.forEach(tag => {
     const tagName = typeof tag === 'string' ? tag : tag.name;
     const tagColor = typeof tag === 'string' ? null : (tag.color || null);
     const isChecked = checked.includes(tagName);
@@ -63,7 +75,7 @@ function renderTagsChecklist(selectedTags) {
     label.draggable = true;
     label.dataset.tag = tagName;
     const dotHtml = tagColor ? `<span class="tag-check-dot" style="background:${tagColor}"></span>` : '';
-    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tagName}" ${isChecked ? 'checked' : ''}>${dotHtml}<span>#${tagName}</span>`;
+    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${tagName}" ${isChecked ? 'checked' : ''}>${dotHtml}<span>${tagName}</span>`;
     label.addEventListener('dragstart', e => {
       _draggedTag = tagName;
       e.dataTransfer.setData('text/plain', tagName);
@@ -90,6 +102,44 @@ function renderTagsChecklist(selectedTags) {
     input.querySelector('input').focus();
   };
   checklist.appendChild(addBtn);
+
+  // Special tags section
+  const specialWrap = document.createElement('div');
+  specialWrap.className = 'tags-special-section';
+  const specialLabel = document.createElement('span');
+  specialLabel.className = 'tags-special-title';
+  specialLabel.textContent = 'Especiales';
+  specialWrap.appendChild(specialLabel);
+
+  SPECIAL_TAGS.forEach(st => {
+    const isChecked = checked.includes(st.name);
+    const label = document.createElement('label');
+    label.className = 'tag-check-label tag-check-special';
+    label.dataset.tag = st.name;
+    label.innerHTML = `<input type="checkbox" name="tx-tags" value="${st.name}" ${isChecked ? 'checked' : ''}><i data-lucide="${st.icon}" style="width:12px;height:12px;color:${st.color}"></i><span>${st.name}</span>`;
+    // Oculto syncs with excluded checkbox
+    if (st.name === 'Oculto') {
+      label.querySelector('input').addEventListener('change', function() {
+        const excl = document.getElementById('tx-is-excluded');
+        if (excl) excl.checked = this.checked;
+      });
+    }
+    specialWrap.appendChild(label);
+  });
+  checklist.appendChild(specialWrap);
+
+  // Sync excluded checkbox ↔ Oculto tag
+  const exclCb = document.getElementById('tx-is-excluded');
+  if (exclCb) {
+    exclCb.onchange = function() {
+      const ocultoInput = checklist.querySelector('input[name="tx-tags"][value="Oculto"]');
+      if (ocultoInput) ocultoInput.checked = this.checked;
+      // Visual update
+      const ocultoLabel = ocultoInput?.closest('.tag-check-label');
+      if (ocultoLabel) ocultoLabel.classList.toggle('tag-check-special-active', this.checked);
+    };
+  }
+
   lucide.createIcons();
 }
 
@@ -200,6 +250,15 @@ function openTransactionModal(txId) {
     document.getElementById('tx-due-date').value = tx.due_date || '';
 
     document.getElementById('tx-is-excluded').checked = !!tx.excluded;
+    // Sync excluded → Oculto tag visual
+    if (tx.excluded) {
+      const ocultoInput = document.getElementById('tx-tags-checklist')?.querySelector('input[name="tx-tags"][value="Oculto"]');
+      if (ocultoInput) {
+        ocultoInput.checked = true;
+        const lbl = ocultoInput.closest('.tag-check-label');
+        if (lbl) lbl.classList.add('tag-check-special-active');
+      }
+    }
 
     // Installment fields when editing
     const isInst = !!(tx.installment_group && tx.installment_total);
@@ -1971,6 +2030,15 @@ function sortTransactions(arr) {
         break;
       case 'amount':
         return dir * ((Math.abs(a.amount) || 0) - (Math.abs(b.amount) || 0));
+      case 'cuota': {
+        const aIdx = a.installment_index || 0;
+        const aTot = a.installment_total || 0;
+        const bIdx = b.installment_index || 0;
+        const bTot = b.installment_total || 0;
+        const aRatio = aTot > 0 ? aIdx / aTot : 0;
+        const bRatio = bTot > 0 ? bIdx / bTot : 0;
+        return dir * (aRatio - bRatio);
+      }
       default:
         return 0;
     }
@@ -2132,6 +2200,45 @@ function renderTransactions() {
   const hideFutures = vp.showFutureTxs === false;
   const visibleOutOfPeriodFuture = hideFutures ? [] : outOfPeriodFuture;
 
+  // Separate CC transactions for closing groups
+  const showClosing = vp.showClosingRows !== false;
+  const ccAccIds = new Set(state.accounts.filter(a => a.type === 'credit_card').map(a => a.id));
+  const ccTx = showClosing ? inPeriodRows.filter(tx => ccAccIds.has(tx.account_id)) : [];
+  const nonCCTx = showClosing ? inPeriodRows.filter(tx => !ccAccIds.has(tx.account_id)) : inPeriodRows;
+
+  // Determine if showing multiple CC accounts (need to distinguish by name)
+  const ccInView = [...ccAccIds].filter(id => ccTx.some(tx => tx.account_id === id)
+    || visibleOutOfPeriodFuture.some(tx => tx.account_id === id));
+  const showAccountInLabel = !isSingleAccount && ccInView.length > 1;
+
+  // Group ALL CC transactions (present + future) by billing period
+  const ccGroups = {};
+  const addTxToCCGroups = (tx) => {
+    const acc = state.accounts.find(a => a.id === tx.account_id);
+    if (!acc) return;
+    const sch = acc.card_schedule ? acc.card_schedule[tx.date ? tx.date.substring(0, 7) : ''] : null;
+    const closingDay = sch ? sch.closing : 20;
+    const periodKey = getClosingPeriodKey(tx.date, closingDay);
+    const key = showAccountInLabel ? periodKey + '|' + tx.account_id : periodKey;
+    if (!ccGroups[key]) {
+      const label = getClosingPeriodMonthLabel(periodKey) + (showAccountInLabel ? ' · ' + acc.name : '');
+      ccGroups[key] = { key, txs: [], total: 0, label, period: periodKey };
+    }
+    ccGroups[key].txs.push(tx);
+    // Exclude payment txs and excluded txs from total
+    const isPayment = (tx.tags || []).includes('Pago de tarjeta');
+    if (!isPayment && !tx.excluded) {
+      const accCur = acc.currency || (state.settings.currency || 'ARS');
+      const converted = convertCurrency(Number(tx.amount) || 0, accCur, state.settings.currency || 'ARS');
+      ccGroups[key].total += converted !== null ? converted : (Number(tx.amount) || 0);
+    }
+  };
+  if (showClosing) {
+    ccTx.forEach(addTxToCCGroups);
+    visibleOutOfPeriodFuture.filter(tx => ccAccIds.has(tx.account_id)).forEach(addTxToCCGroups);
+  }
+  const sortedCcGroups = Object.values(ccGroups).sort((a, b) => b.key.localeCompare(a.key));
+
   // Count badge only counts in-period present rows
   document.getElementById('tx-count-badge').textContent = inPeriodRows.length;
 
@@ -2141,20 +2248,24 @@ function renderTransactions() {
     return;
   }
 
-  const appendTxRow = (tx, isFutureRow) => {
+  const appendTxRow = (tx, closingPeriod) => {
     const acc       = state.accounts.find(a => a.id === tx.account_id);
     const isExpense = tx.amount < 0;
     const isSelected = state.selectedTxIds.has(tx.id);
+    // A future tx shows normal (not dimmed) if it's within the closing period's month
+    const isFutureRow = tx.is_future && (!closingPeriod || tx.date.substring(0, 7) !== closingPeriod);
 
-    const tagPills = (tx.tags || []).map(tag => {
+    const tagPills = (tx.tags || []).filter(tag => tag !== 'Pago de tarjeta').map(tag => {
       const c = _tagColor(tag);
       return `<span class="tag-pill" style="background:${c.bg};color:${c.text};">#${tag}</span>`;
     }).join('');
 
     const excludedPill = tx.excluded ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
+    const hasPaymentTag = (tx.tags || []).includes('Pago de tarjeta');
+    const paymentPill = hasPaymentTag ? '<span class="tag-pill-payment"><i data-lucide="credit-card"></i>Pago</span>' : '';
 
     const notesHtml = tx.notes || '';
-    const tagsHtml  = (tagPills || '') + excludedPill;
+    const tagsHtml  = (tagPills || '') + excludedPill + paymentPill;
 
     const accCurrency = acc?.currency || state.settings.currency || 'ARS';
     const amtStyle = state.settings.amountStyle || 'default';
@@ -2219,7 +2330,7 @@ function renderTransactions() {
     if (hasChildrenVisible) tr.classList.add('has-children-visible');
 
     tr.innerHTML = `
-      <td class="tx-cell">${isFutureRow ? '' : `<input type="checkbox" class="tx-checkbox" data-tx-id="${tx.id}" ${isSelected ? 'checked' : ''} onclick="handleTxRowClick('${tx.id}', event)">`}</td>
+      <td class="tx-cell"><input type="checkbox" class="tx-checkbox" data-tx-id="${tx.id}" ${isSelected ? 'checked' : ''} onclick="handleTxRowClick('${tx.id}', event)"></td>
       <td class="date-cell editable-cell" data-field="date" title="Click para editar">${formatDate(tx.date)}</td>
       <td class="col-account account-cell editable-cell" data-field="account_id" title="Click para editar">${acc ? acc.name : '—'}</td>
       <td class="payee-cell editable-cell" data-field="payee" title="Click para editar">${payeeCellHtml}</td>
@@ -2277,13 +2388,15 @@ function renderTransactions() {
       : (showSign ? '+' : '') + formatAccountCurrency(child.amount, accCurrency);
     const amountClass = showColor ? (isExpense ? 'expense' : 'income') : 'amount-no-color';
 
-    const tagPills = (child.tags || []).map(tag => {
+    const tagPills = (child.tags || []).filter(tag => tag !== 'Pago de tarjeta').map(tag => {
       const c = _tagColor(tag);
       return `<span class="tag-pill" style="background:${c.bg};color:${c.text};">#${tag}</span>`;
     }).join('');
     const excludedPill = child.excluded ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
+    const hasPaymentTag = (child.tags || []).includes('Pago de tarjeta');
+    const paymentPill = hasPaymentTag ? '<span class="tag-pill-payment"><i data-lucide="credit-card"></i>Pago</span>' : '';
     const notesHtml = child.notes || '';
-    const tagsHtml = (tagPills || '') + excludedPill;
+    const tagsHtml = (tagPills || '') + excludedPill + paymentPill;
 
     let childActionsHtml = `
       <div class="row-action-dropdown">
@@ -2358,40 +2471,91 @@ function renderTransactions() {
     });
   };
 
-  // Render future rows first (above header) so they expand upward
-  if (visibleOutOfPeriodFuture.length > 0) {
-    const colCount  = isSingleAccount ? 10 : 11;
-    const groupKey  = 'future-group-open';
-    const isOpen    = sessionStorage.getItem(groupKey) === 'true';
+  // Render future rows — CC are already in closing groups, only show non-CC futures
+  const futureNonCC = visibleOutOfPeriodFuture.filter(tx => !ccAccIds.has(tx.account_id));
+  if (futureNonCC.length > 0) {
+    const colCount = isSingleAccount ? 10 : 11;
+    const groupKey = 'future-group-open';
+    const isOpen = sessionStorage.getItem(groupKey) === 'true';
 
-    if (isOpen) {
-      visibleOutOfPeriodFuture.forEach(tx => appendTxRow(tx, true));
-    }
-
-    // Header acts as separator between future and present
-    const headerTr  = document.createElement('tr');
+    const headerTr = document.createElement('tr');
     headerTr.className = 'future-group-row';
-    const headerTd  = document.createElement('td');
+    const headerTd = document.createElement('td');
     headerTd.colSpan = colCount;
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'future-group-header';
-    headerDiv.innerHTML = `
-      <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
-      <span>Cuotas futuras</span>
-      <span class="future-group-count" style="margin-left:auto;">${visibleOutOfPeriodFuture.length}</span>
+    headerTd.innerHTML = `
+      <div class="future-group-header">
+        <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
+        <span class="future-group-label">Cuotas futuras</span>
+        <span class="future-group-count">${futureNonCC.length} mov.</span>
+      </div>
     `;
-    headerDiv.addEventListener('click', () => {
+    headerTr.addEventListener('click', () => {
       const nowOpen = sessionStorage.getItem(groupKey) === 'true';
       sessionStorage.setItem(groupKey, (!nowOpen).toString());
       renderTransactions();
     });
-    headerTd.appendChild(headerDiv);
-    headerTr.appendChild(headerTd);
     tbody.appendChild(headerTr);
+
+    if (isOpen) {
+      futureNonCC.forEach(tx => appendTxRow(tx, null));
+    }
   }
 
-  // Render in-period rows (present + future that fell in period as normal)
-  inPeriodRows.forEach(tx => appendTxRow(tx, false));
+  // Render in-period rows: closing groups for CC + normal rows
+  if (showClosing && sortedCcGroups.length > 0) {
+    // Render CC closing groups (with both present and future txs inside)
+    sortedCcGroups.forEach(group => {
+      const isOpen = isClosingGroupOpen(group.key);
+      const groupAccountId = group.txs[0]?.account_id || '';
+      const paid = isClosingPaid(group.key, group.total, groupAccountId);
+      const colCount = isSingleAccount ? 10 : 11;
+      const totalHtml = formatCurrency(group.total);
+      const futureCount = group.txs.filter(tx => tx.is_future).length;
+
+      const headerTr = document.createElement('tr');
+      headerTr.className = 'closing-group-row';
+      const headerTd = document.createElement('td');
+      headerTd.colSpan = colCount;
+      headerTd.innerHTML = `
+        <div class="closing-group-header">
+          <span class="closing-group-arrow ${isOpen ? 'open' : ''}">›</span>
+          <span class="closing-group-label">Cierre ${group.label}</span>
+          <span class="closing-group-count">${group.txs.length} mov.${futureCount > 0 ? ' · ' + futureCount + ' futuras' : ''}</span>
+          <span class="closing-group-total">${totalHtml}</span>
+          <button class="closing-paid-btn ${paid ? 'paid' : ''}" onclick="event.stopPropagation();toggleClosingPaid('${group.key}', ${group.total}, '${groupAccountId}');renderAll()" title="${paid ? 'Marcar como no pagado' : 'Marcar como pagado'}">
+            <i data-lucide="${paid ? 'check' : 'circle'}"></i>
+          </button>
+        </div>
+      `;
+      headerTr.addEventListener('click', () => {
+        toggleClosingGroup(group.key);
+        renderTransactions();
+      });
+      headerTd.style.cursor = 'pointer';
+      headerTr.appendChild(headerTd);
+      tbody.appendChild(headerTr);
+
+      if (isOpen) {
+        const sorted = [...group.txs].sort((a, b) => {
+          // When sorting by date, interleave future + present by date
+          if (state.sortColumn === 'date') {
+            const dir = state.sortDirection === 'asc' ? 1 : -1;
+            return dir * (a.date || '').localeCompare(b.date || '');
+          }
+          // Default: future first
+          return (b.is_future ? 1 : 0) - (a.is_future ? 1 : 0);
+        });
+        // All txs in group should be from same account (one CC)
+        const groupAccountId = group.txs[0]?.account_id;
+        sorted.forEach(tx => appendTxRow(tx, group.period));
+      }
+    });
+    // Render non-CC in-period rows
+    nonCCTx.forEach(tx => appendTxRow(tx, null));
+  } else {
+    // No closing groups — render all as normal
+    inPeriodRows.forEach(tx => appendTxRow(tx, null));
+  }
 
   // Render out-of-period present group (collapsible, only when period filter is active)
   if (hasPeriodFilter && outOfPeriodPresent.length > 0) {
@@ -2420,7 +2584,7 @@ function renderTransactions() {
     tbody.appendChild(headerTr);
 
     if (isOpen) {
-      outOfPeriodPresent.forEach(tx => appendTxRow(tx, true));
+      outOfPeriodPresent.forEach(tx => appendTxRow(tx, null));
     }
   }
 

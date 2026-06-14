@@ -215,13 +215,14 @@
                 <label class="view-toggle-item"><input type="checkbox" data-pref="showColAmount" onchange="toggleViewPref('showColAmount',this.checked)"><span>Monto</span></label>
               </div>
               <div class="view-toggle-sep"></div>
-              <div class="view-toggle-section">
-                <div class="view-toggle-section-title">Vista</div>
-                <label class="view-toggle-item"><input type="checkbox" data-pref="showAccountBalances" onchange="toggleViewPref('showAccountBalances',this.checked)"><span>Balances en sidebar</span></label>
-                <label class="view-toggle-item"><input type="checkbox" data-pref="showFutureTxs" onchange="toggleViewPref('showFutureTxs',this.checked)"><span>Transacciones futuras</span></label>
-                <label class="view-toggle-item"><input type="checkbox" data-pref="showImportBtn" onchange="toggleViewPref('showImportBtn',this.checked)"><span>Botón importar</span></label>
-                <label class="view-toggle-item"><input type="checkbox" data-pref="showFilterBtn" onchange="toggleViewPref('showFilterBtn',this.checked)"><span>Botón filtros</span></label>
-              </div>
+                <div class="view-toggle-section">
+                  <div class="view-toggle-section-title">Vista</div>
+                  <label class="view-toggle-item"><input type="checkbox" data-pref="showAccountBalances" onchange="toggleViewPref('showAccountBalances',this.checked)"><span>Balances en sidebar</span></label>
+                  <label class="view-toggle-item"><input type="checkbox" data-pref="showFutureTxs" onchange="toggleViewPref('showFutureTxs',this.checked)"><span>Transacciones futuras</span></label>
+                  <label class="view-toggle-item"><input type="checkbox" data-pref="showClosingRows" onchange="toggleViewPref('showClosingRows',this.checked)"><span>Agrupar por cierre TC</span></label>
+                  <label class="view-toggle-item"><input type="checkbox" data-pref="showImportBtn" onchange="toggleViewPref('showImportBtn',this.checked)"><span>Botón importar</span></label>
+                  <label class="view-toggle-item"><input type="checkbox" data-pref="showFilterBtn" onchange="toggleViewPref('showFilterBtn',this.checked)"><span>Botón filtros</span></label>
+                </div>
             </div>
           </div>
           <div class="search-box" id="search-box">
@@ -255,7 +256,7 @@
                 <th class="col-resizable col-sortable" data-sort="date" onclick="toggleSort('date')" style="min-width:95px; width:95px;"><span class="col-sort-label">Fecha</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-account col-sortable" data-sort="account" onclick="toggleSort('account')" style="min-width:115px; width:130px;"><span class="col-sort-label">Cuenta</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-sortable" data-sort="payee" onclick="toggleSort('payee')" style="min-width:150px; width:160px;"><span class="col-sort-label">Beneficiario</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
-                <th class="col-resizable c" style="width:80px; min-width:70px;">Cuota<span class="col-resize-handle"></span></th>
+                <th class="col-resizable c col-sortable" data-sort="cuota" onclick="toggleSort('cuota')" style="width:80px; min-width:70px;"><span class="col-sort-label">Cuota</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-sortable" data-sort="notes" onclick="toggleSort('notes')" style="min-width:160px; width:100%;"><span class="col-sort-label">Notas / Detalle</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-sortable" data-sort="tags" onclick="toggleSort('tags')" style="min-width:120px; width:140px;"><span class="col-sort-label">Etiquetas</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
                 <th class="col-resizable col-sortable" data-sort="category" onclick="toggleSort('category')" style="min-width:120px; width:140px;"><span class="col-sort-label">Categoría</span><span class="sort-arrow"></span><span class="col-resize-handle"></span></th>
@@ -1661,18 +1662,18 @@
   </div>
 </div>
 
-<script src="js/state.js"></script>
-<script src="js/currency.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/modals.js"></script>
+<script src="js/state.js?v=5"></script>
+<script src="js/currency.js?v=5"></script>
+<script src="js/utils.js?v=5"></script>
+<script src="js/modals.js?v=5"></script>
 <div id="dash-donut-tooltip" class="dash-donut-tooltip" style="display:none"></div>
-<script src="js/sidebar.js"></script>
-<script src="js/transactions.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/import.js"></script>
-<script src="js/backup.js"></script>
-<script src="js/calendar.js"></script>
-<script src="js/app.js"></script>
+<script src="js/sidebar.js?v=5"></script>
+<script src="js/transactions.js?v=5"></script>
+<script src="js/dashboard.js?v=5"></script>
+<script src="js/settings.js?v=5"></script>
+<script src="js/import.js?v=5"></script>
+<script src="js/backup.js?v=5"></script>
+<script src="js/calendar.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

@@ -32,9 +32,12 @@ let state = {
       { name: 'Ropa', icon: 'shirt' },
       { name: 'Tecnología', icon: 'smartphone' },
       { name: 'Otros', icon: 'more-horizontal' },
+      { name: 'Pagos', icon: 'credit-card' },
       { name: 'Sin asignar', icon: 'circle-dashed' },
     ],
-    tags: []
+    tags: [
+      { name: 'Pago de tarjeta', color: '#22c55e', isSystem: true },
+    ]
   },
   settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'ARS', showSymbol: true, decimals: 2, amountStyle: 'default',
     viewPrefs: {
@@ -96,6 +99,12 @@ function loadData() {
       state.predefined.tags = state.predefined.tags.map((t, i) => ({ name: t, color: colors[i % colors.length] }));
       saveData('predefined');
     }
+    // Ensure 'Pago de tarjeta' tag exists (system tag)
+    const hasPagoTag = state.predefined.tags.some(t => (typeof t === 'string' ? t : t.name) === 'Pago de tarjeta');
+    if (!hasPagoTag) {
+      state.predefined.tags.push({ name: 'Pago de tarjeta', color: '#22c55e', isSystem: true });
+      saveData('predefined');
+    }
     // Ensure 'Sin asignar' category exists
     const hasSinAsignar = state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === 'Sin asignar');
     if (!hasSinAsignar) {
@@ -106,6 +115,12 @@ function loadData() {
     const hasTransferencias = state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === 'Transferencias');
     if (!hasTransferencias) {
       state.predefined.categories.push({ name: 'Transferencias', icon: 'arrow-left-right' });
+      saveData('predefined');
+    }
+    // Ensure 'Pagos' category exists
+    const hasPagos = state.predefined.categories.some(c => (typeof c === 'string' ? c : c.name) === 'Pagos');
+    if (!hasPagos) {
+      state.predefined.categories.push({ name: 'Pagos', icon: 'credit-card' });
       saveData('predefined');
     }
     // Ensure account_types exists (migration for older presets)

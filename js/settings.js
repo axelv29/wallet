@@ -276,28 +276,51 @@ function openCcScheduleModal(accId) {
   const monthSelect = document.getElementById('cc-schedule-month');
   monthSelect.innerHTML = '';
   const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  for (let i = 0; i < 12; i++) {
-    const ym = addMonths(getCurrentYearMonth(), i);
+  const currentYm = getCurrentYearMonth();
+
+  // Find earliest transaction month for this account
+  let earliestYm = currentYm;
+  state.transactions.forEach(tx => {
+    if (tx.account_id === accId && tx.date) {
+      const txYm = tx.date.substring(0, 7);
+      if (txYm < earliestYm) earliestYm = txYm;
+    }
+  });
+
+  // Generate months from earliest transaction month to current + 12
+  const startOffset = -monthsBetween(earliestYm, currentYm);
+  const totalMonths = startOffset + 13; // past months + current + 12 future
+
+  for (let i = startOffset; i < startOffset + totalMonths; i++) {
+    const ym = addMonths(currentYm, i);
     const [y, m] = ym.split('-').map(Number);
     const opt = document.createElement('option');
     opt.value = ym;
-    opt.textContent = monthNamesShort[m] + ' ' + y;
+    opt.textContent = (i < 0 ? '‹ ' : '') + monthNamesShort[m] + ' ' + y;
     monthSelect.appendChild(opt);
   }
 
-  let currentYm = monthSelect.value;
-  ccSchedulePrevYm = currentYm;
-  loadScheduleForMonth(acc, currentYm);
+  // Select current month by default
+  monthSelect.value = currentYm;
 
-  monthSelect.addEventListener('change', () => {
+  ccSchedulePrevYm = monthSelect.value;
+  loadScheduleForMonth(acc, monthSelect.value);
+
+  monthSelect.onchange = () => {
     saveCurrentMonthSchedule(acc, ccSchedulePrevYm);
     ccSchedulePrevYm = monthSelect.value;
     loadScheduleForMonth(acc, monthSelect.value);
     saveData('accounts');
-  });
+  };
 
   document.getElementById('cc-schedule-modal').classList.add('open');
   lucide.createIcons();
+}
+
+function monthsBetween(ym1, ym2) {
+  const [y1, m1] = ym1.split('-').map(Number);
+  const [y2, m2] = ym2.split('-').map(Number);
+  return (y2 - y1) * 12 + (m2 - m1);
 }
 
 function loadScheduleForMonth(acc, ym) {
@@ -577,11 +600,11 @@ function renderListItems(type, list) {
   const ul = document.getElementById('predefined-' + type + '-list');
   if (!ul) return;
   ul.innerHTML = '';
-  const filtered = (type === 'categories' || type === 'payees') ? list.filter(item => (typeof item === 'string' ? item : item.name) !== 'Sin asignar') : list;
+  const filtered = (type === 'categories' || type === 'payees') ? list.filter(item => (typeof item === 'string' ? item : item.name) !== 'Sin asignar') : list.filter(item => !item.isSystem);
   filtered.forEach(item => {
     const name = typeof item === 'string' ? item : item.name;
     const icon = typeof item === 'string' ? null : item.icon;
-    const isProtected = type === 'categories' && name === 'Sin asignar';
+    const isProtected = (type === 'categories' && name === 'Sin asignar') || (type === 'tags' && item.isSystem);
 
     const li = document.createElement('li');
 
@@ -644,6 +667,7 @@ function renderListItems(type, list) {
 function startRename(type, item, targetEl) {
   const name = typeof item === 'string' ? item : item.name;
   if (type === 'categories' && name === 'Sin asignar') return;
+  if (type === 'tags' && item.isSystem) return;
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -848,23 +872,26 @@ function removePredefined(type, item) {
     return;
   }
   if (type === 'tags') {
-    const usedCount = state.transactions.filter(t => (t.tags || []).includes(item)).length;
+    const tagName = typeof item === 'string' ? item : item.name;
+    const isSystem = typeof item === 'object' && item.isSystem;
+    if (isSystem) return;
+    const usedCount = state.transactions.filter(t => (t.tags || []).includes(tagName)).length;
     if (usedCount > 0) {
       showConfirm(
-        `La etiqueta "#${item}" está siendo usada en ${usedCount} transacciones. Se eliminará de todas. ¿Continuar?`,
+        `La etiqueta "#${tagName}" está siendo usada en ${usedCount} transacciones. Se eliminará de todas. ¿Continuar?`,
         { title: 'Eliminar etiqueta', confirmText: 'Eliminar', danger: true }
       ).then(ok => {
         if (!ok) return;
         state.transactions.forEach(t => {
-          if (t.tags && t.tags.includes(item)) t.tags = t.tags.filter(tag => tag !== item);
+          if (t.tags && t.tags.includes(tagName)) t.tags = t.tags.filter(tag => tag !== tagName);
         });
-        state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== item);
+        state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== tagName);
         saveData('predefined');
         saveData('transactions');
         renderPredefinedLists();
       });
     } else {
-      state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== item);
+      state.predefined[type] = state.predefined[type].filter(i => (typeof i === 'string' ? i : i.name) !== tagName);
       saveData('predefined');
       renderPredefinedLists();
     }
