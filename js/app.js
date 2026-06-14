@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.classList.add('theme-light');
   }
   loadData();
+  ensureViewPrefs();
   setupSearchableSelects();
   setupKeyboardShortcuts();
   initCustomThemeUI();
@@ -97,6 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchBox && searchBox.classList.contains('expanded') && !searchBox.contains(e.target)) {
       collapseSearchBox();
     }
+    const viewToggleWrap = document.getElementById('view-toggle-wrap');
+    if (viewToggleWrap && !viewToggleWrap.contains(e.target)) {
+      closeViewMenu();
+    }
   });
 });
 
@@ -105,6 +110,7 @@ function renderAll() {
   renderSidebar();
   renderHeaderAndMetrics();
   renderTransactions();
+  applyViewPrefs();
   renderDashboard();
   updateSelectors();
   updateFilterBadge();
@@ -604,6 +610,10 @@ function setupKeyboardShortcuts() {
       collapseSearchBox();
       return;
     }
+    if (e.key === 'Escape' && document.getElementById('view-toggle-menu')?.classList.contains('open')) {
+      closeViewMenu();
+      return;
+    }
     if (e.ctrlKey && e.key === 'k') {
       e.preventDefault();
       toggleSearchBox();
@@ -727,6 +737,102 @@ function initColumnResize() {
   handles.forEach(h => {
     h.addEventListener('mousedown', onMouseDown);
   });
+}
+
+// ── VIEW PREFS ───────────────────────────────────────────────
+function ensureViewPrefs() {
+  if (!state.settings.viewPrefs) {
+    state.settings.viewPrefs = {
+      showImportBtn: true, showFilterBtn: true, showAccountBalances: true,
+      showClosingRows: true, showFutureTxs: true,
+      showColDate: true, showColAccount: true, showColPayee: true,
+      showColInstallment: true, showColNotes: true, showColTags: true,
+      showColCategory: true, showColAmount: true,
+    };
+    localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
+  }
+}
+
+function applyViewPrefs() {
+  ensureViewPrefs();
+  const vp = state.settings.viewPrefs;
+
+  // Toggle toolbar buttons
+  const importBtn = document.getElementById('import-btn');
+  const filterBtn = document.getElementById('filter-toggle-btn');
+  if (importBtn) importBtn.style.display = vp.showImportBtn ? '' : 'none';
+  if (filterBtn) filterBtn.style.display = vp.showFilterBtn ? '' : 'none';
+
+  // Toggle sidebar balances
+  const sidebarBalances = document.querySelectorAll('.acc-balance-sidebar');
+  sidebarBalances.forEach(el => {
+    el.style.visibility = vp.showAccountBalances ? 'visible' : 'hidden';
+  });
+  const netWorthEl = document.getElementById('net-worth-val');
+  if (netWorthEl) netWorthEl.style.visibility = vp.showAccountBalances ? 'visible' : 'hidden';
+
+  // Column visibility mapping: pref key → CSS class on th/td
+  const colMap = [
+    { key: 'showColDate',       thIndex: 1,  cssClass: 'date-cell' },
+    { key: 'showColAccount',    thIndex: 2,  cssClass: 'col-account' },
+    { key: 'showColPayee',      thIndex: 3,  cssClass: 'payee-cell' },
+    { key: 'showColInstallment',thIndex: 4,  cssClass: 'cuota-cell' },
+    { key: 'showColNotes',      thIndex: 5,  cssClass: 'notes-cell' },
+    { key: 'showColTags',       thIndex: 6,  cssClass: 'tags-cell' },
+    { key: 'showColCategory',   thIndex: 7,  cssClass: 'category-cell' },
+    { key: 'showColAmount',     thIndex: 8,  cssClass: 'amount-cell' },
+  ];
+
+  const ledger = document.querySelector('.ledger');
+  if (ledger) {
+    const ths = ledger.querySelectorAll('thead th');
+    colMap.forEach(col => {
+      const hidden = !vp[col.key];
+      // Hide th
+      if (ths[col.thIndex]) ths[col.thIndex].classList.toggle('col-hidden', hidden);
+      // Hide matching td cells
+      ledger.querySelectorAll('tbody tr').forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        // Account column may shift if isSingleAccount hides it, find by class
+        const cell = tr.querySelector('.' + col.cssClass);
+        if (cell) cell.classList.toggle('col-hidden', hidden);
+      });
+    });
+  }
+
+  // Sync checkboxes in the view menu
+  document.querySelectorAll('#view-toggle-menu input[data-pref]').forEach(cb => {
+    cb.checked = !!vp[cb.dataset.pref];
+  });
+}
+
+function toggleViewMenu(e) {
+  e && e.stopPropagation();
+  const menu = document.getElementById('view-toggle-menu');
+  if (!menu) return;
+  const isOpen = menu.classList.contains('open');
+  if (isOpen) {
+    closeViewMenu();
+  } else {
+    applyViewPrefs();
+    menu.classList.add('open');
+  }
+}
+
+function closeViewMenu() {
+  const menu = document.getElementById('view-toggle-menu');
+  if (menu) menu.classList.remove('open');
+}
+
+function toggleViewPref(key, val) {
+  ensureViewPrefs();
+  state.settings.viewPrefs[key] = val;
+  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
+  applyViewPrefs();
+  // Re-render if it affects transactions (future txs)
+  if (key === 'showFutureTxs' || key === 'showClosingRows') {
+    renderTransactions();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -877,3 +983,7 @@ window.toggleSplitDropdown          = toggleSplitDropdown;
 window.closeSplitDropdown           = closeSplitDropdown;
 window.toggleSidebar                = toggleSidebar;
 window.pinSidebar                  = pinSidebar;
+window.toggleViewMenu              = toggleViewMenu;
+window.closeViewMenu               = closeViewMenu;
+window.toggleViewPref              = toggleViewPref;
+window.applyViewPrefs              = applyViewPrefs;

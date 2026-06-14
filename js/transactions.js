@@ -2127,10 +2127,15 @@ function renderTransactions() {
   // Merged in-period rows (present + future that fell in period)
   const inPeriodRows = [...inPeriodPresent, ...inPeriodFuture];
 
+  // Apply viewPrefs: hide future transactions if disabled
+  const vp = state.settings.viewPrefs || {};
+  const hideFutures = vp.showFutureTxs === false;
+  const visibleOutOfPeriodFuture = hideFutures ? [] : outOfPeriodFuture;
+
   // Count badge only counts in-period present rows
   document.getElementById('tx-count-badge').textContent = inPeriodRows.length;
 
-  if (inPeriodRows.length === 0 && outOfPeriodFuture.length === 0 && outOfPeriodPresent.length === 0) {
+  if (inPeriodRows.length === 0 && visibleOutOfPeriodFuture.length === 0 && outOfPeriodPresent.length === 0) {
     const colCount = isSingleAccount ? 10 : 11;
     tbody.innerHTML = `<tr class="empty-row"><td colspan="${colCount}">No hay movimientos registrados.</td></tr>`;
     return;
@@ -2354,13 +2359,13 @@ function renderTransactions() {
   };
 
   // Render future rows first (above header) so they expand upward
-  if (outOfPeriodFuture.length > 0) {
+  if (visibleOutOfPeriodFuture.length > 0) {
     const colCount  = isSingleAccount ? 10 : 11;
     const groupKey  = 'future-group-open';
     const isOpen    = sessionStorage.getItem(groupKey) === 'true';
 
     if (isOpen) {
-      outOfPeriodFuture.forEach(tx => appendTxRow(tx, true));
+      visibleOutOfPeriodFuture.forEach(tx => appendTxRow(tx, true));
     }
 
     // Header acts as separator between future and present
@@ -2373,7 +2378,7 @@ function renderTransactions() {
     headerDiv.innerHTML = `
       <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
       <span>Cuotas futuras</span>
-      <span class="future-group-count" style="margin-left:auto;">${outOfPeriodFuture.length}</span>
+      <span class="future-group-count" style="margin-left:auto;">${visibleOutOfPeriodFuture.length}</span>
     `;
     headerDiv.addEventListener('click', () => {
       const nowOpen = sessionStorage.getItem(groupKey) === 'true';

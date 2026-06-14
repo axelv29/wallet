@@ -177,7 +177,7 @@
               </button>
             </div>
           </div>
-          <button class="btn" onclick="openImportModal()">
+          <button class="btn" id="import-btn" onclick="openImportModal()">
             <i data-lucide="file-spreadsheet"></i> Importar
           </button>
           <button class="btn" id="filter-toggle-btn" onclick="openFilterPanel()">
@@ -198,6 +198,32 @@
           </div>
         </div>
         <div class="toolbar-right">
+          <div class="view-toggle-wrap" id="view-toggle-wrap">
+            <button class="theme-btn" onclick="toggleViewMenu(event)" title="Preferencias de vista">
+              <i data-lucide="eye"></i>
+            </button>
+            <div class="view-toggle-menu" id="view-toggle-menu">
+              <div class="view-toggle-section">
+                <div class="view-toggle-section-title">Columnas</div>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColDate" onchange="toggleViewPref('showColDate',this.checked)"><span>Fecha</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColAccount" onchange="toggleViewPref('showColAccount',this.checked)"><span>Cuenta</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColPayee" onchange="toggleViewPref('showColPayee',this.checked)"><span>Beneficiario</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColInstallment" onchange="toggleViewPref('showColInstallment',this.checked)"><span>Cuota</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColNotes" onchange="toggleViewPref('showColNotes',this.checked)"><span>Notas</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColTags" onchange="toggleViewPref('showColTags',this.checked)"><span>Etiquetas</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColCategory" onchange="toggleViewPref('showColCategory',this.checked)"><span>Categoría</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showColAmount" onchange="toggleViewPref('showColAmount',this.checked)"><span>Monto</span></label>
+              </div>
+              <div class="view-toggle-sep"></div>
+              <div class="view-toggle-section">
+                <div class="view-toggle-section-title">Vista</div>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showAccountBalances" onchange="toggleViewPref('showAccountBalances',this.checked)"><span>Balances en sidebar</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showFutureTxs" onchange="toggleViewPref('showFutureTxs',this.checked)"><span>Transacciones futuras</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showImportBtn" onchange="toggleViewPref('showImportBtn',this.checked)"><span>Botón importar</span></label>
+                <label class="view-toggle-item"><input type="checkbox" data-pref="showFilterBtn" onchange="toggleViewPref('showFilterBtn',this.checked)"><span>Botón filtros</span></label>
+              </div>
+            </div>
+          </div>
           <div class="search-box" id="search-box">
             <button class="search-box-btn" onclick="toggleSearchBox()" title="Buscar movimientos">
               <i data-lucide="search"></i>
