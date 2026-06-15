@@ -164,19 +164,9 @@
 
       <div class="toolbar">
         <div class="toolbar-left">
-          <div class="split-btn" id="new-tx-split">
-            <button class="btn btn-primary split-btn-main" onclick="openTransactionModal()">
-              <i data-lucide="plus"></i> Nueva transacción
-            </button>
-            <button class="btn btn-primary split-btn-arrow" onclick="toggleSplitDropdown(event)" title="Más opciones">
-              <i data-lucide="chevron-down"></i>
-            </button>
-            <div class="split-dropdown" id="split-dropdown">
-              <button class="split-dropdown-item" onclick="openTransferModal();closeSplitDropdown()">
-                <i data-lucide="arrow-left-right"></i> Transferencia
-              </button>
-            </div>
-          </div>
+          <button class="btn btn-primary" onclick="openTransactionModal()">
+            <i data-lucide="plus"></i> Nueva transacción
+          </button>
           <button class="btn" id="import-btn" onclick="openImportModal()">
             <i data-lucide="file-spreadsheet"></i> Importar
           </button>
@@ -1053,66 +1043,7 @@
   </div>
 </div>
 
-<!-- ══════════════ MODAL: Transferencia entre cuentas ══════════════ -->
-<div class="modal-overlay" id="transfer-modal">
-  <div class="modal-card">
-    <div class="modal-head">
-      <span class="modal-title">Transferencia entre cuentas</span>
-      <button class="modal-close" onclick="closeTransferModal()"><i data-lucide="x"></i></button>
-    </div>
-    <form id="transfer-form" onsubmit="handleTransferSubmit(event)" novalidate>
-      <div class="modal-body">
-
-        <!-- Date -->
-        <div class="form-group">
-          <label class="form-label" for="tf-date">Fecha</label>
-          <input type="date" id="tf-date">
-        </div>
-
-        <!-- Origin + Destination accounts -->
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="tf-account-from">Desde</label>
-            <select id="tf-account-from" required onchange="onTransferAccountChange()"></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="tf-account-to">Hacia</label>
-            <select id="tf-account-to" required onchange="updateTransferConvertedNote()"></select>
-          </div>
-        </div>
-
-        <!-- Amount -->
-        <div class="form-group">
-          <label class="form-label" for="tf-amount">Monto</label>
-          <div class="tf-amount-wrap">
-            <input type="text" id="tf-amount" inputmode="decimal" placeholder="0" required>
-            <span class="tf-amount-currency" id="tf-amount-currency"></span>
-          </div>
-          <div class="tf-converted-note" id="tf-converted-note" style="display:none;"></div>
-        </div>
-
-        <!-- Tags -->
-        <div class="form-group">
-          <label class="form-label">Etiquetas</label>
-          <div class="tags-wrapper">
-            <div class="tags-box" id="tf-tags-checklist"></div>
-          </div>
-        </div>
-
-        <!-- Notes -->
-        <div class="form-group">
-          <label class="form-label" for="tf-notes">Nota</label>
-          <input type="text" id="tf-notes" placeholder="Comentario opcional...">
-        </div>
-
-      </div>
-      <div class="modal-foot">
-        <button type="button" class="btn" onclick="closeTransferModal()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Transferir</button>
-      </div>
-    </form>
-  </div>
-</div>
+<!-- ══════════════ MODAL: Transferencia entre cuentas (deshabilitado) ══════════════ -->
 
 <!-- ══════════════ MODAL: Importar CSV/XLS/PDF/IMG ══════════════ -->
 <div class="modal-overlay" id="csv-import-modal">
