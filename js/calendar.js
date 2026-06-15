@@ -117,8 +117,8 @@ function renderCalGrid() {
   }
 }
 
-function calSelectDay(dateStr) {
-  event.stopPropagation();
+function calSelectDay(dateStr, ev) {
+  (ev || event).stopPropagation();
   if (!_calState.selStart || (_calState.selStart && _calState.selEnd)) {
     _calState.selStart = dateStr;
     _calState.selEnd = null;
@@ -171,8 +171,8 @@ function renderCalMonthsGrid() {
   }
 }
 
-function calSelectMonth(month) {
-  event.stopPropagation();
+function calSelectMonth(month, ev) {
+  (ev || event).stopPropagation();
   const sel = { year: _calState.viewYear, month };
   if (!_calState.selStartMonth || (_calState.selStartMonth && _calState.selEndMonth)) {
     _calState.selStartMonth = sel;

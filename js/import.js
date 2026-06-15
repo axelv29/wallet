@@ -1041,14 +1041,14 @@ Reglas:
       }]
     };
 
-    console.log('[IA] Enviando archivo a Gemini:', file.name, mimeType, '(' + Math.round(base64Data.length * 0.75 / 1024) + ' KB)');
+    // console.log('[IA] Enviando archivo a Gemini:', file.name, mimeType, '(' + Math.round(base64Data.length * 0.75 / 1024) + ' KB)');
 
     const maxRetries = 2;
     let lastError = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
-        console.log('[IA] Reintento ' + attempt + '/' + maxRetries + '…');
+        // console.log('[IA] Reintento ' + attempt + '/' + maxRetries + '…');
         await new Promise(r => setTimeout(r, 2000 * attempt));
       }
 
@@ -1074,14 +1074,14 @@ Reglas:
         if (!textResponse) throw new Error('Respuesta vacía de Gemini');
 
         textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-        console.log('[IA] Respuesta:', textResponse.substring(0, 200));
+        // console.log('[IA] Respuesta:', textResponse.substring(0, 200));
         const parsed = JSON.parse(textResponse);
 
         if (!parsed.headers || !parsed.rows || !Array.isArray(parsed.rows)) {
           throw new Error('Formato de respuesta inválido de la IA');
         }
 
-        console.log('[IA] Transacciones extraídas:', parsed.rows.length);
+        // console.log('[IA] Transacciones extraídas:', parsed.rows.length);
         loadGeminiDataAsCsv(parsed, file.name);
         return;
       }
