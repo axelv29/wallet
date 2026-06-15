@@ -3460,7 +3460,6 @@ function selectClosingTxs(key, accountId) {
   state.selectedTxIds = new Set();
   state.transactions.forEach(tx => {
     if (tx.account_id !== accId) return;
-    if (tx.is_future) return;
     const txPeriod = tx.closing_period || (tx.date ? tx.date.substring(0, 7) : '');
     if (txPeriod === periodKey) state.selectedTxIds.add(tx.id);
   });

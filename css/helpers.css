@@ -98,6 +98,7 @@
   color: var(--text-mid);
   user-select: none;
   transition: background 0.12s ease;
+  position: relative;
 }
 
 .closing-group-header:hover {
