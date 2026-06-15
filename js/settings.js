@@ -1111,7 +1111,7 @@ function renderCcPaymentSummary(paid) {
     <div class="cc-pay-paid-row"><span><i data-lucide="check-circle"></i> Pagado</span><span>${formatCurrency(ccPaymentSum)}</span></div>
     <div class="cc-pay-paid-row cc-pay-remaining"><span>Restante</span><span>${formatCurrency(ccPaymentRemaining)}</span></div>
     <div style="margin-top:8px;display:flex;gap:6px;">
-      <button type="button" class="btn btn-danger btn-small" onclick="cancelPaymentFromModal()"><i data-lucide="trash-2" style="width:12px;height:12px;"></i> Cancelar pagos</button>
+      <button type="button" class="btn btn-ghost btn-small" style="color:var(--text-lo);font-size:11px;padding:4px 8px;" onclick="cancelPaymentFromModal()"><i data-lucide="trash-2" style="width:11px;height:11px;"></i> Cancelar pagos</button>
     </div>
   `;
   lucide.createIcons();

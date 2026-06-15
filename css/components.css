@@ -149,7 +149,6 @@ table.ledger thead th.c { text-align: center; }
 }
 
 table.ledger tbody tr {
-  border-bottom: 1px solid var(--border);
   transition: background 0.08s;
 }
 
@@ -159,6 +158,7 @@ table.ledger tbody td {
   padding: 6px 16px;
   vertical-align: middle;
   line-height: 1.3;
+  border-bottom: 1px solid var(--border);
 }
 
 td.date-cell {
@@ -1619,7 +1619,6 @@ tr.split-child-row td.tx-cell {
 }
 tr.split-child-row td:not(.split-child-indent):not(.tx-cell) {
   background: var(--bg-surface);
-  font-size: 11px;
 }
 tr.split-child-row:hover td:not(.split-child-indent):not(.tx-cell) {
   background: var(--bg-raised);

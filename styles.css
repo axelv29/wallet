@@ -3337,7 +3337,6 @@ tr.split-child-row:hover {
   background: var(--bg-sunken);
 }
 tr.split-child-row td {
-  font-size: 12.5px;
   padding-top: 5px !important;
   padding-bottom: 5px !important;
   border-bottom: 1px solid var(--border);

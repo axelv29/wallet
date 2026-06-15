@@ -85,18 +85,19 @@
 
 .closing-group-row td {
   padding: 0 !important;
+  border-left: 3px solid var(--accent);
 }
 
 .closing-group-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 5px 16px;
+  gap: 12px;
+  padding: 8px 20px;
   background: var(--bg-raised);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-mid);
   user-select: none;
-  transition: background 0.1s;
+  transition: background 0.12s ease;
 }
 
 .closing-group-header:hover {
@@ -104,10 +105,17 @@
 }
 
 .closing-group-arrow {
-  display: inline-block;
-  transition: transform 0.15s;
-  font-size: 14px;
-  color: var(--text-mid);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease;
+  color: var(--text-lo);
+  flex-shrink: 0;
+}
+
+.closing-group-arrow svg {
+  width: 14px;
+  height: 14px;
 }
 
 .closing-group-arrow.open {
@@ -116,71 +124,90 @@
 
 .closing-group-label {
   font-weight: 600;
+  font-size: 12.5px;
   color: var(--text-mid);
+  letter-spacing: -0.01em;
 }
 
 .closing-group-meta {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
   color: var(--text-lo);
-  margin-left: 24px;
+  margin-left: 4px;
 }
 
 .closing-group-meta-count {
-  margin-left: 24px;
-  font-size: 12px;
+  font-size: 10.5px;
+  color: var(--text-lo);
+  background: var(--bg-sunken);
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
 }
 
 .closing-group-total {
   margin-left: auto;
   font-family: var(--font-mono, monospace);
   font-weight: 600;
+  font-size: 13px;
   color: var(--text-mid);
+  letter-spacing: -0.02em;
 }
 
 .closing-paid-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: none;
+  width: 24px;
+  height: 24px;
+  background: var(--bg-sunken);
   border: none;
+  border-radius: 50%;
   padding: 0;
   color: var(--text-lo);
   cursor: pointer;
-  transition: color 0.15s;
+  transition: background 0.12s, color 0.12s;
   flex-shrink: 0;
 }
 
 .closing-paid-btn:hover {
-  color: var(--positive);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .closing-paid-btn.paid {
+  background: var(--positive-bg);
   color: var(--positive);
 }
 
 .closing-paid-btn svg {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
 }
 
 .closing-paid-btn:disabled {
   cursor: default;
+  opacity: 0.5;
 }
 
 .closing-more-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: none;
+  width: 24px;
+  height: 24px;
+  background: transparent;
   border: none;
+  border-radius: var(--r-sm);
   padding: 0;
   color: var(--text-lo);
   cursor: pointer;
-  transition: color 0.15s;
+  transition: background 0.12s, color 0.12s;
   flex-shrink: 0;
   position: relative;
 }
-.closing-more-btn:hover { color: var(--text-hi); }
+.closing-more-btn:hover { color: var(--text-hi); background: var(--bg-sunken); }
 .closing-more-btn svg { width: 14px; height: 14px; }
 
 .closing-menu-dropdown {
@@ -715,21 +742,22 @@ tr.tx-future:hover td:not(.actions-cell) {
   opacity: 0.85;
 }
 
-/* ── FUTURE GROUP ROWS (mismo estilo que closing) ─────── */
+/* ── FUTURE GROUP ROWS ──────────────────────────────── */
 .future-group-row td {
   padding: 0 !important;
+  border-left: 3px solid var(--text-lo);
 }
 
 .future-group-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 5px 16px;
+  gap: 12px;
+  padding: 8px 20px;
   background: var(--bg-raised);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-mid);
   user-select: none;
-  transition: background 0.1s;
+  transition: background 0.12s ease;
   cursor: pointer;
 }
 
@@ -738,24 +766,32 @@ tr.tx-future:hover td:not(.actions-cell) {
 }
 
 .future-group-arrow {
-  display: inline-block;
-  transition: transform 0.15s;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease;
   color: var(--text-lo);
+  flex-shrink: 0;
 }
 
-.future-group-arrow.open {
-  transform: rotate(90deg);
+.future-group-arrow svg {
+  width: 14px;
+  height: 14px;
 }
 
 .future-group-label {
   font-weight: 600;
-  color: var(--text-mid);
+  font-size: 12.5px;
+  color: var(--text-hi);
+  letter-spacing: -0.01em;
 }
 
 .future-group-count {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-lo);
+  background: var(--bg-sunken);
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
   margin-left: auto;
 }
 

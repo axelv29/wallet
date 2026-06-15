@@ -2504,7 +2504,7 @@ function renderTransactions() {
     headerTd.colSpan = colCount;
     headerTd.innerHTML = `
       <div class="future-group-header">
-        <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
+        <span class="future-group-arrow ${isOpen ? 'open' : ''}"><i data-lucide="chevron-right"></i></span>
         <span class="future-group-label">Cuotas futuras</span>
         <span class="future-group-count">${futureNonCC.length} mov.</span>
       </div>
@@ -2536,22 +2536,26 @@ function renderTransactions() {
       const payIcon = paid ? 'calendar-check' : (isCurrentPeriod ? 'calendar-1' : (status ? status.icon : 'circle'));
       const payOpacity = '1';
       const payColor = paid ? 'var(--positive)' : (isCurrentPeriod ? 'var(--text-mid)' : (status ? status.color : 'var(--text-lo)'));
-      const payTitle = paid ? 'Marcar como no pagado' : (status ? status.label : 'Pagar');
+      const statusDetail = status && status.detail ? ` · ${status.detail}` : '';
+      const payTitle = paid
+        ? `Pagado${statusDetail} — click para marcar como no pagado`
+        : (status ? `${status.label}${statusDetail}` : 'Pagar');
       const payAction = paid
         ? `onToggleClosingPay('${group.period}','${groupAccountId}','${group.key}',${group.total})`
         : (status && status.status !== 'not_closed' && status.status !== 'no_schedule')
           ? `openPaymentModal('${group.period}','${groupAccountId}')`
           : '';
 
+      const periodRange = getPeriodDateRange(groupAccountId, group.period);
       const headerTr = document.createElement('tr');
       headerTr.className = 'closing-group-row';
       const headerTd = document.createElement('td');
       headerTd.colSpan = colCount;
       headerTd.innerHTML = `
         <div class="closing-group-header">
-          <span class="closing-group-arrow ${isOpen ? 'open' : ''}">›</span>
-          <span class="closing-group-label">Cierre ${group.label}</span>
-          ${isOpen ? `<span class="closing-group-meta">${getPeriodDateRange(groupAccountId, group.period)}<span class="closing-group-meta-count">${group.txs.length} mov.</span></span>` : ''}
+          <span class="closing-group-arrow ${isOpen ? 'open' : ''}"><i data-lucide="chevron-right"></i></span>
+          <span class="closing-group-label" title="${periodRange}">Cierre ${group.label}</span>
+          ${isOpen ? `<span class="closing-group-meta-count">${group.txs.length} mov.</span>` : ''}
           <span class="closing-group-total">${totalHtml}</span>
           <button class="closing-paid-btn ${paid ? 'paid' : ''}" ${payAction ? `onclick="event.stopPropagation();${payAction}"` : 'disabled'} style="opacity:${payOpacity};color:${payColor}" title="${payTitle}">
             <i data-lucide="${payIcon}"></i>
@@ -2605,7 +2609,7 @@ function renderTransactions() {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'future-group-header';
     headerDiv.innerHTML = `
-      <span class="future-group-arrow ${isOpen ? 'open' : ''}">›</span>
+      <span class="future-group-arrow ${isOpen ? 'open' : ''}"><i data-lucide="chevron-right"></i></span>
       <span>Fuera del período</span>
       <span class="future-group-count" style="margin-left:auto;">${outOfPeriodPresent.length}</span>
     `;
