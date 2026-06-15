@@ -369,7 +369,7 @@ function onCsvMappingChange() {
   tbody.innerHTML = '';
   const importAccId = document.getElementById('csv-target-account')?.value;
   const importAcc = state.accounts.find(a => a.id === importAccId);
-  const importCur = importAcc?.currency || state.settings.currency || 'ARS';
+  const importCur = importAcc?.currency || state.settings.currency || 'UYU';
   const cats = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name);
 
   parsed.forEach((tx, idx) => {
@@ -999,7 +999,7 @@ async function processFileWithGemini(file) {
     const mimeType = getMimeType(file);
 
     const categoriesList = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name).join(', ');
-    const curCode = state.settings.currency || 'ARS';
+    const curCode = state.settings.currency || 'UYU';
 
     const prompt = `Actúas como un procesador de extractos bancarios.
 El usuario subió un archivo que contiene su extracto bancario o resumen de cuenta.

@@ -94,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pcal && pcal.classList.contains('open') && !e.target.closest('.modal-card') && !e.target.closest('.period-option-custom')) {
       closePeriodCalendar();
     }
+    const ccCal = document.getElementById('cc-date-calendar-popup');
+    if (ccCal && ccCal.classList.contains('open') && !e.target.closest('.modal-card') && !e.target.closest('.cc-date-trigger')) {
+      closeCcDateCalendar();
+    }
     const searchBox = document.getElementById('search-box');
     if (searchBox && searchBox.classList.contains('expanded') && !searchBox.contains(e.target)) {
       collapseSearchBox();
@@ -212,9 +216,9 @@ function showView(name) {
     const keyInput = document.getElementById('set-gemini-key');
     if (keyInput) keyInput.value = state.settings.geminiKey || '';
     const curSel = document.getElementById('set-currency');
-    if (curSel) curSel.value = state.settings.currency || 'ARS';
+    if (curSel) curSel.value = state.settings.currency || 'UYU';
     const accCurSel = document.getElementById('acc-currency');
-    if (accCurSel) accCurSel.value = state.settings.currency || 'ARS';
+    if (accCurSel) accCurSel.value = state.settings.currency || 'UYU';
     const symCb = document.getElementById('set-show-symbol');
     if (symCb) symCb.checked = state.settings.showSymbol !== false;
     const decSel = document.getElementById('set-decimals');
@@ -961,8 +965,31 @@ window.calculateCycleBalance   = calculateCycleBalance;
 window.addMonths               = addMonths;
 window.openCcScheduleModal     = openCcScheduleModal;
 window.closeCcScheduleModal    = closeCcScheduleModal;
-window.addCcScheduleRow        = addCcScheduleRow;
+window.onCcScheduleAccChange   = onCcScheduleAccChange;
+window.onCcScheduleDateChange  = onCcScheduleDateChange;
 window.saveCcSchedule          = saveCcSchedule;
+window.selectCcTimelineMonth   = selectCcTimelineMonth;
+window.openCcDateCalendar      = openCcDateCalendar;
+window.closeCcDateCalendar     = closeCcDateCalendar;
+window.ccCalNavMonth           = ccCalNavMonth;
+window.ccCalSelectDay          = ccCalSelectDay;
+window.ccCalClear              = ccCalClear;
+window.onDefaultScheduleToggle = onDefaultScheduleToggle;
+window.onDefaultDayInput       = onDefaultDayInput;
+window.onDefaultMonthToggle    = onDefaultMonthToggle;
+window.openPaymentModal        = openPaymentModal;
+window.closePaymentModal       = closePaymentModal;
+window.setPaymentType          = setPaymentType;
+window.onPaymentSourceChange   = onPaymentSourceChange;
+window.onPaymentAmountInput    = onPaymentAmountInput;
+window.onPaymentFineToggle     = onPaymentFineToggle;
+window.onPaymentFineInput      = onPaymentFineInput;
+window.confirmPayment          = confirmPayment;
+window.cancelPaymentFromModal  = cancelPaymentFromModal;
+window.editPaymentField       = editPaymentField;
+window.editPaymentPayee       = editPaymentPayee;
+window.renderPaymentPreview   = renderPaymentPreview;
+window.closeExistingPaymentDropdown = closeExistingPaymentDropdown;
 window.openSplitModal         = openSplitModal;
 window.closeSplitModal        = closeSplitModal;
 window.addSplitRow            = addSplitRow;
@@ -990,5 +1017,11 @@ window.applyViewPrefs              = applyViewPrefs;
 window.toggleClosingGroup         = toggleClosingGroup;
 window.isClosingGroupOpen         = isClosingGroupOpen;
 window.toggleClosingPaid          = toggleClosingPaid;
+window.removeClosingPayments      = removeClosingPayments;
+window.onToggleClosingPay         = onToggleClosingPay;
 window.isClosingPaid              = isClosingPaid;
+window.getClosingStatus           = getClosingStatus;
+window.toggleClosingMenu          = toggleClosingMenu;
+window.closeClosingMenu           = closeClosingMenu;
+window.selectClosingTxs           = selectClosingTxs;
 window.getBillingPeriodTxs        = getBillingPeriodTxs;

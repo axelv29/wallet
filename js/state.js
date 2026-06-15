@@ -39,7 +39,7 @@ let state = {
       { name: 'Pago de tarjeta', color: '#22c55e', isSystem: true },
     ]
   },
-  settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'ARS', showSymbol: true, decimals: 2, amountStyle: 'default',
+  settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'UYU', showSymbol: true, decimals: 2, amountStyle: 'default',
     viewPrefs: {
       showImportBtn: true,
       showFilterBtn: true,
@@ -135,7 +135,7 @@ function loadData() {
     saveData('predefined');
   }
 
-  // ── Migration: card_closing_day/card_due_day → card_schedule ──
+  // ── Migration: card_closing_day/card_due_day → card_schedule (ISO dates) ──
   let scheduleMigrated = false;
   state.accounts.forEach(acc => {
     if (acc.type === 'credit_card' && !acc.card_schedule) {
@@ -145,14 +145,54 @@ function loadData() {
       if (closing || due) {
         const now = new Date();
         const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        acc.card_schedule[ym] = { closing: closing || 1, due: due || 10 };
+        const y = now.getFullYear(), m = now.getMonth() + 1;
+        const closingDay = closing || 1;
+        const dueDay = due || 10;
+        const dueOff = dueDay <= closingDay ? 1 : 0;
+        acc.card_schedule[ym] = { closing: formatDateISO(new Date(y, m - 1, closingDay)), due: formatDateISO(new Date(y, m - 1 + dueOff, dueDay)) };
       }
       delete acc.card_closing_day;
       delete acc.card_due_day;
       scheduleMigrated = true;
     }
   });
-  if (scheduleMigrated) saveData('accounts');
+  // ── Migration: convert day-number card_schedule to ISO dates ──
+  let scheduleIsoMigrated = false;
+  state.accounts.forEach(acc => {
+    if (acc.type === 'credit_card' && acc.card_schedule) {
+      Object.keys(acc.card_schedule).forEach(ym => {
+        const sch = acc.card_schedule[ym];
+        if (sch && typeof sch.closing === 'number') {
+          const [y, m] = ym.split('-').map(Number);
+          const closingDay = sch.closing;
+          const dueDay = sch.due || 10;
+          const dueOff = dueDay <= closingDay ? 1 : 0;
+          acc.card_schedule[ym] = { closing: formatDateISO(new Date(y, m - 1, closingDay)), due: formatDateISO(new Date(y, m - 1 + dueOff, dueDay)) };
+          scheduleIsoMigrated = true;
+        }
+      });
+    }
+  });
+  if (scheduleMigrated || scheduleIsoMigrated) saveData('accounts');
+
+  // ── Migration: ensure default_schedule exists on CC accounts ──
+  state.accounts.forEach(acc => {
+    if (acc.type === 'credit_card') {
+      if (!acc.default_schedule) {
+        acc.default_schedule = { active: false, closing_day: 20, due_offset: 10, next_month: false };
+      } else {
+        // Migrate old fields
+        if (acc.default_schedule.closing_month_offset !== undefined) {
+          acc.default_schedule.next_month = !!acc.default_schedule.closing_month_offset;
+          delete acc.default_schedule.closing_month_offset;
+        }
+        if (acc.default_schedule.due_month_offset !== undefined) {
+          delete acc.default_schedule.due_month_offset;
+        }
+        if (acc.default_schedule.next_month === undefined) acc.default_schedule.next_month = false;
+      }
+    }
+  });
 
   // ── Migration: Convert account.balance to "Ajuste de saldo" transactions ──
   let migrated = false;

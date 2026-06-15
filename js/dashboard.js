@@ -601,7 +601,14 @@ function renderDashboard() {
   if (nextBtn) nextBtn.style.display = isMonthMode ? '' : 'none';
 
   // ── Filter transactions for selected period ──
-  const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
+  const dashIncludeTx = (tx) => {
+    if (tx.excluded || tx.split_parent_id) return false;
+    const acc = state.accounts.find(a => a.id === tx.account_id);
+    if (acc && acc.type === 'credit_card') return true;
+    return !tx.is_future;
+  };
+
+  const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
 
   let totalIncome = 0, totalExpenses = 0;
   monthTxs.forEach(tx => {
@@ -741,7 +748,7 @@ function renderDashboard() {
   const recentList = document.getElementById('dash-recent-list');
   if (recentList) {
     recentList.innerHTML = '';
-    let recent = [...state.transactions].filter(tx => !tx.is_future && !tx.excluded && isTxInPeriod(tx));
+    let recent = [...state.transactions].filter(tx => dashIncludeTx(tx) && isTxInPeriod(tx));
     if (dashState.accounts !== null) {
       const accSet = new Set(dashState.accounts);
       recent = recent.filter(tx => accSet.has(tx.account_id));
@@ -753,7 +760,7 @@ function renderDashboard() {
       recent.forEach(tx => {
         const isExpense = tx.amount < 0;
         const rAcc = state.accounts.find(a => a.id === tx.account_id);
-        const rCur = rAcc?.currency || state.settings.currency || 'ARS';
+        const rCur = rAcc?.currency || state.settings.currency || 'UYU';
         const rTooltip = getConvertedTooltip(tx.amount, rCur);
         const amtStyle = state.settings.amountStyle || 'default';
         const showSign = amtStyle !== 'no-sign';
@@ -805,7 +812,7 @@ function renderDashCharts() {
     }
     if (isAllMode) {
       // Find all months that have transactions
-      const dates = state.transactions.filter(t => !t.is_future && !t.excluded).map(t => t.date);
+      const dates = state.transactions.filter(t => dashIncludeTx(t)).map(t => t.date);
       if (dates.length > 0) {
         dates.sort();
         const first = new Date(dates[0] + 'T00:00:00');
@@ -824,7 +831,7 @@ function renderDashCharts() {
       const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
       state.transactions.forEach(tx => {
         const td = new Date(tx.date + 'T00:00:00');
-        if (td.getMonth() === m && td.getFullYear() === y && !tx.is_future && !tx.excluded && !tx.split_parent_id) {
+        if (td.getMonth() === m && td.getFullYear() === y && dashIncludeTx(tx)) {
           if (accFilter && !accFilter.has(tx.account_id)) return;
           if (tx.amount > 0) inc += tx.amount;
           else exp += Math.abs(tx.amount);
@@ -839,7 +846,7 @@ function renderDashCharts() {
   // ── Donut chart (expenses) ──
   const donutCanvas = document.getElementById('dash-donut-chart');
   if (donutCanvas && dashState.visibleSections.gastos && donutCanvas.offsetWidth > 0) {
-    const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
+    const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
     const catTotals = {};
     monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';
@@ -854,7 +861,7 @@ function renderDashCharts() {
   // ── Donut chart (income) ──
   const donutIncomeCanvas = document.getElementById('dash-donut-income-chart');
   if (donutIncomeCanvas && dashState.visibleSections.ingresos && donutIncomeCanvas.offsetWidth > 0) {
-    const monthTxs = dashGetTxForPeriod().filter(tx => !tx.is_future);
+    const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
     const catTotals = {};
     monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';

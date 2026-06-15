@@ -177,12 +177,13 @@ function loadData() {
     state.accounts = JSON.parse(lsAcc);
   } else {
     const ym = getCurrentYearMonth();
+    const [sy, sm] = ym.split('-').map(Number);
     state.accounts = [
       { id: 'acc-1', name: 'Itaú Débito',  type: 'liquid',      balance: 1047.40 },
       { id: 'acc-2', name: 'Brou',          type: 'liquid',      balance: 1900.00 },
       { id: 'acc-3', name: 'Efectivo',      type: 'liquid',      balance: 1727.00 },
-      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: -10300.38, card_schedule: { [ym]: { closing: 20, due: 30 } } },
-      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: -460.00,   card_schedule: { [ym]: { closing: 15, due: 25 } } }
+      { id: 'acc-4', name: 'Itaú Crédito',  type: 'credit_card', balance: -10300.38, card_schedule: { [ym]: { closing: formatDateISO(new Date(sy, sm - 1, 20)), due: formatDateISO(new Date(sy, sm, 30)) } } },
+      { id: 'acc-5', name: 'Deudas',        type: 'credit_card', balance: -460.00,   card_schedule: { [ym]: { closing: formatDateISO(new Date(sy, sm - 1, 15)), due: formatDateISO(new Date(sy, sm, 25)) } } }
     ];
     saveData('accounts');
   }
@@ -197,7 +198,11 @@ function loadData() {
       if (closing || due) {
         const now = new Date();
         const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        acc.card_schedule[ym] = { closing: closing || 1, due: due || 10 };
+        const y = now.getFullYear(), m = now.getMonth() + 1;
+        const closingDay = closing || 1;
+        const dueDay = due || 10;
+        const dueOff = dueDay <= closingDay ? 1 : 0;
+        acc.card_schedule[ym] = { closing: formatDateISO(new Date(y, m - 1, closingDay)), due: formatDateISO(new Date(y, m - 1 + dueOff, dueDay)) };
       }
       delete acc.card_closing_day;
       delete acc.card_due_day;
@@ -205,6 +210,25 @@ function loadData() {
     }
   });
   if (scheduleMigrated) saveData('accounts');
+
+  // ── Migration: convert day-number card_schedule to ISO dates ──
+  let scheduleIsoMigrated = false;
+  state.accounts.forEach(acc => {
+    if (acc.type === 'credit_card' && acc.card_schedule) {
+      Object.keys(acc.card_schedule).forEach(ym => {
+        const sch = acc.card_schedule[ym];
+        if (sch && typeof sch.closing === 'number') {
+          const [y, m] = ym.split('-').map(Number);
+          const closingDay = sch.closing;
+          const dueDay = sch.due || 10;
+          const dueOff = dueDay <= closingDay ? 1 : 0;
+          acc.card_schedule[ym] = { closing: formatDateISO(new Date(y, m - 1, closingDay)), due: formatDateISO(new Date(y, m - 1 + dueOff, dueDay)) };
+          scheduleIsoMigrated = true;
+        }
+      });
+    }
+  });
+  if (scheduleIsoMigrated) saveData('accounts');
 
   if (lsTx) {
     state.transactions = JSON.parse(lsTx);
@@ -457,11 +481,13 @@ function createAccountFromFloating(event) {
 
   const newAcc = { id: 'acc-' + Date.now(), name, type, balance: 0, currency };
   if (type === 'credit_card') {
-    const closing = parseInt(document.getElementById('acc-f-close-day').value) || 1;
-    const due = parseInt(document.getElementById('acc-f-due-day').value) || 10;
+    const closingDay = parseInt(document.getElementById('acc-f-close-day').value) || 1;
+    const dueDay = parseInt(document.getElementById('acc-f-due-day').value) || 10;
     const ym = getCurrentYearMonth();
+    const [y, m] = ym.split('-').map(Number);
+    const dueOff = dueDay <= closingDay ? 1 : 0;
     newAcc.card_schedule = {};
-    newAcc.card_schedule[ym] = { closing, due };
+    newAcc.card_schedule[ym] = { closing: formatDateISO(new Date(y, m - 1, closingDay)), due: formatDateISO(new Date(y, m - 1 + dueOff, dueDay)) };
   }
 
   state.accounts.push(newAcc);
@@ -506,11 +532,13 @@ function createNewAccount(event) {
 
   const newAcc = { id: 'acc-' + Date.now(), name, type, balance };
   if (type === 'credit_card') {
-    const closing = parseInt(document.getElementById('acc-close-day').value) || 1;
-    const due = parseInt(document.getElementById('acc-due-day').value) || 10;
+    const closingDay = parseInt(document.getElementById('acc-close-day').value) || 1;
+    const dueDay = parseInt(document.getElementById('acc-due-day').value) || 10;
     const ym = getCurrentYearMonth();
+    const [y, m] = ym.split('-').map(Number);
+    const dueOff = dueDay <= closingDay ? 1 : 0;
     newAcc.card_schedule = {};
-    newAcc.card_schedule[ym] = { closing, due };
+    newAcc.card_schedule[ym] = { closing: formatDateISO(new Date(y, m - 1, closingDay)), due: formatDateISO(new Date(y, m - 1 + dueOff, dueDay)) };
   }
 
   state.accounts.push(newAcc);
@@ -552,8 +580,8 @@ function renderSettingsAccountsList() {
     if (acc.type === 'credit_card' && acc.card_schedule) {
       const ym = getCurrentYearMonth();
       const sch = acc.card_schedule[ym];
-      if (sch) {
-        scheduleInfo = ' · cierre ' + sch.closing;
+      if (sch && sch.closing) {
+        scheduleInfo = ' · cierre ' + new Date(sch.closing + 'T12:00:00').getDate();
       }
     }
     const item = document.createElement('div');
@@ -1030,8 +1058,9 @@ function renderSidebar() {
       const sch = getCardSchedule(acc.id, ym);
       if (sch) {
         const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-        const [, m] = ym.split('-').map(Number);
-        scheduleHtml = '<span class="acc-schedule-sidebar">cierre ' + sch.closing + ' ' + monthNamesShort[m] + ' · vence ' + sch.due + ' ' + monthNamesShort[m] + '</span>';
+        const closingDate = new Date(sch.closing + 'T12:00:00');
+        const dueDate = new Date(sch.due + 'T12:00:00');
+        scheduleHtml = '<span class="acc-schedule-sidebar">cierre ' + closingDate.getDate() + ' ' + monthNamesShort[closingDate.getMonth() + 1] + ' · vence ' + dueDate.getDate() + ' ' + monthNamesShort[dueDate.getMonth() + 1] + '</span>';
       } else {
         scheduleHtml = '<span class="acc-schedule-sidebar acc-schedule-pending">Configurar cierre y vencimiento</span>';
       }
@@ -1095,8 +1124,9 @@ function renderHeaderAndMetrics() {
         const sch = getCardSchedule(acc.id, ym);
         if (sch) {
           const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-          const [, m] = ym.split('-').map(Number);
-          subtitle = `Tarjeta · cierre ${sch.closing} ${monthNamesShort[m]} · vence ${sch.due} ${monthNamesShort[m]}`;
+          const closingDate = new Date(sch.closing + 'T12:00:00');
+          const dueDate = new Date(sch.due + 'T12:00:00');
+          subtitle = `Tarjeta · cierre ${closingDate.getDate()} ${monthNamesShort[closingDate.getMonth() + 1]} · vence ${dueDate.getDate()} ${monthNamesShort[dueDate.getMonth() + 1]}`;
         } else {
           subtitle = `Tarjeta · Configurar cierre y vencimiento`;
         }
@@ -1980,7 +2010,7 @@ function showWelcomeOnFirstVisit() {
 // ── CONFIRM MODAL ──────────────────────────────────────────────
 let _confirmResolve = null;
 
-function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', danger = false } = {}) {
+function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', danger = false, middleText = '' } = {}) {
   return new Promise(resolve => {
     _confirmResolve = resolve;
     document.getElementById('confirm-title').textContent = title;
@@ -1988,6 +2018,13 @@ function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', 
     const btn = document.getElementById('confirm-action-btn');
     btn.textContent = confirmText;
     btn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+    const midBtn = document.getElementById('confirm-middle-btn');
+    if (middleText) {
+      midBtn.textContent = middleText;
+      midBtn.style.display = '';
+    } else {
+      midBtn.style.display = 'none';
+    }
     document.getElementById('confirm-modal').classList.add('open');
     lucide.createIcons();
   });
@@ -1995,6 +2032,8 @@ function showConfirm(message, { title = 'Confirmar', confirmText = 'Confirmar', 
 
 function resolveConfirm(val) {
   document.getElementById('confirm-modal').classList.remove('open');
+  const midBtn = document.getElementById('confirm-middle-btn');
+  if (midBtn) midBtn.style.display = 'none';
   if (_confirmResolve) { _confirmResolve(val); _confirmResolve = null; }
 }
 

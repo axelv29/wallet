@@ -10,13 +10,13 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="vendor/lucide.min.js"></script>
   <script src="vendor/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="css/base.css?v=4">
-  <link rel="stylesheet" href="css/layout.css?v=4">
-  <link rel="stylesheet" href="css/components.css?v=4">
-  <link rel="stylesheet" href="css/settings.css?v=4">
-  <link rel="stylesheet" href="css/dashboard.css?v=4">
-  <link rel="stylesheet" href="css/helpers.css?v=4">
-  <link rel="stylesheet" href="css/period.css?v=4">
+  <link rel="stylesheet" href="css/base.css?v=6">
+  <link rel="stylesheet" href="css/layout.css?v=6">
+  <link rel="stylesheet" href="css/components.css?v=6">
+  <link rel="stylesheet" href="css/settings.css?v=6">
+  <link rel="stylesheet" href="css/dashboard.css?v=6">
+  <link rel="stylesheet" href="css/helpers.css?v=6">
+  <link rel="stylesheet" href="css/period.css?v=6">
   <script>
     (function() {
       try {
@@ -570,10 +570,10 @@
                 <div class="form-group">
                   <label class="form-label" for="set-currency">Divisa</label>
                   <select id="set-currency" class="sel-fit">
+                    <option value="UYU">UYU Peso uruguayo</option>
                     <option value="ARS">ARS Peso argentino</option>
                     <option value="USD">USD Dólar</option>
                     <option value="EUR">EUR Euro</option>
-                    <option value="UYU">UYU Peso uruguayo</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -749,10 +749,10 @@
                   <div class="form-group">
                     <label class="form-label" for="acc-currency">Moneda</label>
                     <select id="acc-currency" required>
+                      <option value="UYU">UYU Peso uruguayo</option>
                       <option value="ARS">ARS Peso argentino</option>
                       <option value="USD">USD Dólar</option>
                       <option value="EUR">EUR Euro</option>
-                      <option value="UYU">UYU Peso uruguayo</option>
                     </select>
                   </div>
                   <div class="closing-fields" id="cc-closing-fields" style="display:none;">
@@ -1390,10 +1390,10 @@
           <div class="form-group">
             <label class="form-label" for="acc-edit-currency">Moneda</label>
             <select id="acc-edit-currency" required style="padding-right:28px;">
+              <option value="UYU">UYU Peso uruguayo</option>
               <option value="ARS">ARS Peso argentino</option>
               <option value="USD">USD Dólar</option>
               <option value="EUR">EUR Euro</option>
-              <option value="UYU">UYU Peso uruguayo</option>
             </select>
           </div>
         </div>
@@ -1416,34 +1416,160 @@
   </div>
 </div>
 
-<!-- ══════════════ MODAL: Calendario de cierre ══════════════ -->
+<!-- ══════════════ MODAL: Configurar cierre y vencimiento ══════════════ -->
 <div class="modal-overlay" id="cc-schedule-modal">
-  <div class="modal-card" style="max-width:340px;">
+  <div class="modal-card" style="max-width:420px;">
     <div class="modal-head">
-      <span class="modal-title" id="cc-schedule-title">Calendario de cierre</span>
+      <span class="modal-title"><i data-lucide="calendar-cog"></i> Configurar cierre y vencimiento</span>
       <button class="modal-close" onclick="closeCcScheduleModal()"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body" style="padding:16px;">
-      <div class="form-row">
-        <div class="form-group" style="flex:1;">
-          <label class="form-label" for="cc-schedule-month">Mes</label>
-          <select id="cc-schedule-month" class="form-select"></select>
-        </div>
+      <!-- Selector de cuenta (solo si hay >1 TC) -->
+      <div class="form-group" id="cc-schedule-acc-group" style="display:none;">
+        <label class="form-label">Cuenta</label>
+        <select id="cc-schedule-acc-select" onchange="onCcScheduleAccChange()"></select>
       </div>
-      <div class="form-row">
-        <div class="form-group" style="flex:1;">
-          <label class="form-label" for="cc-schedule-closing">Cierre</label>
-          <input id="cc-schedule-closing" type="number" min="1" max="31" class="form-input" placeholder="día">
-        </div>
-        <div class="form-group" style="flex:1;">
-          <label class="form-label" for="cc-schedule-due">Vencimiento</label>
-          <input id="cc-schedule-due" type="number" min="1" max="31" class="form-input" placeholder="día">
-        </div>
+
+      <!-- Timeline horizontal de meses -->
+      <div class="cc-timeline-wrap">
+        <div class="cc-timeline" id="cc-timeline"></div>
       </div>
-      <div class="cc-note" style="margin-top:8px;">Al cambiar de mes se guarda automáticamente.</div>
+
+      <!-- Fecha predeterminada para todos los meses -->
+      <div class="cc-default-schedule" id="cc-default-schedule"></div>
+
+      <div class="cc-modal-divider"></div>
+      <div class="cc-month-subtitle" id="cc-month-subtitle"></div>
+
+      <!-- Configuración de fechas del mes seleccionado -->
+      <div class="cc-month-config" id="cc-month-config">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha de cierre</label>
+            <input type="hidden" id="cc-schedule-closing-date">
+            <button type="button" class="cc-date-trigger" id="cc-closing-trigger" onclick="openCcDateCalendar('closing')">
+              <i data-lucide="calendar"></i>
+              <span id="cc-closing-display">Sin configurar</span>
+            </button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha de vencimiento</label>
+            <input type="hidden" id="cc-schedule-due-date">
+            <button type="button" class="cc-date-trigger" id="cc-due-trigger" onclick="openCcDateCalendar('due')">
+              <i data-lucide="calendar"></i>
+              <span id="cc-due-display">Sin configurar</span>
+            </button>
+          </div>
+        </div>
+        <div class="cc-validation-alert" id="cc-validation-alert" style="display:none;"></div>
+      </div>
+
+      <!-- Resumen del período -->
+      <div class="cc-period-summary" id="cc-period-summary"></div>
+
+      <!-- Estado y acciones -->
+      <div class="cc-status-section" id="cc-status-section"></div>
     </div>
-    <div class="modal-foot" style="padding:12px 16px; border-top:1px solid var(--border);">
+    <div class="modal-foot">
+      <button type="button" class="btn btn-primary" onclick="saveCcSchedule()"><i data-lucide="save"></i> Guardar</button>
       <button type="button" class="btn" onclick="closeCcScheduleModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Calendario de fecha de cierre ══════════════ -->
+<div class="modal-overlay" id="cc-date-calendar-popup">
+  <div class="modal-card" style="max-width:320px;">
+    <div class="modal-head">
+      <span class="modal-title" id="cc-cal-title">Seleccionar fecha</span>
+      <button class="modal-close" onclick="closeCcDateCalendar()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:0 14px 8px;">
+      <div class="period-cal-nav">
+        <button class="period-cal-nav-btn" onclick="event.stopPropagation();ccCalNavMonth(-1)"><i data-lucide="chevron-left"></i></button>
+        <span class="period-cal-month-label" id="cc-cal-month-label"></span>
+        <button class="period-cal-nav-btn" onclick="event.stopPropagation();ccCalNavMonth(1)"><i data-lucide="chevron-right"></i></button>
+      </div>
+      <div class="period-cal-weekdays">
+        <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span>
+      </div>
+      <div class="period-cal-grid" id="cc-cal-grid"></div>
+      <div class="cc-cal-markers-legend" id="cc-cal-markers-legend"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="ccCalClear()">Limpiar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL: Pago de tarjeta ══════════════ -->
+<div class="modal-overlay" id="cc-payment-modal">
+  <div class="modal-card" style="max-width:400px;">
+    <div class="modal-head">
+      <span class="modal-title"><i data-lucide="credit-card"></i> Pago de tarjeta</span>
+      <button class="modal-close" onclick="closePaymentModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <!-- Advertencia de pago ya registrado -->
+      <div class="cc-pay-alert already-paid" id="cc-pay-alert-paid" style="display:none;">
+        <i data-lucide="info"></i>
+        <span id="cc-pay-alert-paid-text">Este período ya fue pagado.</span>
+      </div>
+
+      <!-- Advertencia de vencimiento -->
+      <div class="cc-pay-alert overdue" id="cc-pay-alert-overdue" style="display:none;">
+        <i data-lucide="alert-triangle"></i>
+        <span id="cc-pay-alert-overdue-text">La fecha de vencimiento ya pasó.</span>
+      </div>
+
+      <!-- Advertencia de "Otro medio" -->
+      <div class="cc-pay-alert warning" id="cc-pay-alert-other" style="display:none;">
+        <i data-lucide="alert-circle"></i>
+        <span>Pago desde otro medio. Puede generar inconsistencias en la conciliación.</span>
+      </div>
+
+      <!-- Cuenta origen -->
+      <div class="form-group">
+        <label class="form-label">Cuenta origen</label>
+        <select id="cc-pay-source" class="form-select" onchange="onPaymentSourceChange()"></select>
+      </div>
+
+      <!-- Tipo de pago -->
+      <div class="form-group">
+        <label class="form-label">Tipo de pago</label>
+        <div class="cc-pay-type-row">
+          <button class="cc-pay-type-btn active" id="cc-pay-total-btn" onclick="setPaymentType('total')">Total</button>
+          <button class="cc-pay-type-btn" id="cc-pay-partial-btn" onclick="setPaymentType('partial')">Parcial</button>
+        </div>
+      </div>
+
+      <!-- Monto -->
+      <div class="form-group" id="cc-pay-amount-group">
+        <label class="form-label">Monto</label>
+        <div class="cc-pay-amount-wrap">
+          <input type="text" id="cc-pay-amount" class="form-input" inputmode="decimal" autocomplete="off" oninput="onPaymentAmountInput()">
+          <span class="cc-pay-amount-total" id="cc-pay-amount-total"></span>
+        </div>
+      </div>
+
+      <!-- Resumen de pagos ya registrados -->
+      <div class="cc-pay-paid-summary" id="cc-pay-paid-summary" style="display:none;"></div>
+
+      <!-- Multa -->
+      <div class="form-group" id="cc-pay-fine-group" style="display:none;">
+        <label class="cc-pay-fine-toggle">
+          <input type="checkbox" id="cc-pay-fine-check" onchange="onPaymentFineToggle()">
+          <span>Multa por pago fuera de fecha</span>
+        </label>
+        <input type="text" id="cc-pay-fine-amount" class="form-input" inputmode="decimal" autocomplete="off" style="display:none;margin-top:6px;" placeholder="Monto multa" oninput="onPaymentFineInput()">
+      </div>
+
+      <!-- Preview editable -->
+      <div class="cc-pay-preview" id="cc-pay-preview"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn" onclick="closePaymentModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="cc-pay-confirm-btn" onclick="confirmPayment()">Pagar</button>
     </div>
   </div>
 </div>
@@ -1491,6 +1617,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn" id="confirm-cancel-btn" onclick="resolveConfirm(false)">Cancelar</button>
+      <button class="btn" id="confirm-middle-btn" onclick="resolveConfirm('middle')" style="display:none;"></button>
       <button class="btn btn-primary" id="confirm-action-btn" onclick="resolveConfirm(true)">Confirmar</button>
     </div>
   </div>
@@ -1662,18 +1789,17 @@
   </div>
 </div>
 
-<script src="js/state.js?v=5"></script>
-<script src="js/currency.js?v=5"></script>
-<script src="js/utils.js?v=5"></script>
-<script src="js/modals.js?v=5"></script>
-<div id="dash-donut-tooltip" class="dash-donut-tooltip" style="display:none"></div>
-<script src="js/sidebar.js?v=5"></script>
-<script src="js/transactions.js?v=5"></script>
-<script src="js/dashboard.js?v=5"></script>
-<script src="js/settings.js?v=5"></script>
-<script src="js/import.js?v=5"></script>
-<script src="js/backup.js?v=5"></script>
-<script src="js/calendar.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/state.js?v=9"></script>
+<script src="js/currency.js?v=9"></script>
+<script src="js/utils.js?v=9"></script>
+<script src="js/modals.js?v=9"></script>
+<script src="js/sidebar.js?v=9"></script>
+<script src="js/transactions.js?v=9"></script>
+<script src="js/dashboard.js?v=9"></script>
+<script src="js/settings.js?v=9"></script>
+<script src="js/import.js?v=9"></script>
+<script src="js/backup.js?v=9"></script>
+<script src="js/calendar.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 </body>
 </html>

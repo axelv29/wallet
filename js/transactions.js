@@ -219,6 +219,9 @@ function openTransactionModal(txId) {
   updateSelectors();
   state.editingTxId = txId || null;
 
+  // Prevent browser autofill suggestions
+  document.querySelectorAll('#tx-modal input:not([type="checkbox"]):not([type="file"]), #tx-modal select').forEach(el => el.setAttribute('autocomplete', 'off'));
+
   if (!txId && state.currentView !== 'all' && state.currentView !== 'multi' && state.currentView !== 'receivables') {
     document.getElementById('tx-account').value = state.currentView;
   }
@@ -381,7 +384,8 @@ function getInstallmentMonthOffset(dateVal, accountId) {
   const txYM = dateVal.substring(0, 7);
   const sch = acc.card_schedule[txYM];
   if (!sch) return 0;
-  return sch.closing < txDay ? 1 : 0;
+  const closingDay = new Date(sch.closing + 'T12:00:00').getDate();
+  return closingDay < txDay ? 1 : 0;
 }
 
 function buildInstallmentTimeline() {
@@ -709,7 +713,7 @@ async function deleteTransaction(txId) {
     if (!parent) return;
     const childCount = state.transactions.filter(t => t.split_parent_id === parent.id).length;
     const acc = state.accounts.find(a => a.id === parent.account_id);
-    const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+    const accCurrency = acc?.currency || state.settings.currency || 'UYU';
     const removedAbs = Math.abs(tx.amount);
     if (childCount <= 1) {
       if (!await showConfirm(`Esta es la única división. Al eliminarla, la transacción volverá a ser única.`, { title: 'Eliminar única división', confirmText: 'Eliminar' })) return;
@@ -741,7 +745,7 @@ async function markAsCollected(txId) {
   const tx = state.transactions.find(t => t.id === txId);
   if (!tx) return;
   const acc = state.accounts.find(a => a.id === tx.account_id);
-  const accCur = acc?.currency || state.settings.currency || 'ARS';
+  const accCur = acc?.currency || state.settings.currency || 'UYU';
   if (await showConfirm(`¿Marcar como cobrado el préstamo de ${formatAccountCurrency(Math.abs(tx.amount), accCur)} de ${tx.payee}?`, { title: 'Cobrar préstamo', confirmText: 'Marcar cobrado' })) {
     tx.is_receivable = false;
     state.transactions.unshift({
@@ -879,6 +883,7 @@ const FILTER_COLUMNS = [
   { value: 'account_name', label: 'Cuenta', type: 'text' },
   { value: 'amount', label: 'Monto', type: 'number' },
   { value: 'date', label: 'Fecha', type: 'date' },
+  { value: 'closing_period', label: 'Cierre TC', type: 'text' },
 ];
 
 function getOperatorsForColumn(col) {
@@ -1095,7 +1100,7 @@ function updateSelectionBar() {
     return;
   }
 
-  const settingsCur = state.settings.currency || 'ARS';
+  const settingsCur = state.settings.currency || 'UYU';
   let total = 0;
   const selectedIds = [...state.selectedTxIds];
 
@@ -2124,6 +2129,18 @@ function renderTransactions() {
             if (f.operator === 'not_equals') return text !== val;
             return true;
           }
+          case 'closing_period': {
+            const txAcc = state.accounts.find(a => a.id === tx.account_id);
+            if (!txAcc || txAcc.type !== 'credit_card' || !txAcc.card_schedule) return false;
+            const periodKey = getClosingPeriodKey(tx.date, txAcc.card_schedule);
+            const periodLabel = getClosingPeriodMonthLabel(periodKey).toLowerCase();
+            const keyMatch = periodKey.toLowerCase().includes(val);
+            const labelMatch = periodLabel.toLowerCase().includes(val);
+            if (f.operator === 'contains') return keyMatch || labelMatch;
+            if (f.operator === 'equals') return periodKey === f.value || periodLabel === f.value.toLowerCase();
+            if (f.operator === 'not_equals') return periodKey !== f.value && periodLabel !== f.value.toLowerCase();
+            return true;
+          }
           case 'account_name': {
             const text = (acc ? acc.name : '').toLowerCase();
             if (f.operator === 'contains') return text.includes(val);
@@ -2213,12 +2230,16 @@ function renderTransactions() {
 
   // Group ALL CC transactions (present + future) by billing period
   const ccGroups = {};
+  const ungroupedCcIds = new Set();
   const addTxToCCGroups = (tx) => {
     const acc = state.accounts.find(a => a.id === tx.account_id);
     if (!acc) return;
-    const sch = acc.card_schedule ? acc.card_schedule[tx.date ? tx.date.substring(0, 7) : ''] : null;
-    const closingDay = sch ? sch.closing : 20;
-    const periodKey = getClosingPeriodKey(tx.date, closingDay);
+    // Use closing_period if set (payment txs), otherwise compute from date
+    const periodKey = tx.closing_period || getClosingPeriodKey(tx.date, acc.card_schedule);
+    if (!periodKey) {
+      ungroupedCcIds.add(tx.id);
+      return;
+    }
     const key = showAccountInLabel ? periodKey + '|' + tx.account_id : periodKey;
     if (!ccGroups[key]) {
       const label = getClosingPeriodMonthLabel(periodKey) + (showAccountInLabel ? ' · ' + acc.name : '');
@@ -2228,8 +2249,8 @@ function renderTransactions() {
     // Exclude payment txs and excluded txs from total
     const isPayment = (tx.tags || []).includes('Pago de tarjeta');
     if (!isPayment && !tx.excluded) {
-      const accCur = acc.currency || (state.settings.currency || 'ARS');
-      const converted = convertCurrency(Number(tx.amount) || 0, accCur, state.settings.currency || 'ARS');
+      const accCur = acc.currency || (state.settings.currency || 'UYU');
+      const converted = convertCurrency(Number(tx.amount) || 0, accCur, state.settings.currency || 'UYU');
       ccGroups[key].total += converted !== null ? converted : (Number(tx.amount) || 0);
     }
   };
@@ -2267,7 +2288,7 @@ function renderTransactions() {
     const notesHtml = tx.notes || '';
     const tagsHtml  = (tagPills || '') + excludedPill + paymentPill;
 
-    const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+    const accCurrency = acc?.currency || state.settings.currency || 'UYU';
     const amtStyle = state.settings.amountStyle || 'default';
     const showSign = amtStyle !== 'no-sign';
     const showColor = amtStyle !== 'no-color';
@@ -2379,7 +2400,7 @@ function renderTransactions() {
   const appendSplitChildRow = (child, parent, isLast) => {
     const acc = state.accounts.find(a => a.id === child.account_id);
     const isExpense = child.amount < 0;
-    const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+    const accCurrency = acc?.currency || state.settings.currency || 'UYU';
     const amtStyle = state.settings.amountStyle || 'default';
     const showSign = amtStyle !== 'no-sign';
     const showColor = amtStyle !== 'no-color';
@@ -2471,8 +2492,8 @@ function renderTransactions() {
     });
   };
 
-  // Render future rows — CC are already in closing groups, only show non-CC futures
-  const futureNonCC = visibleOutOfPeriodFuture.filter(tx => !ccAccIds.has(tx.account_id));
+  // Render future rows — CC are already in closing groups, only show non-CC futures (and ungrouped CC futures)
+  const futureNonCC = visibleOutOfPeriodFuture.filter(tx => !ccAccIds.has(tx.account_id) || ungroupedCcIds.has(tx.id));
   if (futureNonCC.length > 0) {
     const colCount = isSingleAccount ? 10 : 11;
     const groupKey = 'future-group-open';
@@ -2508,9 +2529,21 @@ function renderTransactions() {
       const isOpen = isClosingGroupOpen(group.key);
       const groupAccountId = group.txs[0]?.account_id || '';
       const paid = isClosingPaid(group.key, group.total, groupAccountId);
+      const status = getClosingStatus(group.period, groupAccountId);
       const colCount = isSingleAccount ? 10 : 11;
       const totalHtml = formatCurrency(group.total);
-      const futureCount = group.txs.filter(tx => tx.is_future).length;
+
+
+      const isCurrentPeriod = group.period === getCurrentYearMonth();
+      const payIcon = paid ? 'calendar-check' : (isCurrentPeriod ? 'calendar-1' : (status ? status.icon : 'circle'));
+      const payOpacity = '1';
+      const payColor = paid ? 'var(--positive)' : (isCurrentPeriod ? 'var(--text-mid)' : (status ? status.color : 'var(--text-lo)'));
+      const payTitle = paid ? 'Marcar como no pagado' : (status ? status.label : 'Pagar');
+      const payAction = paid
+        ? `onToggleClosingPay('${group.period}','${groupAccountId}','${group.key}',${group.total})`
+        : (status && status.status !== 'not_closed' && status.status !== 'no_schedule')
+          ? `openPaymentModal('${group.period}','${groupAccountId}')`
+          : '';
 
       const headerTr = document.createElement('tr');
       headerTr.className = 'closing-group-row';
@@ -2520,10 +2553,13 @@ function renderTransactions() {
         <div class="closing-group-header">
           <span class="closing-group-arrow ${isOpen ? 'open' : ''}">›</span>
           <span class="closing-group-label">Cierre ${group.label}</span>
-          <span class="closing-group-count">${group.txs.length} mov.${futureCount > 0 ? ' · ' + futureCount + ' futuras' : ''}</span>
+          ${isOpen ? `<span class="closing-group-meta">${getPeriodDateRange(groupAccountId, group.period)}<span class="closing-group-meta-count">${group.txs.length} mov.</span></span>` : ''}
           <span class="closing-group-total">${totalHtml}</span>
-          <button class="closing-paid-btn ${paid ? 'paid' : ''}" onclick="event.stopPropagation();toggleClosingPaid('${group.key}', ${group.total}, '${groupAccountId}');renderAll()" title="${paid ? 'Marcar como no pagado' : 'Marcar como pagado'}">
-            <i data-lucide="${paid ? 'check' : 'circle'}"></i>
+          <button class="closing-paid-btn ${paid ? 'paid' : ''}" ${payAction ? `onclick="event.stopPropagation();${payAction}"` : 'disabled'} style="opacity:${payOpacity};color:${payColor}" title="${payTitle}">
+            <i data-lucide="${payIcon}"></i>
+          </button>
+          <button class="closing-more-btn" onclick="event.stopPropagation();toggleClosingMenu(this,'${group.key}','${groupAccountId}','${group.period}')" title="Acciones">
+            <i data-lucide="more-horizontal"></i>
           </button>
         </div>
       `;
@@ -2552,6 +2588,8 @@ function renderTransactions() {
     });
     // Render non-CC in-period rows
     nonCCTx.forEach(tx => appendTxRow(tx, null));
+    // Render CC transactions without a closing schedule as normal rows
+    inPeriodRows.filter(tx => ungroupedCcIds.has(tx.id)).forEach(tx => appendTxRow(tx, null));
   } else {
     // No closing groups — render all as normal
     inPeriodRows.forEach(tx => appendTxRow(tx, null));
@@ -2637,7 +2675,7 @@ function openSplitModal(txId) {
 
   const totalAbs = Math.abs(tx.amount);
   const acc = state.accounts.find(a => a.id === tx.account_id);
-  const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+  const accCurrency = acc?.currency || state.settings.currency || 'UYU';
   document.getElementById('split-total-val').textContent = formatAccountCurrency(totalAbs, accCurrency);
 
   const existingChildren = state.transactions.filter(t => t.split_parent_id === txId);
@@ -2994,7 +3032,7 @@ function recalcSplitProgress() {
   const tx = state.transactions.find(t => t.id === _splitTxId);
   if (!tx) return;
   const acc = state.accounts.find(a => a.id === tx.account_id);
-  const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+  const accCurrency = acc?.currency || state.settings.currency || 'UYU';
   const totalAbs = Math.abs(tx.amount);
 
   const rows = [...document.querySelectorAll('#split-rows-wrap .split-row')];
@@ -3046,7 +3084,7 @@ function saveSplits() {
   const tx = state.transactions.find(t => t.id === _splitTxId);
   if (!tx) return;
   const acc = state.accounts.find(a => a.id === tx.account_id);
-  const accCurrency = acc?.currency || state.settings.currency || 'ARS';
+  const accCurrency = acc?.currency || state.settings.currency || 'UYU';
 
   const rows = [...document.querySelectorAll('#split-rows-wrap .split-row')];
   const splits = rows.map(row => ({
@@ -3133,6 +3171,9 @@ function isSplitChildrenOpen(txId) {
 // ── TRANSFER BETWEEN ACCOUNTS ──────────────────────────────────
 
 function openTransferModal() {
+  // Prevent browser autofill suggestions
+  document.querySelectorAll('#transfer-modal input:not([type="checkbox"]):not([type="file"]), #transfer-modal select').forEach(el => el.setAttribute('autocomplete', 'off'));
+
   const fromSelect = document.getElementById('tf-account-from');
   const toSelect   = document.getElementById('tf-account-to');
 
@@ -3370,6 +3411,59 @@ async function handleTransferSubmit(event) {
   saveData('transactions');
   closeTransferModal();
   renderAll();
+}
+
+// ── CLOSING GROUP MENU ──────────────────────────────────────
+
+function toggleClosingMenu(btn, key, accountId, periodKey) {
+  closeClosingMenu();
+  const paid = isClosingPaid(key, 0, accountId);
+  const status = getClosingStatus(periodKey, accountId);
+  const canPay = status && status.status !== 'not_closed' && status.status !== 'no_schedule';
+
+  const dd = document.createElement('div');
+  dd.className = 'closing-menu-dropdown';
+  dd.innerHTML = `
+    <button class="closing-menu-item" onclick="event.stopPropagation();selectClosingTxs('${key}','${accountId}');closeClosingMenu()">
+      <i data-lucide="check-square"></i> Seleccionar transacciones
+    </button>
+    <button class="closing-menu-item" onclick="event.stopPropagation();openCcScheduleModal('${accountId}','${periodKey}');closeClosingMenu()">
+      <i data-lucide="calendar-cog"></i> Configurar cierre y vencimiento
+    </button>
+    <button class="closing-menu-item ${canPay ? '' : 'disabled'}" onclick="event.stopPropagation();${canPay ? `openPaymentModal('${periodKey}','${accountId}');closeClosingMenu()` : ''}">
+      <i data-lucide="${paid ? 'pencil' : 'credit-card'}"></i> ${paid ? 'Editar pago' : 'Pagar tarjeta'}
+    </button>
+  `;
+  btn.parentElement.appendChild(dd);
+  lucide.createIcons();
+
+  const closeHandler = (e) => {
+    if (!dd.contains(e.target) && !btn.contains(e.target)) {
+      closeClosingMenu();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
+function closeClosingMenu() {
+  document.querySelectorAll('.closing-menu-dropdown').forEach(dd => dd.remove());
+}
+
+function selectClosingTxs(key, accountId) {
+  const parts = key.split('|');
+  const periodKey = parts[0];
+  const accId = accountId || parts[1];
+  if (!accId) return;
+  state.selectedTxIds = new Set();
+  state.transactions.forEach(tx => {
+    if (tx.account_id !== accId) return;
+    if (tx.is_future) return;
+    const txPeriod = tx.closing_period || (tx.date ? tx.date.substring(0, 7) : '');
+    if (txPeriod === periodKey) state.selectedTxIds.add(tx.id);
+  });
+  renderTransactions();
+  updateSelectAllCheckbox();
 }
 
 // ── SPLIT BUTTON DROPDOWN ──────────────────────────────────────

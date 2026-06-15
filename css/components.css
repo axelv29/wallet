@@ -994,6 +994,7 @@ table.ledger tbody tr.selected:hover td {
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
   background: var(--bg-raised);
@@ -1941,19 +1942,6 @@ tr.split-child-last td {
 
 /* ── MODAL: Transferencia ────────────────────────────────── */
 
-/* Adjustments for credit closure modal */
-#cc-schedule-month {
-  font-size: 12px;
-  height: 34px;
-  padding: 7px 8px;
-  line-height: 1.3;
-  box-sizing: border-box;
-  vertical-align: middle;
-}
-#cc-schedule-month option {
-  font-size: 12px;
-  padding: 4px 0;
-}
 .tf-amount-wrap {
   display: flex;
   align-items: center;

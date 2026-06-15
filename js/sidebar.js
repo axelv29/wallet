@@ -44,11 +44,11 @@ function renderSidebar() {
   if (listCredit) listCredit.innerHTML = '';
 
   // Compute running balances filtered by period
-  const settingsCur = state.settings.currency || 'ARS';
+  const settingsCur = state.settings.currency || 'UYU';
   const accBalances = {};
   state.accounts.forEach(acc => { accBalances[acc.id] = 0; });
   state.transactions.forEach(tx => {
-    if (tx.is_future) return;
+    if (!includeCcFutureTx(tx)) return;
     if (tx.excluded) return;
     if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
@@ -222,7 +222,7 @@ function toggleTypeSelection(type) {
 function renderHeaderAndMetrics() {
   const titleEl    = document.getElementById('view-title');
   const subtitleEl = document.getElementById('view-subtitle');
-  const settingsCur = state.settings.currency || 'ARS';
+  const settingsCur = state.settings.currency || 'UYU';
 
   let title    = 'Todas las cuentas';
   let subtitle = 'Resumen general de movimientos';
@@ -253,7 +253,12 @@ function renderHeaderAndMetrics() {
     const totalBal = selAccs.reduce((sum, a) => {
       let bal = 0;
       state.transactions.forEach(tx => {
-        if (tx.account_id === a.id && !tx.is_future && !tx.excluded && !tx.split_parent_id && isTxInPeriod(tx)) bal += Number(tx.amount) || 0;
+        if (tx.account_id !== a.id) return;
+        if (!includeCcFutureTx(tx)) return;
+        if (tx.excluded) return;
+        if (tx.split_parent_id) return;
+        if (!isTxInPeriod(tx)) return;
+        bal += Number(tx.amount) || 0;
       });
       return sum + bal;
     }, 0);
@@ -271,8 +276,9 @@ function renderHeaderAndMetrics() {
         const sch = getCardSchedule(acc.id, ym);
         if (sch) {
           const monthNamesShort = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-          const [, m] = ym.split('-').map(Number);
-          subtitle = `Tarjeta · cierre ${sch.closing} ${monthNamesShort[m]} · vence ${sch.due} ${monthNamesShort[m]}${curLabel} <i data-lucide="calendar-check" class="schedule-icon" onclick="event.preventDefault();openCcScheduleModal('${acc.id}')"></i>`;
+          const closingDate = new Date(sch.closing + 'T12:00:00');
+          const dueDate = new Date(sch.due + 'T12:00:00');
+          subtitle = `Tarjeta · cierre ${closingDate.getDate()} ${monthNamesShort[closingDate.getMonth() + 1]} · vence ${dueDate.getDate()} ${monthNamesShort[dueDate.getMonth() + 1]}${curLabel} <i data-lucide="calendar-check" class="schedule-icon" onclick="event.preventDefault();openCcScheduleModal('${acc.id}')"></i>`;
         } else {
           subtitle = `Tarjeta · Configurar cierre y vencimiento${curLabel} <i data-lucide="calendar-check" class="schedule-icon" onclick="event.preventDefault();openCcScheduleModal('${acc.id}')"></i>`;
         }
