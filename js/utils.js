@@ -427,6 +427,17 @@ function calculateCycleBalance(accountId) {
   return total;
 }
 
+// Convert a transaction amount to the settings currency (or return raw amount if conversion fails)
+function getTxAmountInSettingsCurrency(tx) {
+  const settingsCur = state.settings.currency || 'UYU';
+  const acc = state.accounts.find(a => a.id === tx.account_id);
+  if (!acc) return Number(tx.amount) || 0;
+  const accCur = acc.currency || settingsCur;
+  if (accCur === settingsCur) return Number(tx.amount) || 0;
+  const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
+  return (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+}
+
 function calculateBalances(accountIds) {
   const settingsCur = state.settings.currency || 'UYU';
   const balances = { liquid: 0, credit_card: 0, credit_card_cycle: 0, receivables: 0 };

@@ -612,8 +612,9 @@ function renderDashboard() {
 
   let totalIncome = 0, totalExpenses = 0;
   monthTxs.forEach(tx => {
-    if (tx.amount > 0) totalIncome += tx.amount;
-    else totalExpenses += Math.abs(tx.amount);
+    const val = getTxAmountInSettingsCurrency(tx);
+    if (val > 0) totalIncome += val;
+    else totalExpenses += Math.abs(val);
   });
   const netDiff = totalIncome - totalExpenses;
 
@@ -674,7 +675,7 @@ function renderDashboard() {
   const catTotals = {};
   monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
     const cat = tx.category_name || 'Otros';
-    catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount);
+    catTotals[cat] = (catTotals[cat] || 0) + Math.abs(getTxAmountInSettingsCurrency(tx));
   });
   const catEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
   const maxCat = catEntries.length > 0 ? catEntries[0][1] : 0;
@@ -708,7 +709,7 @@ function renderDashboard() {
   const incomeCatTotals = {};
   monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
     const cat = tx.category_name || 'Otros';
-    incomeCatTotals[cat] = (incomeCatTotals[cat] || 0) + tx.amount;
+    incomeCatTotals[cat] = (incomeCatTotals[cat] || 0) + getTxAmountInSettingsCurrency(tx);
   });
   const incomeCatEntries = Object.entries(incomeCatTotals).sort((a, b) => b[1] - a[1]);
   const maxIncomeCat = incomeCatEntries.length > 0 ? incomeCatEntries[0][1] : 0;
@@ -833,8 +834,9 @@ function renderDashCharts() {
         const td = new Date(tx.date + 'T00:00:00');
         if (td.getMonth() === m && td.getFullYear() === y && dashIncludeTx(tx)) {
           if (accFilter && !accFilter.has(tx.account_id)) return;
-          if (tx.amount > 0) inc += tx.amount;
-          else exp += Math.abs(tx.amount);
+          const conv = getTxAmountInSettingsCurrency(tx);
+          if (conv > 0) inc += conv;
+          else exp += Math.abs(conv);
         }
       });
       incomeData.push(inc);
@@ -850,7 +852,7 @@ function renderDashCharts() {
     const catTotals = {};
     monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';
-      catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount);
+      catTotals[cat] = (catTotals[cat] || 0) + Math.abs(getTxAmountInSettingsCurrency(tx));
     });
     const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const colors = getChartColors(entries.length);
@@ -865,7 +867,7 @@ function renderDashCharts() {
     const catTotals = {};
     monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';
-      catTotals[cat] = (catTotals[cat] || 0) + tx.amount;
+      catTotals[cat] = (catTotals[cat] || 0) + getTxAmountInSettingsCurrency(tx);
     });
     const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const colors = getChartColors(entries.length);
