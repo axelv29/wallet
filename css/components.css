@@ -89,7 +89,8 @@ table.ledger.hide-account-col .col-account {
 
 table.ledger {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 table.ledger thead th {

@@ -808,6 +808,27 @@ function applyViewPrefs() {
   document.querySelectorAll('#view-toggle-menu input[data-pref]').forEach(cb => {
     cb.checked = !!vp[cb.dataset.pref];
   });
+
+  // Redistribute saved column widths to visible columns only
+  const table = document.querySelector('.ledger');
+  if (table) {
+    try {
+      const saved = JSON.parse(localStorage.getItem('wallet_col_widths'));
+      if (saved) {
+        table.querySelectorAll('thead th.col-resizable').forEach((th, i) => {
+          const key = th.dataset.sort || 'col-' + i;
+          const hidden = th.classList.contains('col-hidden') || th.style.display === 'none' || (th.classList.contains('col-account') && table.classList.contains('hide-account-col'));
+          if (hidden) {
+            th.style.width = '';
+            th.style.maxWidth = '';
+          } else if (saved[key]) {
+            th.style.width = saved[key];
+            th.style.maxWidth = 'none';
+          }
+        });
+      }
+    } catch (_) {}
+  }
 }
 
 function toggleViewMenu(e) {
@@ -833,10 +854,7 @@ function toggleViewPref(key, val) {
   state.settings.viewPrefs[key] = val;
   localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
   applyViewPrefs();
-  // Re-render if it affects transactions (future txs)
-  if (key === 'showFutureTxs' || key === 'showClosingRows') {
-    renderTransactions();
-  }
+  renderTransactions();
 }
 
 // ══════════════════════════════════════════════════════════════

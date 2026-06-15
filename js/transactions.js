@@ -2080,6 +2080,7 @@ function renderTransactions() {
   const isSingleAccount = state.selectedAccounts.length === 1
     || (state.currentView !== 'all' && state.currentView !== 'multi' && !state.currentView.startsWith('type-') && state.currentView !== 'receivables');
   document.querySelector('.ledger')?.classList.toggle('hide-account-col', isSingleAccount);
+  const colCount = getColCount();
   if (state.currentView === 'receivables') {
     filtered = filtered.filter(t => t.is_receivable);
   } else if (state.currentView === 'multi') {
@@ -2264,7 +2265,6 @@ function renderTransactions() {
   document.getElementById('tx-count-badge').textContent = inPeriodRows.length;
 
   if (inPeriodRows.length === 0 && visibleOutOfPeriodFuture.length === 0 && outOfPeriodPresent.length === 0) {
-    const colCount = isSingleAccount ? 10 : 11;
     tbody.innerHTML = `<tr class="empty-row"><td colspan="${colCount}">No hay movimientos registrados.</td></tr>`;
     return;
   }
@@ -2495,7 +2495,6 @@ function renderTransactions() {
   // Render future rows — CC are already in closing groups, only show non-CC futures (and ungrouped CC futures)
   const futureNonCC = visibleOutOfPeriodFuture.filter(tx => !ccAccIds.has(tx.account_id) || ungroupedCcIds.has(tx.id));
   if (futureNonCC.length > 0) {
-    const colCount = isSingleAccount ? 10 : 11;
     const groupKey = 'future-group-open';
     const isOpen = sessionStorage.getItem(groupKey) === 'true';
 
@@ -2530,7 +2529,6 @@ function renderTransactions() {
       const groupAccountId = group.txs[0]?.account_id || '';
       const paid = isClosingPaid(group.key, group.total, groupAccountId);
       const status = getClosingStatus(group.period, groupAccountId);
-      const colCount = isSingleAccount ? 10 : 11;
       const totalHtml = formatCurrency(group.total);
 
 
@@ -2597,7 +2595,6 @@ function renderTransactions() {
 
   // Render out-of-period present group (collapsible, only when period filter is active)
   if (hasPeriodFilter && outOfPeriodPresent.length > 0) {
-    const colCount  = isSingleAccount ? 10 : 11;
     const groupKey  = 'oop-group-open';
     const isOpen    = sessionStorage.getItem(groupKey) === 'true';
 
@@ -2629,6 +2626,7 @@ function renderTransactions() {
   updateSelectAllCheckbox();
   updateSelectionBar();
   updateSortIndicators();
+  applyViewPrefs();
   lucide.createIcons();
 }
 

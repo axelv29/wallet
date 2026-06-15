@@ -671,3 +671,17 @@ function getEditOptions(field, tx) {
       return null;
   }
 }
+
+// ── VISIBLE COLUMN COUNT ─────────────────────────────────
+function getColCount() {
+  const ledger = document.querySelector('.ledger');
+  if (!ledger) return 10;
+  const hideAccount = ledger.classList.contains('hide-account-col');
+  const count = Array.from(ledger.querySelectorAll('thead th')).filter(th => {
+    if (th.classList.contains('col-hidden')) return false;
+    if (th.style.display === 'none') return false;
+    if (hideAccount && th.classList.contains('col-account')) return false;
+    return true;
+  }).length;
+  return Math.max(count, 1);
+}
