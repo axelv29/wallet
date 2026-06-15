@@ -753,7 +753,7 @@ function renderDashboard() {
       const accSet = new Set(dashState.accounts);
       recent = recent.filter(tx => accSet.has(tx.account_id));
     }
-    recent.sort((a, b) => b.date.localeCompare(a.date)).splice(8);
+    recent = recent.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
     if (recent.length === 0) {
       recentList.innerHTML = '<div class="dash-empty">Sin movimientos aún</div>';
     } else {
