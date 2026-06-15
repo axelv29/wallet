@@ -76,15 +76,16 @@ function loadData() {
   const lsPre  = localStorage.getItem('wallet_predefined');
 
   if (lsAcc) {
-    state.accounts = JSON.parse(lsAcc);
+    try { state.accounts = JSON.parse(lsAcc); } catch (e) { /* corrupted */ }
   }
 
   if (lsTx) {
-    state.transactions = JSON.parse(lsTx);
+    try { state.transactions = JSON.parse(lsTx); } catch (e) { /* corrupted */ }
   }
 
   if (lsPre) {
-    state.predefined = JSON.parse(lsPre);
+    try { state.predefined = JSON.parse(lsPre); } catch (e) { /* corrupted */ }
+    if (!state.predefined) { state.predefined = { payees: [], categories: [], tags: [], account_types: [] }; }
     // Migrate string categories → { name, icon }
     if (state.predefined.categories.length && typeof state.predefined.categories[0] === 'string') {
       state.predefined.categories = state.predefined.categories.map((c, i) => ({
@@ -236,9 +237,11 @@ function saveData(type) {
 function loadSettings() {
   const s = localStorage.getItem('wallet_settings');
   if (s) {
-    const parsed = JSON.parse(s);
-    state.settings = parsed;
-    if (parsed.period) state.period = parsed.period;
+    try {
+      const parsed = JSON.parse(s);
+      state.settings = parsed;
+      if (parsed.period) state.period = parsed.period;
+    } catch (e) { /* corrupted */ }
   }
 }
 
