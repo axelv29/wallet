@@ -58,13 +58,13 @@
       <div class="sidebar-brand-icon">
         <i data-lucide="credit-card"></i>
       </div>
-      <span class="sidebar-brand-name">Wallet</span>
+      <h1 class="sidebar-brand-name" style="margin:0;font:inherit;color:inherit;">Wallet</h1>
     </div>
-    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Colapsar sidebar">
-      <i data-lucide="panel-left-close"></i>
+    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Colapsar sidebar" aria-label="Colapsar sidebar">
+      <i data-lucide="panel-left-close" aria-hidden="true"></i>
     </button>
-    <button class="sidebar-pin-btn" onclick="pinSidebar()" title="Fijar sidebar">
-      <i data-lucide="pin"></i>
+    <button class="sidebar-pin-btn" onclick="pinSidebar()" title="Fijar sidebar" aria-label="Fijar sidebar">
+      <i data-lucide="pin" aria-hidden="true"></i>
     </button>
 
     <div class="sidebar-primary">
@@ -108,7 +108,7 @@
         <div class="sidebar-section-group">
           <div class="sidebar-header-row">
             <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('liquid');}else{filterTransactions('type-liquid');}">Líquidas</span>
-            <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('liquid')" title="Añadir cuenta líquida"><i data-lucide="plus"></i></button>
+            <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('liquid')" title="Añadir cuenta líquida" aria-label="Añadir cuenta líquida"><i data-lucide="plus" aria-hidden="true"></i></button>
           </div>
           <ul class="account-list" id="sidebar-liquid-list"></ul>
         </div>
@@ -116,7 +116,7 @@
         <div class="sidebar-section-group">
           <div class="sidebar-header-row">
             <span class="section-filter-label" onclick="if(event.ctrlKey||event.metaKey){toggleTypeSelection('credit_card');}else{filterTransactions('type-credit_card');}">Tarjetas de crédito</span>
-            <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('credit_card')" title="Añadir tarjeta de crédito"><i data-lucide="plus"></i></button>
+            <button class="sidebar-add-btn" onclick="openFloatingAccountCreator('credit_card')" title="Añadir tarjeta de crédito" aria-label="Añadir tarjeta de crédito"><i data-lucide="plus" aria-hidden="true"></i></button>
           </div>
           <ul class="account-list" id="sidebar-credit-list"></ul>
         </div>
@@ -151,11 +151,11 @@
           </div>
         </div>
         <div class="header-right">
-          <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
-            <i data-lucide="sun" id="theme-icon"></i>
+          <button class="theme-btn" onclick="toggleTheme()" title="Cambiar tema" aria-label="Cambiar tema">
+            <i data-lucide="sun" id="theme-icon" aria-hidden="true"></i>
           </button>
-          <button class="theme-btn" onclick="openWelcomeModal()" title="¿Cómo funciona?">
-            <i data-lucide="circle-help"></i>
+          <button class="theme-btn" onclick="openWelcomeModal()" title="¿Cómo funciona?" aria-label="Ayuda">
+            <i data-lucide="circle-help" aria-hidden="true"></i>
           </button>
         </div>
       </header>
@@ -914,11 +914,11 @@
 </div>
 
 <!-- ══════════════ MODAL: Nueva Transacción ══════════════ -->
-<div class="modal-overlay" id="tx-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="tx-modal" role="dialog" aria-modal="true">
   <div class="modal-card">
     <div class="modal-head">
       <span class="modal-title">Registrar movimiento</span>
-      <button class="modal-close" onclick="closeTransactionModal()"><i data-lucide="x"></i></button>
+      <button class="modal-close" onclick="closeTransactionModal()" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
     <form id="tx-form" onsubmit="handleTransactionSubmit(event)" novalidate>
       <div class="modal-body">
@@ -1046,11 +1046,11 @@
 <!-- ══════════════ MODAL: Transferencia entre cuentas (deshabilitado) ══════════════ -->
 
 <!-- ══════════════ MODAL: Importar CSV/XLS/PDF/IMG ══════════════ -->
-<div class="modal-overlay" id="csv-import-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="csv-import-modal">
   <div class="modal-card wide csv-import-card">
     <div class="modal-head">
       <span class="modal-title">Importar archivo</span>
-      <button class="modal-close" onclick="closeImportModal()"><i data-lucide="x"></i></button>
+      <button class="modal-close" onclick="closeImportModal()" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
     <div class="modal-body csv-import-body">
 
@@ -1181,7 +1181,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Bienvenida ══════════════ -->
-<div class="modal-overlay" id="welcome-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="welcome-modal">
   <div class="modal-card" style="max-width:480px;">
     <div class="modal-head welcome-head">
       <div class="welcome-title-wrap">
@@ -1247,7 +1247,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Crear cuenta flotante ══════════════ -->
-<div class="modal-overlay" id="acc-floating-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="acc-floating-modal">
   <div class="modal-card" style="max-width:340px;">
     <div class="modal-head">
       <span class="modal-title">Nueva cuenta</span>
@@ -1300,7 +1300,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Editar cuenta ══════════════ -->
-<div class="modal-overlay" id="acc-edit-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="acc-edit-modal">
   <div class="modal-card" style="max-width:340px;">
     <div class="modal-head">
       <span class="modal-title">Editar cuenta</span>
@@ -1348,7 +1348,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Configurar cierre y vencimiento ══════════════ -->
-<div class="modal-overlay" id="cc-schedule-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="cc-schedule-modal">
   <div class="modal-card" style="max-width:420px;">
     <div class="modal-head">
       <span class="modal-title"><i data-lucide="calendar-cog"></i> Configurar cierre y vencimiento</span>
@@ -1409,7 +1409,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Calendario de fecha de cierre ══════════════ -->
-<div class="modal-overlay" id="cc-date-calendar-popup">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="cc-date-calendar-popup">
   <div class="modal-card" style="max-width:320px;">
     <div class="modal-head">
       <span class="modal-title" id="cc-cal-title">Seleccionar fecha</span>
@@ -1434,7 +1434,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Pago de tarjeta ══════════════ -->
-<div class="modal-overlay" id="cc-payment-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="cc-payment-modal">
   <div class="modal-card" style="max-width:400px;">
     <div class="modal-head">
       <span class="modal-title"><i data-lucide="credit-card"></i> Pago de tarjeta</span>
@@ -1506,7 +1506,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Ajustar saldo ══════════════ -->
-<div class="modal-overlay" id="balance-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="balance-modal">
   <div class="modal-card balance-modal-card">
     <div class="balance-modal-header">
       <button class="modal-close balance-modal-close" onclick="closeBalanceModal()"><i data-lucide="x"></i></button>
@@ -1537,7 +1537,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Confirmar acción ══════════════ -->
-<div class="modal-overlay" id="confirm-modal" style="z-index:1000;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="confirm-modal" style="z-index:1000;">
   <div class="modal-card" style="max-width:360px;">
     <div class="modal-head">
       <span class="modal-title" id="confirm-title">Confirmar</span>
@@ -1555,7 +1555,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Dividir Transacción ══════════════ -->
-<div class="modal-overlay" id="split-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="split-modal">
   <div class="modal-card" style="max-width:600px;">
 
     <div class="modal-head">
@@ -1618,7 +1618,7 @@
 </div>
 
 <!-- ══════════════ MODAL: Importar Backup ══════════════ -->
-<div class="modal-overlay" id="import-backup-modal">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="import-backup-modal">
   <div class="modal-card" style="max-width:420px;">
     <div class="modal-head">
       <span class="modal-title">Importar backup</span>
@@ -1674,7 +1674,7 @@
 </div>
 
 <!-- ══════════════ POPUP: Calendario de período ══════════════ -->
-<div class="modal-overlay" id="period-calendar-popup">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="period-calendar-popup">
   <div class="modal-card" style="max-width:340px;">
     <div class="modal-head">
       <span class="modal-title">Seleccionar período</span>
