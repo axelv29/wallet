@@ -67,9 +67,18 @@ function getExchangeRate(fromCurrency, toCurrency) {
   return fromInUSD * rates[toCurrency];
 }
 
+let _convWarningShown = false;
+
 function convertCurrency(value, fromCurrency, toCurrency) {
   if (fromCurrency === toCurrency) return value;
   const rate = getExchangeRate(fromCurrency, toCurrency);
-  if (rate === null) return value; // fallback: return original value
+  if (rate === null) {
+    if (!_convWarningShown) {
+      _convWarningShown = true;
+      console.warn('Tasas de cambio no disponibles — algunos montos se muestran sin convertir');
+    }
+    return value; // fallback: return original value
+  }
+  _convWarningShown = false;
   return value * rate;
 }
