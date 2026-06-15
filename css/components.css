@@ -144,6 +144,10 @@ table.ledger thead th.c { text-align: center; }
   opacity: 1;
 }
 
+.col-sortable.sort-desc .sort-arrow::after {
+  content: '↑'; /* show up arrow when sorted desc (reversed visual) */
+}
+
 .col-sort-label {
   pointer-events: none;
 }
@@ -799,7 +803,7 @@ table.ledger tbody tr.selected:hover td {
 }
 
 .tx-selection-clear:hover {
-  color: var(--text-mid);
+  color: var(--negative);
 }
 
 .tx-selection-clear svg { width: 10px; height: 10px; }
@@ -879,27 +883,6 @@ table.ledger tbody tr.selected:hover td {
   width: 13px;
   height: 13px;
 }
-
-.tx-selection-clear {
-  background: none;
-  border: none;
-  color: var(--text-lo);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: var(--r-xs);
-  padding: 0;
-  transition: color 0.1s;
-}
-
-.tx-selection-clear:hover {
-  color: var(--negative);
-}
-
-.tx-selection-clear svg { width: 10px; height: 10px; }
 
 .empty-row td {
   text-align: center;
