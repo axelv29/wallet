@@ -278,11 +278,13 @@
 
       <div class="dash-scroll">
 
-        <!-- Hero: Monthly Balance + Summary Cards + Period nav -->
-        <div class="dash-hero">
-          <div class="dash-hero-top">
-            <div class="dash-hero-period" id="dash-hero-period">Junio 2026</div>
-            <div class="dash-period-nav" id="dash-period-nav">
+        <!-- ═══════════════════════════════════════════════════════
+             SECTION 1 (fija) — Summary Cards with period comparison
+             ═══════════════════════════════════════════════════════ -->
+        <div class="dash-section-fixed" id="dash-section-fixed">
+          <div class="dash-summary-top">
+            <div class="dash-summary-period" id="dash-hero-period">Junio 2026</div>
+            <div class="dash-summary-nav">
               <button class="dash-month-btn" id="dash-month-prev" onclick="dashPrevMonth()" aria-label="Mes anterior"><i data-lucide="chevron-left"></i></button>
               <div class="dash-period-dropdown" id="dash-period-dropdown">
                 <button class="dash-period-trigger" id="dash-period-trigger" onclick="dashTogglePeriodDropdown()">
@@ -297,117 +299,29 @@
                 </div>
               </div>
               <button class="dash-month-btn" id="dash-month-next" onclick="dashNextMonth()" aria-label="Mes siguiente"><i data-lucide="chevron-right"></i></button>
-            </div>
-          </div>
-          <div class="dash-hero-center">
-            <div class="dash-hero-balance" id="dash-hero-balance">$0</div>
-            <div class="dash-hero-balance-label">Resultado del período</div>
-            <div class="dash-hero-savings" id="dash-hero-savings"></div>
-          </div>
-          <div class="dash-hero-cards" id="dash-hero-cards">
-            <div class="dash-hero-card">
-              <div class="dash-hero-card-icon liquid"><i data-lucide="banknote"></i></div>
-              <div class="dash-hero-card-info">
-                <div class="dash-hero-card-label">Cuentas líquidas</div>
-                <div class="dash-hero-card-val" id="dash-hero-liquid">$0</div>
-              </div>
-            </div>
-            <div class="dash-hero-card">
-              <div class="dash-hero-card-icon cc"><i data-lucide="credit-card"></i></div>
-              <div class="dash-hero-card-info">
-                <div class="dash-hero-card-label">Tarjetas de crédito</div>
-                <div class="dash-hero-card-val" id="dash-hero-cc">$0</div>
-              </div>
-            </div>
-            <div class="dash-hero-card" id="dash-hero-third-card" style="display:none">
-              <div class="dash-hero-card-icon receivables"><i data-lucide="hand-coins"></i></div>
-              <div class="dash-hero-card-info">
-                <div class="dash-hero-card-label" id="dash-hero-third-label">Préstamos a cobrar</div>
-                <div class="dash-hero-card-val" id="dash-hero-third-val">$0</div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Toolbar: filters -->
-        <div class="dash-toolbar">
-          <div class="dash-toolbar-left">
-            <div class="dash-acc-filter" id="dash-acc-filter">
-              <button class="dash-section-btn" onclick="dashToggleAccDropdown()" aria-label="Filtrar por cuenta">
-                <i data-lucide="wallet"></i>
-                <span id="dash-acc-label">Todas las cuentas</span>
-                <i data-lucide="chevron-down" class="dash-section-chevron"></i>
-              </button>
-              <div class="dash-acc-menu" id="dash-acc-menu"></div>
-            </div>
-          </div>
-          <div class="dash-toolbar-right">
-            <div class="dash-section-dropdown">
-            <button class="dash-section-btn" id="dash-section-btn" onclick="dashToggleDropdown()" aria-label="Secciones del dashboard">
-              <i data-lucide="columns-3"></i>
-              <span>Secciones</span>
-              <i data-lucide="chevron-down" class="dash-section-chevron"></i>
-            </button>
-            <div class="dash-section-menu" id="dash-section-menu">
-              <label class="dash-section-item" data-section="resumen">
-                <input type="checkbox" checked onchange="dashToggleSection('resumen')">
-                <span>Resumen</span>
-              </label>
-              <label class="dash-section-item" data-section="gastos">
-                <input type="checkbox" checked onchange="dashToggleSection('gastos')">
-                <span>Gastos</span>
-              </label>
-              <label class="dash-section-item" data-section="ingresos">
-                <input type="checkbox" checked onchange="dashToggleSection('ingresos')">
-                <span>Ingresos</span>
-              </label>
-            </div>
-          </div>
-          </div>
-        </div>
+              <div class="dash-acc-filter" id="dash-acc-filter">
+                <button class="dash-filter-btn" onclick="dashToggleAccDropdown()" aria-label="Filtrar por cuenta">
+                  <i data-lucide="wallet"></i>
+                  <span id="dash-acc-label">Todas las cuentas</span>
+                  <i data-lucide="chevron-down" class="dash-filter-chevron"></i>
+                </button>
+                <div class="dash-acc-menu" id="dash-acc-menu"></div>
+              </div>
 
-        <!-- Metric cards row -->
-        <div class="dash-metrics-row">
-          <div class="dash-metric-card">
-            <div class="dash-metric-icon income"><i data-lucide="arrow-up-right"></i></div>
-            <div class="dash-metric-info">
-              <span class="dash-metric-label">Ingresos</span>
-              <div class="dash-metric-row">
-                <span class="dash-metric-val income" id="dash-income">$0</span>
-                <span class="dash-metric-delta" id="dash-income-delta"></span>
+              <div class="dash-section-dropdown">
+                <button class="dash-filter-btn" id="dash-section-btn" onclick="dashToggleDropdown()" aria-label="Secciones del dashboard">
+                  <i data-lucide="columns-3"></i>
+                  <span>Secciones</span>
+                  <i data-lucide="chevron-down" class="dash-filter-chevron"></i>
+                </button>
+                <div class="dash-section-menu" id="dash-section-menu"></div>
               </div>
             </div>
           </div>
-          <div class="dash-metric-card">
-            <div class="dash-metric-icon expense"><i data-lucide="arrow-down-left"></i></div>
-            <div class="dash-metric-info">
-              <span class="dash-metric-label">Gastos</span>
-              <div class="dash-metric-row">
-                <span class="dash-metric-val expense" id="dash-expenses">$0</span>
-                <span class="dash-metric-delta" id="dash-expenses-delta"></span>
-              </div>
-            </div>
-          </div>
-          <div class="dash-metric-card">
-            <div class="dash-metric-icon difference"><i data-lucide="wallet"></i></div>
-            <div class="dash-metric-info">
-              <span class="dash-metric-label">Diferencia</span>
-              <div class="dash-metric-row">
-                <span class="dash-metric-val" id="dash-net">$0</span>
-                <span class="dash-metric-delta" id="dash-net-delta"></span>
-              </div>
-            </div>
-          </div>
-          <div class="dash-metric-card">
-            <div class="dash-metric-icon movements"><i data-lucide="activity"></i></div>
-            <div class="dash-metric-info">
-              <span class="dash-metric-label">Movimientos</span>
-              <div class="dash-metric-row">
-                <span class="dash-metric-val" id="dash-tx-count">0</span>
-                <span class="dash-metric-delta" id="dash-count-delta"></span>
-              </div>
-            </div>
-          </div>
+
+          <!-- 4 summary cards generated by JS -->
+          <div class="dash-summary-cards" id="dash-summary-cards"></div>
         </div>
 
         <!-- ── SECTION: Resumen ── -->

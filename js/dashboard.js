@@ -160,6 +160,25 @@ function dashClosePeriodDropdown() {
   if (dd) dd.classList.remove('open');
 }
 
+// ── Section menu builder ─────────────────────────────────────
+function dashBuildSectionMenu() {
+  const menu = document.getElementById('dash-section-menu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  const sections = [
+    { id: 'resumen', label: 'Resumen' },
+    { id: 'gastos', label: 'Gastos' },
+    { id: 'ingresos', label: 'Ingresos' },
+  ];
+  sections.forEach(s => {
+    const label = document.createElement('label');
+    label.className = 'dash-section-item';
+    label.dataset.section = s.id;
+    label.innerHTML = `<input type="checkbox" ${dashState.visibleSections[s.id] !== false ? 'checked' : ''} onchange="dashToggleSection('${s.id}')"><span>${s.label}</span>`;
+    menu.appendChild(label);
+  });
+}
+
 function dashToggleSection(name) {
   const checkbox = document.querySelector(`.dash-section-item[data-section="${name}"] input[type="checkbox"]`);
   if (checkbox) dashState.visibleSections[name] = checkbox.checked;
@@ -597,7 +616,98 @@ function dashRenderDelta(elId, current, previous) {
 
 
 
-// ── MAIN renderDashboard ──────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  renderSummaryCards — 4 summary cards with period comparison
+// ══════════════════════════════════════════════════════════════
+function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, prevExpenses, prevNetDiff) {
+  const container = document.getElementById('dash-summary-cards');
+  if (!container) return;
+
+  const savings = netDiff;
+  const prevSavings = prevNetDiff;
+
+  const cards = [
+    {
+      id: 'summary-balance',
+      icon: 'wallet',
+      iconClass: 'balance',
+      label: 'Balance neto',
+      value: netDiff,
+      prev: prevNetDiff,
+      format: v => (v >= 0 ? '+' : '') + formatCurrency(v),
+    },
+    {
+      id: 'summary-income',
+      icon: 'arrow-up-right',
+      iconClass: 'income',
+      label: 'Ingresos',
+      value: totalIncome,
+      prev: prevIncome,
+      format: v => formatCurrency(v),
+    },
+    {
+      id: 'summary-expense',
+      icon: 'arrow-down-left',
+      iconClass: 'expense',
+      label: 'Gastos',
+      value: totalExpenses,
+      prev: prevExpenses,
+      format: v => formatCurrency(v),
+    },
+    {
+      id: 'summary-savings',
+      icon: 'piggy-bank',
+      iconClass: 'savings',
+      label: 'Ahorro',
+      value: savings,
+      prev: prevSavings,
+      format: v => (v >= 0 ? '+' : '') + formatCurrency(v),
+    },
+  ];
+
+  // Determine comparison period label
+  let prevLabel = '';
+  const p = dashGetPeriod();
+  if (dashState.periodType === 'month') {
+    let pm = p.month - 1, py = p.year;
+    if (pm < 0) { pm = 11; py--; }
+    const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    prevLabel = 'vs ' + monthNames[pm];
+  } else if (dashState.periodType !== 'all') {
+    prevLabel = 'vs período ant.';
+  }
+
+  container.innerHTML = cards.map(c => {
+    const change = (c.prev && c.prev !== 0)
+      ? ((c.value - c.prev) / Math.abs(c.prev)) * 100
+      : null;
+    const changeSign = change !== null ? (change >= 0 ? '+' : '') : '';
+    const changeClass = change !== null ? (change >= 0 ? 'positive' : 'negative') : 'neutral';
+    const deltaIcon = change !== null ? (change >= 0 ? 'trending-up' : 'trending-down') : 'minus';
+    const valClass = c.value < 0 ? 'negative' : c.value > 0 ? 'positive' : '';
+
+    return `
+      <div class="dash-summary-card">
+        <div class="dash-summary-card-top">
+          <div class="dash-summary-card-icon ${c.iconClass}">
+            <i data-lucide="${c.icon}"></i>
+          </div>
+        </div>
+        <div class="dash-summary-card-body">
+          <span class="dash-summary-card-label">${c.label}</span>
+          <span class="dash-summary-card-value ${valClass}">${c.format(c.value)}</span>
+        </div>
+        <div class="dash-summary-card-delta ${changeClass}">
+          ${change !== null
+            ? `<i data-lucide="${deltaIcon}"></i> ${changeSign}${change.toFixed(0)}% ${prevLabel ? `<span style="opacity:0.6">${prevLabel}</span>` : ''}`
+            : `<i data-lucide="minus"></i> <span style="opacity:0.6">Sin comparación</span>`
+          }
+        </div>
+      </div>`;
+  }).join('');
+
+  lucide.createIcons();
+}
 
 // ── MAIN renderDashboard ──────────────────────────────────────
 function renderDashboard() {
@@ -661,95 +771,8 @@ function renderDashboard() {
   // ── Balances for hero ──
   const netWorth  = balances.liquid + balances.credit_card + balances.receivables;
 
-  // ── Metric cards with deltas ──
-  const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-  setEl('dash-income', formatCurrency(totalIncome));
-  setEl('dash-expenses', formatCurrency(totalExpenses));
-  const netEl = document.getElementById('dash-net');
-  if (netEl) {
-    netEl.textContent = (netDiff >= 0 ? '+' : '') + formatCurrency(netDiff);
-    const amtStyle = state.settings.amountStyle || 'default';
-    const showDashColor = amtStyle !== 'no-color';
-    netEl.className = 'dash-metric-val' + (showDashColor ? (netDiff < 0 ? ' expense' : netDiff > 0 ? ' income' : '') : '');
-  }
-  setEl('dash-tx-count', monthTxs.length);
-
-  // Metric deltas
-  dashRenderDelta('dash-income-delta', totalIncome, prevIncome);
-  dashRenderDelta('dash-expenses-delta', totalExpenses, prevExpenses);
-  dashRenderDelta('dash-net-delta', netDiff, prevNetDiff);
-  dashRenderDelta('dash-count-delta', monthTxs.length, prevTxs.length);
-
-  // ── Hero balance (big number) ──
-  const heroBalance = document.getElementById('dash-hero-balance');
-  if (heroBalance) {
-    heroBalance.textContent = (netDiff >= 0 ? '+' : '') + formatCurrency(netDiff);
-    heroBalance.className = 'dash-hero-balance' + (netDiff < 0 ? ' negative' : netDiff > 0 ? ' positive' : '');
-  }
-  const heroSavings = document.getElementById('dash-hero-savings');
-  if (heroSavings) {
-    const savingsPct = totalIncome > 0 ? ((netDiff / totalIncome) * 100) : 0;
-    heroSavings.textContent = totalIncome > 0
-      ? `Ahorrás ${savingsPct.toFixed(0)}% de tus ingresos`
-      : 'Sin ingresos en este período';
-  }
-
-  // ── Hero summary cards (account balances) ──
-  const accBalances = {};
-  state.accounts.forEach(acc => { accBalances[acc.id] = 0; });
-  state.transactions.forEach(tx => {
-    if (!includeCcFutureTx(tx)) return;
-    if (isTxExcluded(tx)) return;
-    if (tx.split_parent_id) return;
-    if (!isTxInPeriod(tx)) return;
-    if (accBalances[tx.account_id] !== undefined) {
-      accBalances[tx.account_id] += Number(tx.amount) || 0;
-    }
-  });
-
-  const settingsCur = state.settings.currency || 'UYU';
-  let totalLiquid = 0, totalCC = 0, totalReceivables = 0;
-  const hasLiquidAcc = state.accounts.some(a => a.type === 'liquid');
-  const hasCCAcc = state.accounts.some(a => a.type === 'credit_card');
-  state.accounts.forEach(acc => {
-    const running = accBalances[acc.id] || 0;
-    const cur = acc.currency || settingsCur;
-    const converted = convertCurrency(acc.balance + running, cur, settingsCur);
-    const val = (converted !== null && converted !== undefined) ? converted : (acc.balance + running);
-    if (acc.type === 'liquid') totalLiquid += val;
-    else if (acc.type === 'credit_card') totalCC += val;
-    else totalReceivables += val;
-  });
-
-  setEl('dash-hero-liquid', formatCurrency(totalLiquid));
-  setEl('dash-hero-cc', formatCurrency(totalCC));
-
-  const liquidEl = document.getElementById('dash-hero-liquid');
-  const ccEl = document.getElementById('dash-hero-cc');
-  if (liquidEl) liquidEl.classList.toggle('negative', totalLiquid < 0);
-  if (ccEl) ccEl.classList.toggle('negative', totalCC < 0);
-
-  const liquidCard = document.getElementById('dash-hero-liquid')?.closest('.dash-hero-card');
-  const ccCard = document.getElementById('dash-hero-cc')?.closest('.dash-hero-card');
-  if (liquidCard) liquidCard.style.display = hasLiquidAcc ? '' : 'none';
-  if (ccCard) ccCard.style.display = hasCCAcc ? '' : 'none';
-
-  const thirdCard = document.getElementById('dash-hero-third-card');
-  const heroCards = document.getElementById('dash-hero-cards');
-  const customAccs = state.accounts.filter(a => a.type !== 'liquid' && a.type !== 'credit_card');
-  if (thirdCard) {
-    const showThird = customAccs.length > 0;
-    thirdCard.style.display = showThird ? '' : 'none';
-    if (heroCards) heroCards.classList.toggle('two-cols', !showThird);
-    if (showThird) {
-      setEl('dash-hero-third-val', formatCurrency(totalReceivables));
-      const thirdValEl = document.getElementById('dash-hero-third-val');
-      if (thirdValEl) thirdValEl.classList.toggle('negative', totalReceivables < 0);
-      const typeDef = (state.predefined.account_types || []).find(t => t.id === customAccs[0].type);
-      const label = document.getElementById('dash-hero-third-label');
-      if (label) label.textContent = typeDef ? typeDef.label : customAccs[0].type;
-    }
-  }
+  // ── Summary cards (4 cards) ──
+  renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, prevExpenses, prevNetDiff);
 
   // ── Category breakdown (expenses) ──
   const catTotals = {};
@@ -936,6 +959,7 @@ function renderDashboard() {
   }
 
   lucide.createIcons();
+  dashBuildSectionMenu();
   // Sync section visibility
   Object.keys(dashState.visibleSections).forEach(name => {
     const visible = dashState.visibleSections[name];

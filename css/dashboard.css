@@ -40,146 +40,127 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   HERO — Monthly Balance + Summary Cards + Period nav
+   SECTION 1 (fija) — Summary Cards
    ═══════════════════════════════════════════════════════════ */
-.dash-hero {
+.dash-section-fixed {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 20px 24px;
+  gap: 14px;
 }
-.dash-hero-top {
+
+.dash-summary-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-.dash-hero-period {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-mid);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-/* ── Hero center: big balance number ── */
-.dash-hero-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0 4px;
-}
-.dash-hero-balance {
+.dash-summary-period {
   font-family: var(--font-ui);
-  font-size: 40px;
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
   color: var(--text-hi);
-  transition: color 0.2s;
-}
-.dash-hero-balance.positive { color: var(--positive); }
-.dash-hero-balance.negative { color: var(--negative); }
-.dash-hero-balance-label {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--text-lo);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.dash-hero-savings {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-mid);
-  min-height: 20px;
-}
-
-/* ── Hero cards: liquid / credit card / custom type ── */
-.dash-hero-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.dash-hero-cards.two-cols {
-  grid-template-columns: repeat(2, 1fr);
-}
-.dash-hero-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0;
-}
-.dash-hero-card-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--r-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.dash-hero-card-icon svg { width: 17px; height: 17px; }
-.dash-hero-card-icon.liquid      { background: rgba(34,197,94,0.1);  color: var(--positive); }
-.dash-hero-card-icon.cc          { background: rgba(239,68,68,0.1);  color: var(--negative); }
-.dash-hero-card-icon.receivables { background: rgba(139,92,246,0.1); color: #8b5cf6; }
-.dash-hero-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.dash-hero-card-label {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-lo);
-}
-.dash-hero-card-val {
-  font-family: var(--font-ui);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-hi);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
-.dash-hero-card-val.negative { color: var(--negative); }
 
-/* ── Period nav in hero ── */
-.dash-period-nav {
+.dash-summary-nav {
   display: flex;
   align-items: center;
-  gap: 2px;
-  background: var(--bg-root);
+  gap: 4px;
+}
+
+/* ── Unified filter button (period, account, sections) ── */
+.dash-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 3px 4px;
+  padding: 5px 9px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-mid);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  height: 30px;
+}
+.dash-filter-btn:hover {
+  color: var(--text-hi);
+  border-color: var(--text-lo);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.dash-filter-btn svg { width: 13px; height: 13px; }
+.dash-filter-chevron {
+  transition: transform 0.15s;
+}
+.dash-acc-filter.open .dash-filter-chevron,
+.dash-section-dropdown.open .dash-filter-chevron {
+  transform: rotate(180deg);
+}
+.dash-period-dropdown.open .dash-period-chevron {
+  transform: rotate(180deg);
 }
 
-/* ═══════════════════════════════════════════════════════════
-   TOOLBAR
-   ═══════════════════════════════════════════════════════════ */
-.dash-toolbar {
+/* ── Period dropdown ── */
+.dash-period-dropdown { position: relative; }
+.dash-period-trigger {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 4px;
+  padding: 5px 9px;
+  height: 30px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-hi);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
 }
-.dash-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.dash-period-trigger:hover {
+  border-color: var(--text-lo);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
-.dash-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.dash-period-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--text-lo);
+  transition: transform 0.2s;
+}
+.dash-period-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  display: none;
+  z-index: 50;
+  padding: 4px;
+}
+.dash-period-dropdown.open .dash-period-menu { display: block; }
+.dash-period-item {
+  padding: 7px 10px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-mid);
+  cursor: pointer;
+  border-radius: var(--r-xs);
+  transition: background 0.1s, color 0.1s;
+}
+.dash-period-item:hover {
+  background: var(--bg-raised);
+  color: var(--text-hi);
 }
 
 /* ── Month buttons ── */
@@ -188,7 +169,7 @@
   border: none;
   cursor: pointer;
   color: var(--text-mid);
-  padding: 4px 7px;
+  padding: 4px 6px;
   border-radius: var(--r-xs);
   display: flex;
   align-items: center;
@@ -198,111 +179,57 @@
 .dash-month-btn:hover { background: var(--bg-raised); color: var(--text-hi); }
 .dash-month-btn svg { width: 13px; height: 13px; }
 
-.dash-chart-nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-}
-.dash-chart-label {
-  font-size: 10px;
-  color: var(--text-mid);
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: normal;
-  min-width: 70px;
-  text-align: center;
-}
-
-/* ── Period dropdown ── */
-.dash-period-dropdown {
-  position: relative;
-}
-.dash-period-trigger {
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: var(--r-xs);
-  font-family: var(--font-ui);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-hi);
-  transition: background 0.15s;
-  white-space: nowrap;
-}
-.dash-period-trigger:hover { background: var(--bg-raised); }
-.dash-period-chevron {
-  width: 12px;
-  height: 12px;
-  color: var(--text-lo);
-  transition: transform 0.2s;
-}
-.dash-period-dropdown.open .dash-period-chevron {
-  transform: rotate(180deg);
-}
-.dash-period-menu {
+/* ── Account filter ── */
+.dash-acc-filter { position: relative; }
+.dash-acc-menu {
+  display: none;
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  min-width: 170px;
+  min-width: 180px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   box-shadow: var(--shadow-pop);
-  display: none;
-  z-index: 50;
-  overflow: hidden;
+  z-index: 200;
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
 }
-.dash-period-dropdown.open .dash-period-menu {
-  display: block;
-}
-.dash-period-item {
-  padding: 8px 12px;
+.dash-acc-filter.open .dash-acc-menu { display: block; }
+.dash-acc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
   font-family: var(--font-ui);
   font-size: 12px;
   color: var(--text-mid);
-  cursor: pointer;
   transition: background 0.1s, color 0.1s;
 }
-.dash-period-item:hover {
-  background: var(--bg-raised);
-  color: var(--text-hi);
+.dash-acc-item:hover { background: var(--bg-raised); color: var(--text-hi); }
+.dash-acc-item input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  margin: 0;
+}
+.dash-acc-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
 }
 
 /* ── Section dropdown ── */
-.dash-section-dropdown {
-  position: relative;
-}
-.dash-section-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 5px 10px;
-  cursor: pointer;
-  font-family: var(--font-ui);
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-mid);
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-.dash-section-btn:hover { color: var(--text-hi); }
-.dash-section-btn svg { width: 14px; height: 14px; }
-.dash-section-chevron { transition: transform 0.15s; }
-.dash-section-dropdown.open .dash-section-chevron { transform: rotate(180deg); }
+.dash-section-dropdown { position: relative; }
 .dash-section-menu {
   display: none;
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  min-width: 160px;
+  min-width: 180px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -331,75 +258,37 @@
   margin: 0;
 }
 
-/* ── Account filter dropdown ── */
-.dash-acc-filter {
-  position: relative;
-}
-.dash-acc-menu {
-  display: none;
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 180px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-pop);
-  z-index: 200;
-  padding: 4px;
-  max-height: 280px;
-  overflow-y: auto;
-}
-.dash-acc-filter.open .dash-acc-menu { display: block; }
-.dash-acc-filter.open .dash-section-chevron { transform: rotate(180deg); }
-.dash-acc-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--r-xs);
-  cursor: pointer;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--text-mid);
-  transition: background 0.1s, color 0.1s;
-}
-.dash-acc-item:hover { background: var(--bg-raised); color: var(--text-hi); }
-.dash-acc-item input[type="checkbox"] {
-  width: 13px;
-  height: 13px;
-  cursor: pointer;
-  margin: 0;
-}
-.dash-acc-separator {
-  height: 1px;
-  background: var(--border);
-  margin: 4px 8px;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   METRIC CARDS
-   ═══════════════════════════════════════════════════════════ */
-.dash-metrics-row {
+/* ── 4 Summary Cards ── */
+.dash-summary-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
-.dash-metric-card {
+
+.dash-summary-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: box-shadow 0.2s, border-color 0.2s;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
 }
-.dash-metric-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  border-color: var(--accent);
+.dash-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04);
 }
-.dash-metric-icon {
+
+.dash-summary-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dash-summary-card-icon {
   width: 36px;
   height: 36px;
   border-radius: var(--r-sm);
@@ -408,52 +297,72 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.dash-metric-icon svg { width: 18px; height: 18px; }
-.dash-metric-icon.income    { background: rgba(34,197,94,0.1);  color: var(--positive); }
-.dash-metric-icon.expense   { background: rgba(239,68,68,0.1);  color: var(--negative); }
-.dash-metric-icon.difference { background: rgba(230,184,0,0.1); color: var(--accent); }
-.dash-metric-icon.movements { background: rgba(139,92,246,0.1); color: #8b5cf6; }
-.dash-metric-info {
+.dash-summary-card-icon svg { width: 18px; height: 18px; }
+.dash-summary-card-icon.income   { background: rgba(34,197,94,0.1);  color: var(--positive); }
+.dash-summary-card-icon.expense  { background: rgba(239,68,68,0.1);  color: var(--negative); }
+.dash-summary-card-icon.balance  { background: rgba(230,184,0,0.12); color: var(--accent); }
+.dash-summary-card-icon.savings  { background: rgba(139,92,246,0.1); color: #8b5cf6; }
+
+.dash-summary-card-body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
-.dash-metric-label {
+.dash-summary-card-label {
   font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-lo);
 }
-.dash-metric-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.dash-metric-val {
+.dash-summary-card-value {
   font-family: var(--font-ui);
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 650;
   color: var(--text-hi);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
-.dash-metric-val.income  { color: var(--positive); }
-.dash-metric-val.expense { color: var(--negative); }
-.dash-metric-delta {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-  min-width: 0;
-  font-variant-numeric: tabular-nums;
-}
-.dash-metric-delta.positive { color: var(--positive); }
-.dash-metric-delta.negative { color: var(--negative); }
+.dash-summary-card-value.income  { color: var(--positive); }
+.dash-summary-card-value.expense { color: var(--negative); }
+.dash-summary-card-value.negative { color: var(--negative); }
+.dash-summary-card-value.positive { color: var(--positive); }
 
-/* ═══════════════════════════════════════════════════════════
+.dash-summary-card-delta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: -2px;
+  line-height: 1.2;
+}
+.dash-summary-card-delta.positive { color: var(--positive); }
+.dash-summary-card-delta.negative { color: var(--negative); }
+.dash-summary-card-delta.neutral  { color: var(--text-lo); }
+.dash-summary-card-delta svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* ── Chart nav (inside section cards) ── */
+.dash-chart-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.dash-chart-label {
+  font-size: 10px;
+  color: var(--text-mid);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  min-width: 70px;
+  text-align: center;
+}
    SECTION BLOCKS
    ═══════════════════════════════════════════════════════════ */
 .dash-section-block {
@@ -468,13 +377,14 @@
 /* ── Card component ── */
 .dash-card {
   background: var(--bg-surface);
-  border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 16px 20px;
-  transition: box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
 }
 .dash-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
 }
 .dash-card-head {
   display: flex;
