@@ -778,10 +778,12 @@ function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, pre
       : null;
     const changeSign = change !== null ? (change >= 0 ? '+' : '') : '';
     const deltaIcon = change !== null ? (change >= 0 ? 'trending-up' : 'trending-down') : 'minus';
-    // Force red for expense card; for others use sign-based
+    // Force red for expense card; for savings use gold accent; others use sign-based
     let valClass = '';
     if (c.iconClass === 'expense') {
       valClass = 'negative';
+    } else if (c.iconClass === 'savings') {
+      valClass = c.value < 0 ? 'savings-negative' : 'savings';
     } else if (c.value < 0) {
       valClass = 'negative';
     } else if (c.value > 0) {
@@ -843,7 +845,7 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
           stroke-dasharray="${expenseDash} ${circ - expenseDash}"
           stroke-linecap="round" />` : ''}
         ${savingsDash > 2 ? `<circle cx="${viewBox/2}" cy="${viewBox/2}" r="${r}"
-          fill="none" stroke="var(--positive)" stroke-width="${strokeW}"
+          fill="none" stroke="var(--accent)" stroke-width="${strokeW}"
           stroke-dasharray="${savingsDash} ${circ - savingsDash}"
           stroke-dashoffset="${-(expenseDash + 1)}"
           stroke-linecap="round" />` : ''}
@@ -871,9 +873,9 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
       <div class="dash-savings-stat">
         <span class="dash-savings-stat-label">
           <span class="dash-savings-stat-dot" style="background:var(--accent)"></span>
-          Neto
+          Ahorro
         </span>
-        <span class="dash-savings-stat-val" style="color:${savings >= 0 ? 'var(--positive)' : 'var(--negative)'}">${formatCurrency(savings)}</span>
+        <span class="dash-savings-stat-val" style="color:${savings >= 0 ? 'var(--accent)' : 'var(--negative)'}">${savings >= 0 ? '+' : ''}${formatCurrency(savings)}</span>
       </div>
     </div>`;
 

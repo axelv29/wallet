@@ -334,6 +334,8 @@
 .dash-summary-card-value.expense { color: var(--negative); }
 .dash-summary-card-value.negative { color: var(--negative); }
 .dash-summary-card-value.positive { color: var(--positive); }
+.dash-summary-card-value.savings { color: var(--accent); }
+.dash-summary-card-value.savings-negative { color: var(--negative); }
 
 .dash-summary-card-delta {
   display: flex;
