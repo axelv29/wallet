@@ -579,7 +579,7 @@ function updateDonutTooltip(canvas) {
     if (!found) { tooltip.style.display = 'none'; return; }
 
     const pct = ((found.value / segments.reduce((a, s) => a + s.value, 0)) * 100).toFixed(1);
-    tooltip.innerHTML = `<strong>${found.label}</strong><br>${formatCurrency(found.value)} <span style="color:var(--text-lo)">(${pct}%)</span>`;
+    tooltip.innerHTML = `<div class="tooltip-title">${found.label}</div><div class="tooltip-row"><span class="tooltip-dot" style="background:${found.color};width:8px;height:8px;border-radius:50%"></span><span class="tooltip-val">${formatCurrency(found.value)}</span> <span style="color:var(--text-lo)">(${pct}%)</span></div>`;
     tooltip.style.display = 'block';
     tooltip.style.left = (e.clientX + 12) + 'px';
     tooltip.style.top = (e.clientY - 10) + 'px';
@@ -709,6 +709,75 @@ function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, pre
   lucide.createIcons();
 }
 
+// ══════════════════════════════════════════════════════════════
+//  renderSavingsCard — right-side card next to line chart
+// ══════════════════════════════════════════════════════════════
+function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
+  const body = document.getElementById('dash-savings-body');
+  if (!body) return;
+
+  const savings = netDiff;
+  const savingsPct = totalIncome > 0 ? Math.max(0, (savings / totalIncome) * 100) : 0;
+  const expensePct = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+
+  // SVG ring: 3 segments
+  const r = 42;           // ring radius
+  const circ = 2 * Math.PI * r; // circumference
+  const expenseDash = (expensePct / 100) * circ;
+  const savingsDash = (savingsPct / 100) * circ;
+  const gapDash = Math.max(0, circ - expenseDash - savingsDash);
+
+  const strokeW = 10;
+  const viewBox = 100;
+
+  body.innerHTML = `
+    <div class="dash-savings-ring">
+      <svg viewBox="0 0 ${viewBox} ${viewBox}" aria-label="Proporción de ahorro">
+        <!-- Background ring -->
+        <circle cx="${viewBox/2}" cy="${viewBox/2}" r="${r}"
+          fill="none" stroke="var(--bg-sunken)" stroke-width="${strokeW}" />
+        ${expenseDash > 2 ? `<circle cx="${viewBox/2}" cy="${viewBox/2}" r="${r}"
+          fill="none" stroke="var(--negative)" stroke-width="${strokeW}"
+          stroke-dasharray="${expenseDash} ${circ - expenseDash}"
+          stroke-linecap="round" />` : ''}
+        ${savingsDash > 2 ? `<circle cx="${viewBox/2}" cy="${viewBox/2}" r="${r}"
+          fill="none" stroke="var(--positive)" stroke-width="${strokeW}"
+          stroke-dasharray="${savingsDash} ${circ - savingsDash}"
+          stroke-dashoffset="${-(expenseDash + 1)}"
+          stroke-linecap="round" />` : ''}
+      </svg>
+      <div class="dash-savings-ring-center">
+        <span class="dash-savings-ring-pct">${savingsPct.toFixed(0)}%</span>
+        <span class="dash-savings-ring-label">Ahorro</span>
+      </div>
+    </div>
+    <div class="dash-savings-stats">
+      <div class="dash-savings-stat">
+        <span class="dash-savings-stat-label">
+          <span class="dash-savings-stat-dot" style="background:var(--positive)"></span>
+          Ingresos
+        </span>
+        <span class="dash-savings-stat-val">${formatCurrency(totalIncome)}</span>
+      </div>
+      <div class="dash-savings-stat">
+        <span class="dash-savings-stat-label">
+          <span class="dash-savings-stat-dot" style="background:var(--negative)"></span>
+          Gastos
+        </span>
+        <span class="dash-savings-stat-val">${formatCurrency(totalExpenses)}</span>
+      </div>
+      <div class="dash-savings-stat">
+        <span class="dash-savings-stat-label">
+          <span class="dash-savings-stat-dot" style="background:var(--accent)"></span>
+          Neto
+        </span>
+        <span class="dash-savings-stat-val" style="color:${savings >= 0 ? 'var(--positive)' : 'var(--negative)'}">${formatCurrency(savings)}</span>
+      </div>
+    </div>`;
+
+  lucide.createIcons();
+}
+
 // ── MAIN renderDashboard ──────────────────────────────────────
 function renderDashboard() {
   const accFilter = dashState.accounts !== null ? (dashState.accounts.length > 0 ? dashState.accounts : []) : null;
@@ -773,6 +842,9 @@ function renderDashboard() {
 
   // ── Summary cards (4 cards) ──
   renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, prevExpenses, prevNetDiff);
+
+  // ── Savings side card ──
+  renderSavingsCard(totalIncome, totalExpenses, netDiff);
 
   // ── Category breakdown (expenses) ──
   const catTotals = {};
