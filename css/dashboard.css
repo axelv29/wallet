@@ -12,7 +12,7 @@
   --positive:     #22c55e;
   --negative:     #ef4444;
   --warn:         #d97706;
-  --accent-savings: #8b5cf6;
+  --accent-savings: #0284c7;
   --accent-gradient: linear-gradient(135deg, #e6b800, #f59e0b);
 }
 :root.theme-dark #view-dashboard {
@@ -538,6 +538,7 @@
   display: grid;
   grid-template-columns: 1fr 220px;
   gap: 12px;
+  margin-bottom: 20px;
 }
 
 /* ── Savings side card ── */

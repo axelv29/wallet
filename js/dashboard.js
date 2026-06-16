@@ -359,7 +359,7 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   const incomeFill = isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)';
   const expenseColor = '#ef4444';
   const expenseFill = isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)';
-  const savingsColor = '#2563eb';
+  const savingsColor = '#0284c7';
 
   const allVals = [...incomeData, ...expenseData, ...(savingsData || [])];
   const maxVal = Math.max(...allVals, 1) * 1.1;
@@ -383,17 +383,21 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
 
   // Helper: smooth curve through points
   function smoothCurve(points) {
-    if (points.length < 2) return;
+    if (points.length === 0) return;
     ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i === 0 ? i : i - 1];
+    if (points.length === 1) return;
+    if (points.length === 2) {
+      ctx.lineTo(points[1].x, points[1].y);
+      return;
+    }
+    for (let i = 1; i < points.length - 1; i++) {
+      const p0 = points[i - 1];
       const p1 = points[i];
       const p2 = points[i + 1];
-      const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
       const cp1x = p1.x + (p2.x - p0.x) / 6;
       const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      const cp2x = p2.x - (p2.x - p0.x) / 6;
+      const cp2y = p2.y - (p2.y - p0.y) / 6;
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
     }
   }
@@ -410,7 +414,17 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.beginPath();
   ctx.moveTo(incomePoints[0].x, padT + chartH);
   ctx.lineTo(incomePoints[0].x, incomePoints[0].y);
-  smoothCurve(incomePoints);
+  for (let i = 1; i < incomePoints.length - 1; i++) {
+    const p0 = incomePoints[i - 1], p1 = incomePoints[i], p2 = incomePoints[i + 1];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p2.x - p0.x) / 6;
+    const cp2y = p2.y - (p2.y - p0.y) / 6;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+  if (incomePoints.length > 1) {
+    ctx.lineTo(incomePoints[incomePoints.length - 1].x, incomePoints[incomePoints.length - 1].y);
+  }
   ctx.lineTo(incomePoints[incomePoints.length - 1].x, padT + chartH);
   ctx.closePath();
   ctx.fillStyle = incomeFill;
@@ -421,7 +435,17 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.beginPath();
   ctx.moveTo(expensePoints[0].x, padT + chartH);
   ctx.lineTo(expensePoints[0].x, expensePoints[0].y);
-  smoothCurve(expensePoints);
+  for (let i = 1; i < expensePoints.length - 1; i++) {
+    const p0 = expensePoints[i - 1], p1 = expensePoints[i], p2 = expensePoints[i + 1];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p2.x - p0.x) / 6;
+    const cp2y = p2.y - (p2.y - p0.y) / 6;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+  if (expensePoints.length > 1) {
+    ctx.lineTo(expensePoints[expensePoints.length - 1].x, expensePoints[expensePoints.length - 1].y);
+  }
   ctx.lineTo(expensePoints[expensePoints.length - 1].x, padT + chartH);
   ctx.closePath();
   ctx.fillStyle = expenseFill;
@@ -511,7 +535,17 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
     const sw = 10, sh = 4;
     ctx.fillStyle = item.color;
     ctx.beginPath();
-    ctx.roundRect(legX, padT - 14, sw, sh, 2);
+    const rx = legX, ry = padT - 14, rr = 2;
+    ctx.moveTo(rx + rr, ry);
+    ctx.lineTo(rx + sw - rr, ry);
+    ctx.quadraticCurveTo(rx + sw, ry, rx + sw, ry + rr);
+    ctx.lineTo(rx + sw, ry + sh - rr);
+    ctx.quadraticCurveTo(rx + sw, ry + sh, rx + sw - rr, ry + sh);
+    ctx.lineTo(rx + rr, ry + sh);
+    ctx.quadraticCurveTo(rx, ry + sh, rx, ry + sh - rr);
+    ctx.lineTo(rx, ry + rr);
+    ctx.quadraticCurveTo(rx, ry, rx + rr, ry);
+    ctx.closePath();
     ctx.fill();
     ctx.fillStyle = textColor;
     ctx.font = '10px system-ui, sans-serif';
