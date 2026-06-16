@@ -335,12 +335,17 @@
               <div class="dash-card-head">
                 <i data-lucide="bar-chart-2"></i>
                 <span>Ingresos vs Gastos</span>
+                <div class="dash-range-switch">
+                  <button class="dash-range-btn" data-range="6" onclick="dashSetChartRange(6)">6m</button>
+                  <button class="dash-range-btn" data-range="12" onclick="dashSetChartRange(12)">12m</button>
+                  <button class="dash-range-btn" data-range="0" onclick="dashSetChartRange(0)">Todo</button>
+                </div>
                 <div class="dash-chart-nav">
-                  <button class="dash-month-btn" onclick="dashChartPrevMonth()" aria-label="Mes anterior">
+                  <button class="dash-month-btn" onclick="dashChartPrevMonth()" aria-label="Período anterior">
                     <i data-lucide="chevron-left"></i>
                   </button>
                   <span id="dash-chart-period" class="dash-chart-label"></span>
-                  <button class="dash-month-btn" onclick="dashChartNextMonth()" aria-label="Mes siguiente">
+                  <button class="dash-month-btn" onclick="dashChartNextMonth()" aria-label="Período siguiente">
                     <i data-lucide="chevron-right"></i>
                   </button>
                 </div>

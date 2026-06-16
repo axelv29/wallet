@@ -359,7 +359,6 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
 }
 .dash-chart-label {
   font-size: 10px;
@@ -370,7 +369,44 @@
   min-width: 70px;
   text-align: center;
 }
+
+/* ── Range switch (6m / 12m / Todo) ── */
+.dash-range-switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  background: var(--bg-sunken);
+  border-radius: var(--r-sm);
+  padding: 2px;
+}
+.dash-range-btn {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-lo);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  line-height: 1.4;
+}
+.dash-range-btn:hover {
+  color: var(--text-hi);
+}
+.dash-range-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-hi);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* ═══════════════════════════════════════════════════════════
    SECTION BLOCKS
+   ═══════════════════════════════════════════════════════════ */}
+
+/* ═══════════════════════════════════════════════════════════
    ═══════════════════════════════════════════════════════════ */
 .dash-section-block {
   display: flex;
