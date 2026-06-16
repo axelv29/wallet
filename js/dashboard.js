@@ -969,30 +969,42 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
       });
       const prevTotal = Object.values(prevTotals).reduce((a, b) => a + b, 0);
 
-      const allCats = new Set([...entries.map(e => e[0]), ...Object.keys(prevTotals)]);
+      // Compute catColors same as chart
+      const allEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+      const catColors = {};
+      getChartColors(allEntries.length).forEach((c, i) => { catColors[allEntries[i][0]] = c; });
+
+      const allCats = new Set([...allEntries.map(e => e[0]), ...Object.keys(prevTotals)]);
+      const maxCur = allEntries.length > 0 ? allEntries[0][1] : 1;
+
       let rows = '';
       allCats.forEach(cat => {
         const curAmt = catTotals[cat] || 0;
         const prevAmt = prevTotals[cat] || 0;
         const diff = curAmt - prevAmt;
+        const barPct = Math.min((curAmt / maxCur) * 100, 100);
         const pctChange = prevAmt > 0 ? ((diff / prevAmt) * 100).toFixed(1) : (curAmt > 0 ? '100' : '0');
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '—';
-        const isUpBad = isExp ? diff > 0 : diff < 0; // for expenses, up is bad; for income, down is bad
+        const isUpBad = isExp ? diff > 0 : diff < 0;
+        const color = catColors[cat] || 'var(--text-lo)';
         rows += `
           <div class="dash-compare-row">
-            <span class="dash-compare-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
+            <div class="dash-compare-name-wrap">
+              <span class="dash-compare-bar" style="width:${barPct}%;background:${color}"></span>
+              <span class="dash-compare-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
+            </div>
             <span class="dash-compare-val">${formatCurrency(curAmt)}</span>
             <span class="dash-compare-prev">${formatCurrency(prevAmt)}</span>
-            <span class="dash-compare-diff ${diff === 0 ? '' : (isUpBad ? 'comp-bad' : 'comp-good')}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>
+            <span class="dash-compare-diff ${diff === 0 ? 'comp-flat' : (isUpBad ? 'comp-bad' : 'comp-good')}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>
           </div>
         `;
       });
       compareTable.innerHTML = `
         <div class="dash-compare-header">
           <span class="dash-compare-hdr">Categoría</span>
-          <span class="dash-compare-hdr">Este período</span>
-          <span class="dash-compare-hdr">Período anterior</span>
-          <span class="dash-compare-hdr">Variación</span>
+          <span class="dash-compare-hdr right">Este período</span>
+          <span class="dash-compare-hdr right">Anterior</span>
+          <span class="dash-compare-hdr right">Variación</span>
         </div>
         ${rows}`;
     }

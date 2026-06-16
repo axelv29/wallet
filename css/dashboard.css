@@ -810,41 +810,74 @@
 .dash-compare-card {
   overflow: hidden;
 }
+.dash-compare-table {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 340px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.dash-compare-table::-webkit-scrollbar { width: 4px; }
+.dash-compare-table::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 .dash-compare-header {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
-  padding: 8px 0;
+  grid-template-columns: 1fr 80px 80px 72px;
+  gap: 6px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  z-index: 1;
 }
 .dash-compare-hdr {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   color: var(--text-lo);
   font-weight: 600;
 }
+.dash-compare-hdr.right { text-align: right; }
 .dash-compare-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--bg-sunken);
+  grid-template-columns: 1fr 80px 80px 72px;
+  gap: 6px;
+  padding: 5px 0;
   align-items: center;
+  border-radius: var(--r-xs);
+  transition: background 0.1s;
 }
-.dash-compare-row:last-child { border-bottom: none; }
+.dash-compare-row:hover { background: var(--bg-raised); }
 .dash-compare-name {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-mid);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  font-weight: 500;
 }
 .dash-compare-name:hover { color: var(--accent); }
+.dash-compare-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.dash-compare-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  opacity: 0.1;
+  border-radius: 2px;
+  pointer-events: none;
+}
 .dash-compare-val {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text-hi);
@@ -861,13 +894,19 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  min-width: 60px;
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
 }
 .dash-compare-diff.comp-good {
   color: var(--positive);
+  background: rgba(34,197,94,0.08);
 }
 .dash-compare-diff.comp-bad {
   color: var(--negative);
+  background: rgba(239,68,68,0.08);
+}
+.dash-compare-diff.comp-flat {
+  color: var(--text-lo);
 }
 
 /* ═══════════════════════════════════════════════════════════
