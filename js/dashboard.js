@@ -682,9 +682,16 @@ function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, pre
       ? ((c.value - c.prev) / Math.abs(c.prev)) * 100
       : null;
     const changeSign = change !== null ? (change >= 0 ? '+' : '') : '';
-    const changeClass = change !== null ? (change >= 0 ? 'positive' : 'negative') : 'neutral';
     const deltaIcon = change !== null ? (change >= 0 ? 'trending-up' : 'trending-down') : 'minus';
-    const valClass = c.value < 0 ? 'negative' : c.value > 0 ? 'positive' : '';
+    // Force red for expense card; for others use sign-based
+    let valClass = '';
+    if (c.iconClass === 'expense') {
+      valClass = 'negative';
+    } else if (c.value < 0) {
+      valClass = 'negative';
+    } else if (c.value > 0) {
+      valClass = 'positive';
+    }
 
     return `
       <div class="dash-summary-card">
@@ -697,10 +704,10 @@ function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, pre
           <span class="dash-summary-card-label">${c.label}</span>
           <span class="dash-summary-card-value ${valClass}">${c.format(c.value)}</span>
         </div>
-        <div class="dash-summary-card-delta ${changeClass}">
+        <div class="dash-summary-card-delta neutral">
           ${change !== null
-            ? `<i data-lucide="${deltaIcon}"></i> ${changeSign}${change.toFixed(0)}% ${prevLabel ? `<span style="opacity:0.6">${prevLabel}</span>` : ''}`
-            : `<i data-lucide="minus"></i> <span style="opacity:0.6">Sin comparación</span>`
+            ? `<i data-lucide="${deltaIcon}"></i> ${changeSign}${change.toFixed(0)}% ${prevLabel ? `<span style="opacity:0.5">${prevLabel}</span>` : ''}`
+            : `<i data-lucide="minus"></i> <span style="opacity:0.5">Sin comparación</span>`
           }
         </div>
       </div>`;
