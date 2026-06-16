@@ -2073,57 +2073,71 @@ function toggleSort(column) {
 }
 
 function sortTransactions(arr) {
-  if (!state.sortColumn) return;
+  if (state.sortColumn) {
+    const col = state.sortColumn;
+    const dir = state.sortDirection === 'asc' ? 1 : -1;
 
-  const col = state.sortColumn;
-  const dir = state.sortDirection === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      let va, vb;
+      switch (col) {
+        case 'date':
+          va = a.date || '';
+          vb = b.date || '';
+          return dir * va.localeCompare(vb);
+        case 'account': {
+          const accA = state.accounts.find(ac => ac.id === a.account_id);
+          const accB = state.accounts.find(ac => ac.id === b.account_id);
+          va = accA ? accA.name : '';
+          vb = accB ? accB.name : '';
+          break;
+        }
+        case 'payee':
+          va = a.payee || '';
+          vb = b.payee || '';
+          break;
+        case 'notes':
+          va = a.notes || '';
+          vb = b.notes || '';
+          break;
+        case 'tags':
+          va = (a.tags || []).join(', ');
+          vb = (b.tags || []).join(', ');
+          break;
+        case 'category':
+          va = a.category_name || '';
+          vb = b.category_name || '';
+          break;
+        case 'amount':
+          return dir * ((Math.abs(a.amount) || 0) - (Math.abs(b.amount) || 0));
+        case 'cuota': {
+          const aIdx = a.installment_index || 0;
+          const aTot = a.installment_total || 0;
+          const bIdx = b.installment_index || 0;
+          const bTot = b.installment_total || 0;
+          const aRatio = aTot > 0 ? aIdx / aTot : 0;
+          const bRatio = bTot > 0 ? bIdx / bTot : 0;
+          return dir * (aRatio - bRatio);
+        }
+        default:
+          return 0;
+      }
+      return dir * va.localeCompare(vb);
+    });
+    return;
+  }
 
-  return arr.sort((a, b) => {
-    let va, vb;
-    switch (col) {
-      case 'date':
-        va = a.date || '';
-        vb = b.date || '';
-        return dir * va.localeCompare(vb);
-      case 'account': {
-        const accA = state.accounts.find(ac => ac.id === a.account_id);
-        const accB = state.accounts.find(ac => ac.id === b.account_id);
-        va = accA ? accA.name : '';
-        vb = accB ? accB.name : '';
-        break;
-      }
-      case 'payee':
-        va = a.payee || '';
-        vb = b.payee || '';
-        break;
-      case 'notes':
-        va = a.notes || '';
-        vb = b.notes || '';
-        break;
-      case 'tags':
-        va = (a.tags || []).join(', ');
-        vb = (b.tags || []).join(', ');
-        break;
-      case 'category':
-        va = a.category_name || '';
-        vb = b.category_name || '';
-        break;
-      case 'amount':
-        return dir * ((Math.abs(a.amount) || 0) - (Math.abs(b.amount) || 0));
-      case 'cuota': {
-        const aIdx = a.installment_index || 0;
-        const aTot = a.installment_total || 0;
-        const bIdx = b.installment_index || 0;
-        const bTot = b.installment_total || 0;
-        const aRatio = aTot > 0 ? aIdx / aTot : 0;
-        const bRatio = bTot > 0 ? bIdx / bTot : 0;
-        return dir * (aRatio - bRatio);
-      }
-      default:
-        return 0;
+  // Default: push "Pago de tarjeta" to the end
+  const payments = [];
+  const rest = [];
+  for (const tx of arr) {
+    if ((tx.tags || []).includes('Pago de tarjeta')) {
+      payments.push(tx);
+    } else {
+      rest.push(tx);
     }
-    return dir * va.localeCompare(vb);
-  });
+  }
+  arr.length = 0;
+  arr.push(...rest, ...payments);
 }
 
 function updateSortIndicators() {
