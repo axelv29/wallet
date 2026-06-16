@@ -728,6 +728,103 @@
   background: var(--positive);
 }
 
+/* clickable category row */
+.dash-cat-row-clickable {
+  cursor: pointer;
+}
+.dash-cat-row-clickable:hover .dash-cat-name {
+  color: var(--accent);
+}
+
+/* Donut toggle button */
+.dash-top-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.dash-top-toggle:hover {
+  background: var(--bg-sunken);
+  color: var(--text-hi);
+}
+.dash-top-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Comparison table */
+.dash-compare-card {
+  overflow: hidden;
+}
+.dash-compare-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.dash-compare-hdr {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-lo);
+  font-weight: 600;
+}
+.dash-compare-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--bg-sunken);
+  align-items: center;
+}
+.dash-compare-row:last-child { border-bottom: none; }
+.dash-compare-name {
+  font-size: 12px;
+  color: var(--text-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dash-compare-name:hover { color: var(--accent); }
+.dash-compare-val {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+  text-align: right;
+}
+.dash-compare-prev {
+  font-size: 11px;
+  color: var(--text-lo);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dash-compare-diff {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 60px;
+}
+.dash-compare-diff.comp-good {
+  color: var(--positive);
+}
+.dash-compare-diff.comp-bad {
+  color: var(--negative);
+}
+
 /* ═══════════════════════════════════════════════════════════
    RECENT ACTIVITY
    ═══════════════════════════════════════════════════════════ */

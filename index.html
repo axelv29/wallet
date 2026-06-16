@@ -383,13 +383,17 @@
           </div>
         </div>
 
-        <!-- ── SECTION: Gastos ── -->
-        <div class="dash-section-block" id="dash-section-gastos">
+        <!-- ── SECTION: Categorías (donut + comparativa) ── -->
+        <div class="dash-section-block" id="dash-section-categorias">
           <div class="dash-cols">
+            <!-- Donut chart -->
             <div class="dash-card">
               <div class="dash-card-head">
                 <i data-lucide="pie-chart"></i>
-                <span>Distribución de gastos</span>
+                <span id="dash-donut-title">Distribución de gastos</span>
+                <button class="dash-top-toggle" id="dash-donut-toggle" onclick="dashToggleDonutMode()" title="Alternar entre gastos e ingresos">
+                  <i data-lucide="arrow-left-right"></i>
+                </button>
               </div>
               <div class="dash-donut-wrap">
                 <div class="dash-donut-visual">
@@ -399,44 +403,17 @@
                     <div class="dash-donut-total-val" id="dash-donut-total">$0</div>
                   </div>
                 </div>
-                <div class="dash-donut-detail" id="dash-donut-detail-expenses"></div>
               </div>
+              <!-- Category list below donut -->
+              <div id="dash-donut-cat-list" class="dash-cat-list" style="margin-top:8px"></div>
             </div>
-            <div class="dash-card">
+            <!-- Comparative table -->
+            <div class="dash-card dash-compare-card">
               <div class="dash-card-head">
-                <i data-lucide="list"></i>
-                <span>Por categoría</span>
+                <i data-lucide="bar-chart-horizontal"></i>
+                <span id="dash-compare-title">Comparación con período anterior</span>
               </div>
-              <div id="dash-category-list" class="dash-cat-list"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── SECTION: Ingresos ── -->
-        <div class="dash-section-block" id="dash-section-ingresos">
-          <div class="dash-cols">
-            <div class="dash-card">
-              <div class="dash-card-head">
-                <i data-lucide="pie-chart"></i>
-                <span>Distribución de ingresos</span>
-              </div>
-              <div class="dash-donut-wrap">
-                <div class="dash-donut-visual">
-                  <canvas id="dash-donut-income-chart" class="dash-donut-canvas"></canvas>
-                  <div class="dash-donut-center" id="dash-donut-income-center">
-                    <div class="dash-donut-total-label">Total</div>
-                    <div class="dash-donut-total-val" id="dash-donut-income-total">$0</div>
-                  </div>
-                </div>
-                <div class="dash-donut-detail" id="dash-donut-detail-income"></div>
-              </div>
-            </div>
-            <div class="dash-card">
-              <div class="dash-card-head">
-                <i data-lucide="list"></i>
-                <span>Por categoría</span>
-              </div>
-              <div id="dash-income-category-list" class="dash-cat-list"></div>
+              <div id="dash-compare-table" class="dash-compare-table"></div>
             </div>
           </div>
         </div>

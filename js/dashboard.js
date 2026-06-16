@@ -10,7 +10,8 @@ let dashState = {
   chartMonth: null,
   periodType: 'month',
   accounts: null,
-  visibleSections: { resumen: true, gastos: true, ingresos: true },
+  visibleSections: { resumen: true, categorias: true },
+  donutMode: 'expense', // 'expense' | 'income'
   lineChartInstance: null,
   donutChartInstance: null,
   donutIncomeChartInstance: null,
@@ -167,8 +168,7 @@ function dashBuildSectionMenu() {
   menu.innerHTML = '';
   const sections = [
     { id: 'resumen', label: 'Resumen' },
-    { id: 'gastos', label: 'Gastos' },
-    { id: 'ingresos', label: 'Ingresos' },
+    { id: 'categorias', label: 'Categorías' },
   ];
   sections.forEach(s => {
     const label = document.createElement('label');
@@ -778,6 +778,130 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
   lucide.createIcons();
 }
 
+// ══════════════════════════════════════════════════════════════
+//  renderDonutCategories — unified donut + cat list + compare table
+// ══════════════════════════════════════════════════════════════
+function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
+  const isExp = dashState.donutMode === 'expense';
+  const total = isExp ? totalExpenses : totalIncome;
+  const filtered = monthTxs.filter(tx => isExp ? tx.amount < 0 : tx.amount > 0);
+
+  // Build category totals
+  const catTotals = {};
+  filtered.forEach(tx => {
+    const cat = tx.category_name || 'Otros';
+    catTotals[cat] = (catTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
+  });
+  const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+
+  // Update title
+  const title = document.getElementById('dash-donut-title');
+  if (title) title.textContent = isExp ? 'Distribución de gastos' : 'Distribución de ingresos';
+  const compareTitle = document.getElementById('dash-compare-title');
+  if (compareTitle) compareTitle.textContent = `Comparación de ${isExp ? 'gastos' : 'ingresos'} vs período anterior`;
+
+  // Update center total
+  const totalEl = document.getElementById('dash-donut-total');
+  if (totalEl) totalEl.textContent = formatCurrency(total);
+
+  // Render cat list below donut
+  const list = document.getElementById('dash-donut-cat-list');
+  if (list) {
+    list.innerHTML = '';
+    if (entries.length === 0) {
+      list.innerHTML = '<div class="dash-empty">Sin datos en este período</div>';
+    } else {
+      const maxVal = entries[0][1];
+      entries.forEach(([cat, amount]) => {
+        const pct = maxVal > 0 ? (amount / maxVal) * 100 : 0;
+        const totalPct = total > 0 ? (amount / total * 100).toFixed(0) : 0;
+        const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
+        const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
+        const row = document.createElement('div');
+        row.className = 'dash-cat-row dash-cat-row-clickable';
+        row.title = 'Ver movimientos de "' + cat + '"';
+        row.addEventListener('click', () => dashGoToCategory(cat));
+        row.innerHTML = `
+          <div class="dash-cat-top">
+            <span class="dash-cat-label">
+              <span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>
+              <span class="dash-cat-name">${cat}</span>
+            </span>
+            <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
+          </div>
+          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
+        `;
+        list.appendChild(row);
+      });
+    }
+  }
+
+  // ── Comparison table ──
+  const compareTable = document.getElementById('dash-compare-table');
+  if (compareTable) {
+    if (!prevTxs || prevTxs.length === 0 || entries.length === 0) {
+      compareTable.innerHTML = '<div class="dash-empty">Sin datos del período anterior para comparar</div>';
+    } else {
+      // Build previous period totals
+      const prevTotals = {};
+      prevTxs.forEach(tx => {
+        if (isExp ? tx.amount < 0 : tx.amount > 0) {
+          const cat = tx.category_name || 'Otros';
+          prevTotals[cat] = (prevTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
+        }
+      });
+      const prevTotal = Object.values(prevTotals).reduce((a, b) => a + b, 0);
+
+      const allCats = new Set([...entries.map(e => e[0]), ...Object.keys(prevTotals)]);
+      let rows = '';
+      allCats.forEach(cat => {
+        const curAmt = catTotals[cat] || 0;
+        const prevAmt = prevTotals[cat] || 0;
+        const diff = curAmt - prevAmt;
+        const pctChange = prevAmt > 0 ? ((diff / prevAmt) * 100).toFixed(1) : (curAmt > 0 ? '100' : '0');
+        const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '—';
+        const isUpBad = isExp ? diff > 0 : diff < 0; // for expenses, up is bad; for income, down is bad
+        rows += `
+          <div class="dash-compare-row">
+            <span class="dash-compare-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
+            <span class="dash-compare-val">${formatCurrency(curAmt)}</span>
+            <span class="dash-compare-prev">${formatCurrency(prevAmt)}</span>
+            <span class="dash-compare-diff ${diff === 0 ? '' : (isUpBad ? 'comp-bad' : 'comp-good')}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>
+          </div>
+        `;
+      });
+      compareTable.innerHTML = `
+        <div class="dash-compare-header">
+          <span class="dash-compare-hdr">Categoría</span>
+          <span class="dash-compare-hdr">Este período</span>
+          <span class="dash-compare-hdr">Período anterior</span>
+          <span class="dash-compare-hdr">Variación</span>
+        </div>
+        ${rows}`;
+    }
+  }
+
+  lucide.createIcons();
+}
+
+function dashToggleDonutMode() {
+  dashState.donutMode = dashState.donutMode === 'expense' ? 'income' : 'expense';
+  renderDashboard();
+}
+
+function dashGoToCategory(catName) {
+  const searchInput = document.getElementById('tx-search-input');
+  if (searchInput) {
+    searchInput.value = catName;
+    // Trigger input event so any listeners fire
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  state.currentView = 'all';
+  state.selectedAccounts = [];
+  showView('main');
+  renderAll();
+}
+
 // ── MAIN renderDashboard ──────────────────────────────────────
 function renderDashboard() {
   const accFilter = dashState.accounts !== null ? (dashState.accounts.length > 0 ? dashState.accounts : []) : null;
@@ -846,113 +970,8 @@ function renderDashboard() {
   // ── Savings side card ──
   renderSavingsCard(totalIncome, totalExpenses, netDiff);
 
-  // ── Category breakdown (expenses) ──
-  const catTotals = {};
-  monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
-    const cat = tx.category_name || 'Otros';
-    catTotals[cat] = (catTotals[cat] || 0) + Math.abs(getTxAmountInSettingsCurrency(tx));
-  });
-  const catEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-  const maxCat = catEntries.length > 0 ? catEntries[0][1] : 0;
-  const catColorMap = {};
-  getChartColors(catEntries.length).forEach((c, i) => { catColorMap[catEntries[i][0]] = c; });
-  const hiddenExp = dashState.hiddenCats.expenses || new Set();
-  const catSorted = [...catEntries].sort((a, b) => {
-    const ha = hiddenExp.has(a[0]) ? 1 : 0;
-    const hb = hiddenExp.has(b[0]) ? 1 : 0;
-    if (ha !== hb) return ha - hb;
-    return b[1] - a[1];
-  });
-
-  const catList = document.getElementById('dash-category-list');
-  if (catList) {
-    catList.innerHTML = '';
-    if (catEntries.length === 0) {
-      catList.innerHTML = '<div class="dash-empty">Sin gastos en este período</div>';
-    } else {
-      catSorted.forEach(([cat, amount]) => {
-        const pct = maxCat > 0 ? (amount / maxCat) * 100 : 0;
-        const totalPct = totalExpenses > 0 ? (amount / totalExpenses * 100).toFixed(0) : 0;
-        const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
-        const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
-        const isHidden = hiddenExp.has(cat);
-        const color = catColorMap[cat] || 'var(--text-lo)';
-        const row = document.createElement('div');
-        row.className = 'dash-cat-row' + (isHidden ? ' cat-hidden' : '');
-        row.innerHTML = `
-          <div class="dash-cat-top">
-            <span class="dash-cat-label">
-              <span class="dash-cat-icon" style="color:${color}"><i data-lucide="${catIcon}"></i></span>
-              <span class="dash-cat-name">${cat}</span>
-              <button class="dash-cat-eye" onclick="event.stopPropagation();dashToggleCat('${cat.replace(/'/g, "\\'")}','expense')" title="${isHidden ? 'Mostrar' : 'Ocultar'}">
-                <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
-              </button>
-            </span>
-            <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
-          </div>
-          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-        `;
-        catList.appendChild(row);
-      });
-    }
-  }
-
-  // ── Category breakdown (income) ──
-  const incomeCatTotals = {};
-  monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
-    const cat = tx.category_name || 'Otros';
-    incomeCatTotals[cat] = (incomeCatTotals[cat] || 0) + getTxAmountInSettingsCurrency(tx);
-  });
-  const incomeCatEntries = Object.entries(incomeCatTotals).sort((a, b) => b[1] - a[1]);
-  const maxIncomeCat = incomeCatEntries.length > 0 ? incomeCatEntries[0][1] : 0;
-  const incomeCatColorMap = {};
-  getChartColors(incomeCatEntries.length).forEach((c, i) => { incomeCatColorMap[incomeCatEntries[i][0]] = c; });
-  const hiddenInc = dashState.hiddenCats.income || new Set();
-  const incomeCatSorted = [...incomeCatEntries].sort((a, b) => {
-    const ha = hiddenInc.has(a[0]) ? 1 : 0;
-    const hb = hiddenInc.has(b[0]) ? 1 : 0;
-    if (ha !== hb) return ha - hb;
-    return b[1] - a[1];
-  });
-
-  const incomeCatList = document.getElementById('dash-income-category-list');
-  if (incomeCatList) {
-    incomeCatList.innerHTML = '';
-    if (incomeCatEntries.length === 0) {
-      incomeCatList.innerHTML = '<div class="dash-empty">Sin ingresos en este período</div>';
-    } else {
-      incomeCatSorted.forEach(([cat, amount]) => {
-        const pct = maxIncomeCat > 0 ? (amount / maxIncomeCat) * 100 : 0;
-        const totalPct = totalIncome > 0 ? (amount / totalIncome * 100).toFixed(0) : 0;
-        const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
-        const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
-        const isHidden = hiddenInc.has(cat);
-        const color = incomeCatColorMap[cat] || 'var(--text-lo)';
-        const row = document.createElement('div');
-        row.className = 'dash-cat-row' + (isHidden ? ' cat-hidden' : '');
-        row.innerHTML = `
-          <div class="dash-cat-top">
-            <span class="dash-cat-label">
-              <span class="dash-cat-icon" style="color:${color}"><i data-lucide="${catIcon}"></i></span>
-              <span class="dash-cat-name">${cat}</span>
-              <button class="dash-cat-eye" onclick="event.stopPropagation();dashToggleCat('${cat.replace(/'/g, "\\'")}','income')" title="${isHidden ? 'Mostrar' : 'Ocultar'}">
-                <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
-              </button>
-            </span>
-            <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
-          </div>
-          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill income-fill" style="width:${pct}%;background:${color}"></div></div>
-        `;
-        incomeCatList.appendChild(row);
-      });
-    }
-  }
-
-  // ── Donut totals ──
-  const donutTotal = document.getElementById('dash-donut-total');
-  if (donutTotal) donutTotal.textContent = formatCurrency(totalExpenses);
-  const donutIncomeTotal = document.getElementById('dash-donut-income-total');
-  if (donutIncomeTotal) donutIncomeTotal.textContent = formatCurrency(totalIncome);
+  // ── Category breakdown (donut mode based) ──
+  renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs);
 
   // ── Recent activity (10 items) ──
   const recentList = document.getElementById('dash-recent-list');
@@ -1115,40 +1134,22 @@ function renderLineChart() {
 function renderDashCharts() {
   renderLineChart();
 
-  // ── Donut chart (expenses) ──
+  // ── Donut chart (based on donutMode) ──
   const donutCanvas = document.getElementById('dash-donut-chart');
-  if (donutCanvas && dashState.visibleSections.gastos && donutCanvas.offsetWidth > 0) {
+  if (donutCanvas && dashState.visibleSections.categorias && donutCanvas.offsetWidth > 0) {
+    const isExp = dashState.donutMode === 'expense';
     const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
     const catTotals = {};
-    monthTxs.filter(tx => tx.amount < 0).forEach(tx => {
+    monthTxs.filter(tx => isExp ? tx.amount < 0 : tx.amount > 0).forEach(tx => {
       const cat = tx.category_name || 'Otros';
-      catTotals[cat] = (catTotals[cat] || 0) + Math.abs(getTxAmountInSettingsCurrency(tx));
+      catTotals[cat] = (catTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
     });
     const allSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
     const dColorMap = {};
     getChartColors(allSorted.length).forEach((c, i) => { dColorMap[allSorted[i][0]] = c; });
-    const hiddenExp = dashState.hiddenCats.expenses || new Set();
-    const entries = allSorted.filter(([k]) => !hiddenExp.has(k)).slice(0, 8);
+    const entries = allSorted.slice(0, 8);
     const colors = entries.map(([k]) => dColorMap[k] || '#6b7280');
-    drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total gastos');
-  }
-
-  // ── Donut chart (income) ──
-  const donutIncomeCanvas = document.getElementById('dash-donut-income-chart');
-  if (donutIncomeCanvas && dashState.visibleSections.ingresos && donutIncomeCanvas.offsetWidth > 0) {
-    const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
-    const catTotals = {};
-    monthTxs.filter(tx => tx.amount > 0).forEach(tx => {
-      const cat = tx.category_name || 'Otros';
-      catTotals[cat] = (catTotals[cat] || 0) + getTxAmountInSettingsCurrency(tx);
-    });
-    const allSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-    const dColorMap = {};
-    getChartColors(allSorted.length).forEach((c, i) => { dColorMap[allSorted[i][0]] = c; });
-    const hiddenInc = dashState.hiddenCats.income || new Set();
-    const entries = allSorted.filter(([k]) => !hiddenInc.has(k)).slice(0, 8);
-    const colors = entries.map(([k]) => dColorMap[k] || '#6b7280');
-    drawDonutChart(donutIncomeCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, 'Total ingresos');
+    drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, isExp ? 'Total gastos' : 'Total ingresos');
   }
 }
 
