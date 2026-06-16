@@ -400,8 +400,8 @@
 .dash-section-block {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-bottom: 24px;
+  gap: 20px;
+  padding-bottom: 28px;
   border-bottom: 1px solid var(--border);
 }
 .dash-section-block:last-child {
@@ -536,7 +536,7 @@
 .dash-chart-layout {
   display: grid;
   grid-template-columns: 1fr 220px;
-  gap: 12px;
+  gap: 16px;
 }
 
 /* ── Savings side card ── */
@@ -712,6 +712,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+.dash-cat-name:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .dash-cat-icon {
   display: flex;
@@ -719,12 +726,6 @@
   flex-shrink: 0;
 }
 .dash-cat-icon svg { width: 12px; height: 12px; }
-.dash-cat-color-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 .dash-cat-compare {
   font-size: 10px;
   font-weight: 600;
@@ -828,10 +829,12 @@
 .dash-cats-card {
   display: flex;
   flex-direction: column;
+  max-height: 400px;
 }
 .dash-cats-card .dash-cat-list {
   max-height: none;
   flex: 1;
+  overflow-y: auto;
 }
 
 /* ═══════════════════════════════════════════════════════════
