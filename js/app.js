@@ -942,7 +942,6 @@ window.dashToggleTop             = dashToggleTop;
 window.dashToggleCat            = dashToggleCat;
 window.dashChartPrevMonth        = dashChartPrevMonth;
 window.dashChartNextMonth        = dashChartNextMonth;
-window.dashSetChartRange         = dashSetChartRange;
 window.dashToggleDonutMode       = dashToggleDonutMode;
 window.dashGoToCategory          = dashGoToCategory;
 window.onCsvFileSelected         = onCsvFileSelected;

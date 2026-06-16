@@ -11,7 +11,7 @@ let dashState = {
   periodType: 'month',
   accounts: null,
   visibleSections: { resumen: true, categorias: true },
-  donutMode: 'expense', // 'expense' | 'income'
+  donutMode: 'expense',
   lineChartInstance: null,
   donutChartInstance: null,
   topMode: 'expense',
@@ -347,7 +347,7 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.scale(dpr, dpr);
 
   const W = rect.width, H = rect.height;
-  const padL = 48, padR = 16, padT = 28, padB = 34;
+  const padL = 52, padR = 12, padT = 20, padB = 36;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
   const n = labels.length;
@@ -355,122 +355,101 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   const isDark = document.documentElement.classList.contains('theme-dark');
   const textColor = isDark ? '#a1a1aa' : '#71717a';
   const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const incomeColor  = '#22c55e';
+  const incomeColor = '#22c55e';
+  const incomeFill = isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)';
   const expenseColor = '#ef4444';
+  const expenseFill = isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)';
   const savingsColor = '#e6b800';
 
   const allVals = [...incomeData, ...expenseData, ...(savingsData || [])];
-  const maxVal = Math.max(...allVals, 1) * 1.12;
-  const minVal = 0;
+  const maxVal = Math.max(...allVals, 1) * 1.1;
 
   ctx.clearRect(0, 0, W, H);
 
-  // ── Grid lines (subtle) ──
+  // Grid lines (dashed)
   ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
-  const gridLines = 4;
-  for (let i = 0; i <= gridLines; i++) {
-    const y = padT + (chartH / gridLines) * i;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH / 4) * i;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-    const val = maxVal - ((maxVal - minVal) / gridLines) * i;
+    const val = maxVal * (1 - i / 4);
     ctx.fillStyle = textColor;
-    ctx.font = '10px system-ui, sans-serif';
+    ctx.font = '10px "DM Sans", -apple-system, sans-serif';
     ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toFixed(0), padL - 8, y);
+    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val.toFixed(0), padL - 6, y + 3.5);
   }
   ctx.setLineDash([]);
 
-  // ── Helper: smooth curve ──
+  // Helper: smooth curve through points
   function smoothCurve(points) {
-    if (points.length === 0) return;
+    if (points.length < 2) return;
     ctx.moveTo(points[0].x, points[0].y);
-    if (points.length === 1) return;
-    if (points.length === 2) {
-      ctx.lineTo(points[1].x, points[1].y);
-      return;
-    }
-    for (let i = 1; i < points.length - 1; i++) {
-      const p0 = points[i - 1];
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
       const p1 = points[i];
       const p2 = points[i + 1];
+      const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
       const cp1x = p1.x + (p2.x - p0.x) / 6;
       const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p2.x - p0.x) / 6;
-      const cp2y = p2.y - (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
     }
   }
 
   function getPoints(data) {
-    if (n <= 1) return data.map((val, i) => ({ x: padL + 0.5 * chartW, y: padT + chartH - ((val - minVal) / (maxVal - minVal)) * chartH }));
     return data.map((val, i) => ({
       x: padL + (i / (n - 1)) * chartW,
-      y: padT + chartH - ((val - minVal) / (maxVal - minVal)) * chartH,
+      y: padT + chartH - (val / maxVal) * chartH,
     }));
   }
 
-  const incPts = getPoints(incomeData);
-  const expPts = getPoints(expenseData);
-  const savPts = savingsData ? getPoints(savingsData) : [];
+  // Income area fill
+  const incomePoints = getPoints(incomeData);
+  ctx.beginPath();
+  ctx.moveTo(incomePoints[0].x, padT + chartH);
+  ctx.lineTo(incomePoints[0].x, incomePoints[0].y);
+  smoothCurve(incomePoints);
+  ctx.lineTo(incomePoints[incomePoints.length - 1].x, padT + chartH);
+  ctx.closePath();
+  ctx.fillStyle = incomeFill;
+  ctx.fill();
 
-  // ── Income area (gradient) ──
-  if (incPts.length > 1) {
-    const incGrad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
-    incGrad.addColorStop(0, isDark ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.12)');
-    incGrad.addColorStop(1, isDark ? 'rgba(34,197,94,0.02)' : 'rgba(34,197,94,0.02)');
-    ctx.beginPath();
-    ctx.moveTo(incPts[0].x, padT + chartH);
-    ctx.lineTo(incPts[0].x, incPts[0].y);
-    smoothCurve(incPts);
-    ctx.lineTo(incPts[incPts.length - 1].x, padT + chartH);
-    ctx.closePath();
-    ctx.fillStyle = incGrad;
-    ctx.fill();
-  }
+  // Expense area fill
+  const expensePoints = getPoints(expenseData);
+  ctx.beginPath();
+  ctx.moveTo(expensePoints[0].x, padT + chartH);
+  ctx.lineTo(expensePoints[0].x, expensePoints[0].y);
+  smoothCurve(expensePoints);
+  ctx.lineTo(expensePoints[expensePoints.length - 1].x, padT + chartH);
+  ctx.closePath();
+  ctx.fillStyle = expenseFill;
+  ctx.fill();
 
-  // ── Expense area (gradient) ──
-  if (expPts.length > 1) {
-    const expGrad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
-    expGrad.addColorStop(0, isDark ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.1)');
-    expGrad.addColorStop(1, isDark ? 'rgba(239,68,68,0.02)' : 'rgba(239,68,68,0.02)');
-    ctx.beginPath();
-    ctx.moveTo(expPts[0].x, padT + chartH);
-    ctx.lineTo(expPts[0].x, expPts[0].y);
-    smoothCurve(expPts);
-    ctx.lineTo(expPts[expPts.length - 1].x, padT + chartH);
-    ctx.closePath();
-    ctx.fillStyle = expGrad;
-    ctx.fill();
-  }
+  // Income line
+  ctx.beginPath();
+  smoothCurve(incomePoints);
+  ctx.strokeStyle = incomeColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
 
-  // ── Income line ──
-  if (incPts.length > 1) {
-    ctx.beginPath();
-    smoothCurve(incPts);
-    ctx.strokeStyle = incomeColor;
-    ctx.lineWidth = 2.5;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-  }
+  // Expense line
+  ctx.beginPath();
+  smoothCurve(expensePoints);
+  ctx.strokeStyle = expenseColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
 
-  // ── Expense line ──
-  if (expPts.length > 1) {
+  // Savings line (dashed)
+  const savingsPoints = savingsData ? getPoints(savingsData) : [];
+  if (savingsPoints.length > 1 && savingsData.some(v => v !== 0)) {
     ctx.beginPath();
-    smoothCurve(expPts);
-    ctx.strokeStyle = expenseColor;
-    ctx.lineWidth = 2.5;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-  }
-
-  // ── Savings line (dashed, accent) ──
-  if (savPts.length > 1) {
-    ctx.beginPath();
-    smoothCurve(savPts);
+    smoothCurve(savingsPoints);
     ctx.strokeStyle = savingsColor;
     ctx.lineWidth = 1.8;
     ctx.setLineDash([5, 4]);
@@ -480,33 +459,47 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
     ctx.setLineDash([]);
   }
 
-  // ── Data dots ──
-  const drawDots = (pts, color) => {
-    pts.forEach(p => {
+  // Data points (dots)
+  incomePoints.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = incomeColor;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+  expensePoints.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = expenseColor;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+  if (savingsPoints.length > 1 && savingsData.some(v => v !== 0)) {
+    savingsPoints.forEach(p => {
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = color;
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = savingsColor;
       ctx.fill();
-      ctx.strokeStyle = isDark ? '#1c1c1f' : '#fff';
+      ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     });
-  };
-  drawDots(incPts, incomeColor);
-  drawDots(expPts, expenseColor);
-  if (savPts.length > 1) drawDots(savPts, savingsColor);
+  }
 
-  // ── X labels ──
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.font = '10px system-ui, sans-serif';
+  // X-axis labels
   labels.forEach((label, i) => {
-    const cx = n <= 1 ? padL + 0.5 * chartW : padL + (i / (n - 1)) * chartW;
+    const cx = padL + (i / (n - 1)) * chartW;
     ctx.fillStyle = textColor;
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
     ctx.fillText(label, cx, H - padB + 8);
   });
 
-  // ── Legend ──
+  // Legend (top-left)
   const legItems = [
     { color: incomeColor, label: 'Ingresos' },
     { color: expenseColor, label: 'Gastos' },
@@ -517,8 +510,7 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   let legX = padL;
   ctx.textBaseline = 'middle';
   legItems.forEach(item => {
-    const sw = 10;
-    const sh = 4;
+    const sw = 10, sh = 4;
     ctx.fillStyle = item.color;
     ctx.beginPath();
     ctx.roundRect(legX, padT - 14, sw, sh, 2);
@@ -530,9 +522,9 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
     legX += ctx.measureText(item.label).width + sw + 16;
   });
 
-  // ── Tooltip (attach data for interactivity) ──
+  // Attach data for tooltip
   canvas._chartData = { labels, incomeData, expenseData, savingsData: savingsData || [] };
-  canvas._chartLayout = { padL, padR, padT, padB, chartW, chartH, n, minVal, maxVal, incomeColor, expenseColor, savingsColor };
+  canvas._chartLayout = { padL, padR, padT, padB, chartW, chartH, n, minVal: 0, maxVal, incomeColor, expenseColor, savingsColor };
   updateLineTooltip(canvas);
 }
 
@@ -548,13 +540,11 @@ function updateLineTooltip(canvas) {
     if (!data || !layout || !data.labels.length) { tooltip.style.display = 'none'; return; }
 
     const { labels, incomeData, expenseData, savingsData } = data;
-    const { padL, padT, chartW, chartH, n, minVal, maxVal } = layout;
+    const { padL, padT, chartW, chartH, n, incomeColor, expenseColor, savingsColor } = layout;
 
-    // Find nearest index
     let idx = 0;
     if (n > 1) {
-      const ratio = (mx - padL) / chartW;
-      idx = Math.round(ratio * (n - 1));
+      idx = Math.round(((mx - padL) / chartW) * (n - 1));
       idx = Math.max(0, Math.min(n - 1, idx));
     }
 
@@ -563,10 +553,10 @@ function updateLineTooltip(canvas) {
     const sav = savingsData && savingsData[idx] !== undefined ? savingsData[idx] : null;
 
     let html = `<div class="tooltip-title">${labels[idx]}</div>`;
-    html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${layout.incomeColor}"></span>Ingresos: <strong>${formatCurrency(inc)}</strong></div>`;
-    html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${layout.expenseColor}"></span>Gastos: <strong>${formatCurrency(exp)}</strong></div>`;
+    html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${incomeColor}"></span>Ingresos: <strong>${formatCurrency(inc)}</strong></div>`;
+    html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${expenseColor}"></span>Gastos: <strong>${formatCurrency(exp)}</strong></div>`;
     if (sav !== null) {
-      html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${layout.savingsColor}"></span>Ahorro: <strong>${formatCurrency(sav)}</strong></div>`;
+      html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${savingsColor}"></span>Ahorro: <strong>${formatCurrency(sav)}</strong></div>`;
     }
 
     tooltip.innerHTML = html;
@@ -778,17 +768,9 @@ function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, pre
       : null;
     const changeSign = change !== null ? (change >= 0 ? '+' : '') : '';
     const deltaIcon = change !== null ? (change >= 0 ? 'trending-up' : 'trending-down') : 'minus';
-    // Force red for expense card; for savings use gold accent; others use sign-based
-    let valClass = '';
-    if (c.iconClass === 'expense') {
-      valClass = 'negative';
-    } else if (c.iconClass === 'savings') {
-      valClass = c.value < 0 ? 'savings-negative' : 'savings';
-    } else if (c.value < 0) {
-      valClass = 'negative';
-    } else if (c.value > 0) {
-      valClass = 'positive';
-    }
+
+    // Per-card value color: income→green, expense→red, balance→accent, savings→purple
+    const valClassMap = { 'income': 'income', 'expense': 'expense', 'balance': 'accent', 'savings': 'savings-val' };
 
     return `
       <div class="dash-summary-card">
@@ -799,12 +781,12 @@ function renderSummaryCards(totalIncome, totalExpenses, netDiff, prevIncome, pre
         </div>
         <div class="dash-summary-card-body">
           <span class="dash-summary-card-label">${c.label}</span>
-          <span class="dash-summary-card-value ${valClass}">${c.format(c.value)}</span>
+          <span class="dash-summary-card-value ${valClassMap[c.iconClass] || ''}">${c.format(c.value)}</span>
         </div>
         <div class="dash-summary-card-delta neutral">
           ${change !== null
-            ? `<i data-lucide="${deltaIcon}"></i> ${changeSign}${change.toFixed(0)}% ${prevLabel ? `<span style="opacity:0.5">${prevLabel}</span>` : ''}`
-            : `<i data-lucide="minus"></i> <span style="opacity:0.5">Sin comparación</span>`
+            ? `<i data-lucide="${deltaIcon}"></i> ${changeSign}${change.toFixed(0)}% <span style="opacity:0.55">${prevLabel || ''}</span>`
+            : `<i data-lucide="minus"></i> <span style="opacity:0.55">Sin comparación</span>`
           }
         </div>
       </div>`;
@@ -845,7 +827,7 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
           stroke-dasharray="${expenseDash} ${circ - expenseDash}"
           stroke-linecap="round" />` : ''}
         ${savingsDash > 2 ? `<circle cx="${viewBox/2}" cy="${viewBox/2}" r="${r}"
-          fill="none" stroke="var(--accent)" stroke-width="${strokeW}"
+          fill="none" stroke="var(--positive)" stroke-width="${strokeW}"
           stroke-dasharray="${savingsDash} ${circ - savingsDash}"
           stroke-dashoffset="${-(expenseDash + 1)}"
           stroke-linecap="round" />` : ''}
@@ -875,7 +857,7 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
           <span class="dash-savings-stat-dot" style="background:var(--accent)"></span>
           Ahorro
         </span>
-        <span class="dash-savings-stat-val" style="color:${savings >= 0 ? 'var(--accent)' : 'var(--negative)'}">${savings >= 0 ? '+' : ''}${formatCurrency(savings)}</span>
+        <span class="dash-savings-stat-val" style="color:var(--accent)">${formatCurrency(savings)}</span>
       </div>
     </div>`;
 
@@ -916,37 +898,24 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
       list.innerHTML = '<div class="dash-empty">Sin datos en este período</div>';
     } else {
       const maxVal = entries[0][1];
-      const hiddenKey = isExp ? 'expenses' : 'income';
-      const hiddenSet = dashState.hiddenCats[hiddenKey] || new Set();
-      const catColors = {};
-      getChartColors(entries.length).forEach((c, i) => { catColors[entries[i][0]] = c; });
-
       entries.forEach(([cat, amount]) => {
         const pct = maxVal > 0 ? (amount / maxVal) * 100 : 0;
         const totalPct = total > 0 ? (amount / total * 100).toFixed(0) : 0;
         const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
         const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
-        const color = catColors[cat] || 'var(--text-lo)';
-        const isHidden = hiddenSet.has(cat);
         const row = document.createElement('div');
-        row.className = 'dash-cat-row' + (isHidden ? ' cat-hidden' : '') + ' dash-cat-row-clickable';
+        row.className = 'dash-cat-row dash-cat-row-clickable';
         row.title = 'Ver movimientos de "' + cat + '"';
-        row.addEventListener('click', (e) => {
-          if (e.target.closest('.dash-cat-eye')) return;
-          dashGoToCategory(cat);
-        });
+        row.addEventListener('click', () => dashGoToCategory(cat));
         row.innerHTML = `
           <div class="dash-cat-top">
             <span class="dash-cat-label">
-              <span class="dash-cat-icon" style="color:${color}"><i data-lucide="${catIcon}"></i></span>
+              <span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>
               <span class="dash-cat-name">${cat}</span>
-              <button class="dash-cat-eye" onclick="event.stopPropagation();dashToggleCat('${cat.replace(/'/g, "\\'")}','${isExp ? 'expense' : 'income'}')" title="${isHidden ? 'Mostrar categoría' : 'Ocultar categoría'}">
-                <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
-              </button>
             </span>
             <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
           </div>
-          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
         `;
         list.appendChild(row);
       });
@@ -969,42 +938,30 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
       });
       const prevTotal = Object.values(prevTotals).reduce((a, b) => a + b, 0);
 
-      // Compute catColors same as chart
-      const allEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-      const catColors = {};
-      getChartColors(allEntries.length).forEach((c, i) => { catColors[allEntries[i][0]] = c; });
-
-      const allCats = new Set([...allEntries.map(e => e[0]), ...Object.keys(prevTotals)]);
-      const maxCur = allEntries.length > 0 ? allEntries[0][1] : 1;
-
+      const allCats = new Set([...entries.map(e => e[0]), ...Object.keys(prevTotals)]);
       let rows = '';
       allCats.forEach(cat => {
         const curAmt = catTotals[cat] || 0;
         const prevAmt = prevTotals[cat] || 0;
         const diff = curAmt - prevAmt;
-        const barPct = Math.min((curAmt / maxCur) * 100, 100);
         const pctChange = prevAmt > 0 ? ((diff / prevAmt) * 100).toFixed(1) : (curAmt > 0 ? '100' : '0');
         const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '—';
-        const isUpBad = isExp ? diff > 0 : diff < 0;
-        const color = catColors[cat] || 'var(--text-lo)';
+        const isUpBad = isExp ? diff > 0 : diff < 0; // for expenses, up is bad; for income, down is bad
         rows += `
           <div class="dash-compare-row">
-            <div class="dash-compare-name-wrap">
-              <span class="dash-compare-bar" style="width:${barPct}%;background:${color}"></span>
-              <span class="dash-compare-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
-            </div>
+            <span class="dash-compare-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
             <span class="dash-compare-val">${formatCurrency(curAmt)}</span>
             <span class="dash-compare-prev">${formatCurrency(prevAmt)}</span>
-            <span class="dash-compare-diff ${diff === 0 ? 'comp-flat' : (isUpBad ? 'comp-bad' : 'comp-good')}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>
+            <span class="dash-compare-diff ${diff === 0 ? '' : (isUpBad ? 'comp-bad' : 'comp-good')}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>
           </div>
         `;
       });
       compareTable.innerHTML = `
         <div class="dash-compare-header">
           <span class="dash-compare-hdr">Categoría</span>
-          <span class="dash-compare-hdr right">Este período</span>
-          <span class="dash-compare-hdr right">Anterior</span>
-          <span class="dash-compare-hdr right">Variación</span>
+          <span class="dash-compare-hdr">Este período</span>
+          <span class="dash-compare-hdr">Período anterior</span>
+          <span class="dash-compare-hdr">Variación</span>
         </div>
         ${rows}`;
     }
@@ -1237,11 +1194,9 @@ function renderLineChart() {
   const savingsData = [];
   const end = dashGetChartEndMonth();
 
-  // Determine number of months based on chartRange
   let numMonths = 6;
   if (dashState.chartRange === 12) numMonths = 12;
   else if (dashState.chartRange === 0) {
-    // Count months from earliest transaction to end
     const dates = state.transactions.map(tx => new Date(tx.date + 'T00:00:00'));
     const minDate = dates.length > 0 ? new Date(Math.min(...dates)) : new Date(end.year, end.month - 5, 1);
     const totalM = (end.year - minDate.getFullYear()) * 12 + (end.month - minDate.getMonth());
@@ -1272,7 +1227,6 @@ function renderLineChart() {
   }
   drawLineChart(lineCanvas, labels, incomeData, expenseData, savingsData);
 
-  // Sync active range button
   document.querySelectorAll('.dash-range-btn').forEach(btn => {
     const val = parseInt(btn.dataset.range, 10);
     btn.classList.toggle('active', val === dashState.chartRange);
@@ -1300,9 +1254,7 @@ function renderDashCharts() {
     const allSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
     const dColorMap = {};
     getChartColors(allSorted.length).forEach((c, i) => { dColorMap[allSorted[i][0]] = c; });
-    const hiddenKey = isExp ? 'expenses' : 'income';
-    const hiddenSet = dashState.hiddenCats[hiddenKey] || new Set();
-    const entries = allSorted.filter(([k]) => !hiddenSet.has(k)).slice(0, 8);
+    const entries = allSorted.slice(0, 8);
     const colors = entries.map(([k]) => dColorMap[k] || '#6b7280');
     drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, isExp ? 'Total gastos' : 'Total ingresos');
   }
