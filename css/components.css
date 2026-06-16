@@ -144,10 +144,6 @@ table.ledger thead th.c { text-align: center; }
   opacity: 1;
 }
 
-.col-sortable.sort-desc .sort-arrow::after {
-  content: '↑'; /* show up arrow when sorted desc (reversed visual) */
-}
-
 .col-sort-label {
   pointer-events: none;
 }
