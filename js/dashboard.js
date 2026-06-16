@@ -865,7 +865,7 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  renderDonutCategories — unified donut + cat list + compare table
+//  renderDonutCategories — unified donut + cat list with colors
 // ══════════════════════════════════════════════════════════════
 function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
   const isExp = dashState.donutMode === 'expense';
@@ -880,17 +880,35 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
   });
   const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
 
+  // Build previous period totals (for per-row comparison)
+  const prevTotals = {};
+  if (prevTxs) {
+    prevTxs.forEach(tx => {
+      if (isExp ? tx.amount < 0 : tx.amount > 0) {
+        const cat = tx.category_name || 'Otros';
+        prevTotals[cat] = (prevTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
+      }
+    });
+  }
+
+  // Color map from donut chart
+  const colorMap = {};
+  getChartColors(entries.length).forEach((c, i) => { colorMap[entries[i][0]] = c; });
+
   // Update title
   const title = document.getElementById('dash-donut-title');
   if (title) title.textContent = isExp ? 'Distribución de gastos' : 'Distribución de ingresos';
-  const compareTitle = document.getElementById('dash-compare-title');
-  if (compareTitle) compareTitle.textContent = `Comparación de ${isExp ? 'gastos' : 'ingresos'} vs período anterior`;
 
   // Update center total
   const totalEl = document.getElementById('dash-donut-total');
   if (totalEl) totalEl.textContent = formatCurrency(total);
 
-  // Render cat list below donut
+  // Hidden cats set
+  const key = isExp ? 'expenses' : 'income';
+  if (!dashState.hiddenCats[key]) dashState.hiddenCats[key] = new Set();
+  const hidden = dashState.hiddenCats[key];
+
+  // Render cat list
   const list = document.getElementById('dash-donut-cat-list');
   if (list) {
     list.innerHTML = '';
@@ -898,72 +916,50 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
       list.innerHTML = '<div class="dash-empty">Sin datos en este período</div>';
     } else {
       const maxVal = entries[0][1];
+      const hasPrev = Object.keys(prevTotals).length > 0;
+
       entries.forEach(([cat, amount]) => {
         const pct = maxVal > 0 ? (amount / maxVal) * 100 : 0;
         const totalPct = total > 0 ? (amount / total * 100).toFixed(0) : 0;
         const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
         const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
+        const color = colorMap[cat] || 'var(--accent)';
+        const isHidden = hidden.has(cat);
+
+        // Prev period comparison
+        const prevAmt = prevTotals[cat] || 0;
+        const diff = amount - prevAmt;
+        const pctChange = prevAmt > 0 ? ((diff / prevAmt) * 100).toFixed(1) : (prevAmt === 0 && amount > 0 ? '100' : '0');
+        const isUpBad = isExp ? diff > 0 : diff < 0;
+        let compareHtml = '';
+        if (hasPrev && prevTxs.length > 0) {
+          const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '—';
+          const compClass = diff === 0 ? '' : (isUpBad ? 'comp-bad' : 'comp-good');
+          compareHtml = `<span class="dash-cat-compare ${compClass}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>`;
+        }
+
         const row = document.createElement('div');
-        row.className = 'dash-cat-row dash-cat-row-clickable';
-        row.title = 'Ver movimientos de "' + cat + '"';
-        row.addEventListener('click', () => dashGoToCategory(cat));
+        row.className = 'dash-cat-row' + (isHidden ? ' cat-hidden' : '');
         row.innerHTML = `
           <div class="dash-cat-top">
             <span class="dash-cat-label">
+              <span class="dash-cat-color-dot" style="background:${color}"></span>
               <span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>
-              <span class="dash-cat-name">${cat}</span>
+              <span class="dash-cat-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
+              <button class="dash-cat-eye" onclick="event.stopPropagation();dashToggleCat('${cat.replace(/'/g, "\\'")}','${isExp ? 'expense' : 'income'}')" title="${isHidden ? 'Mostrar' : 'Ocultar'}">
+                <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
+              </button>
             </span>
-            <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
+            <span class="dash-cat-amount">
+              ${formatCurrency(amount)}
+              <span class="dash-cat-pct">${totalPct}%</span>
+              ${compareHtml}
+            </span>
           </div>
-          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
+          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
         `;
         list.appendChild(row);
       });
-    }
-  }
-
-  // ── Comparison table ──
-  const compareTable = document.getElementById('dash-compare-table');
-  if (compareTable) {
-    if (!prevTxs || prevTxs.length === 0 || entries.length === 0) {
-      compareTable.innerHTML = '<div class="dash-empty">Sin datos del período anterior para comparar</div>';
-    } else {
-      // Build previous period totals
-      const prevTotals = {};
-      prevTxs.forEach(tx => {
-        if (isExp ? tx.amount < 0 : tx.amount > 0) {
-          const cat = tx.category_name || 'Otros';
-          prevTotals[cat] = (prevTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
-        }
-      });
-      const prevTotal = Object.values(prevTotals).reduce((a, b) => a + b, 0);
-
-      const allCats = new Set([...entries.map(e => e[0]), ...Object.keys(prevTotals)]);
-      let rows = '';
-      allCats.forEach(cat => {
-        const curAmt = catTotals[cat] || 0;
-        const prevAmt = prevTotals[cat] || 0;
-        const diff = curAmt - prevAmt;
-        const pctChange = prevAmt > 0 ? ((diff / prevAmt) * 100).toFixed(1) : (curAmt > 0 ? '100' : '0');
-        const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '—';
-        const isUpBad = isExp ? diff > 0 : diff < 0; // for expenses, up is bad; for income, down is bad
-        rows += `
-          <div class="dash-compare-row">
-            <span class="dash-compare-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
-            <span class="dash-compare-val">${formatCurrency(curAmt)}</span>
-            <span class="dash-compare-prev">${formatCurrency(prevAmt)}</span>
-            <span class="dash-compare-diff ${diff === 0 ? '' : (isUpBad ? 'comp-bad' : 'comp-good')}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>
-          </div>
-        `;
-      });
-      compareTable.innerHTML = `
-        <div class="dash-compare-header">
-          <span class="dash-compare-hdr">Categoría</span>
-          <span class="dash-compare-hdr">Este período</span>
-          <span class="dash-compare-hdr">Período anterior</span>
-          <span class="dash-compare-hdr">Variación</span>
-        </div>
-        ${rows}`;
     }
   }
 
@@ -1254,7 +1250,9 @@ function renderDashCharts() {
     const allSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
     const dColorMap = {};
     getChartColors(allSorted.length).forEach((c, i) => { dColorMap[allSorted[i][0]] = c; });
-    const entries = allSorted.slice(0, 8);
+    const key = isExp ? 'expenses' : 'income';
+    const hidden = dashState.hiddenCats[key] || new Set();
+    const entries = allSorted.filter(([k]) => !hidden.has(k)).slice(0, 8);
     const colors = entries.map(([k]) => dColorMap[k] || '#6b7280');
     drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, isExp ? 'Total gastos' : 'Total ingresos');
   }

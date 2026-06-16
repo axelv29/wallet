@@ -719,6 +719,20 @@
   flex-shrink: 0;
 }
 .dash-cat-icon svg { width: 12px; height: 12px; }
+.dash-cat-color-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dash-cat-compare {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+.dash-cat-compare.comp-good { color: var(--positive); }
+.dash-cat-compare.comp-bad  { color: var(--negative); }
 .dash-cat-eye {
   display: none;
   align-items: center;
@@ -799,68 +813,25 @@
   height: 14px;
 }
 
-/* Comparison table */
-.dash-compare-card {
-  overflow: hidden;
-}
-.dash-compare-header {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-}
-.dash-compare-hdr {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-lo);
-  font-weight: 600;
-}
-.dash-compare-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--bg-sunken);
+/* ── Donut card (prominent) ── */
+.dash-donut-card {
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
-.dash-compare-row:last-child { border-bottom: none; }
-.dash-compare-name {
-  font-size: 12px;
-  color: var(--text-mid);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
+.dash-donut-card .dash-card-head {
+  width: 100%;
 }
-.dash-compare-name:hover { color: var(--accent); }
-.dash-compare-val {
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-hi);
-  text-align: right;
+
+/* ── Categories card ── */
+.dash-cats-card {
+  display: flex;
+  flex-direction: column;
 }
-.dash-compare-prev {
-  font-size: 11px;
-  color: var(--text-lo);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.dash-compare-diff {
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  min-width: 60px;
-}
-.dash-compare-diff.comp-good {
-  color: var(--positive);
-}
-.dash-compare-diff.comp-bad {
-  color: var(--negative);
+.dash-cats-card .dash-cat-list {
+  max-height: none;
+  flex: 1;
 }
 
 /* ═══════════════════════════════════════════════════════════
