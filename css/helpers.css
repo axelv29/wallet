@@ -105,6 +105,10 @@
   background: var(--bg-sunken);
 }
 
+tr.closing-group-last td {
+  border-bottom: 2px solid var(--text-lo) !important;
+}
+
 .closing-group-arrow {
   display: inline-flex;
   align-items: center;

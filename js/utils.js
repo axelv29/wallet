@@ -446,10 +446,12 @@ function calculateBalances(accountIds) {
   const settingsCur = state.settings.currency || 'UYU';
   const balances = { liquid: 0, credit_card: 0, credit_card_cycle: 0, receivables: 0 };
   const accFilter = accountIds ? new Set(accountIds) : null;
+  const exclCats = new Set(state.settings.excludedBalanceCats || []);
   state.transactions.forEach(tx => {
     if (isTxExcluded(tx)) return;
     if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
+    if (exclCats.has(tx.category_name)) return;
     if (accFilter && !accFilter.has(tx.account_id)) return;
     const acc = state.accounts.find(a => a.id === tx.account_id);
     if (!acc) return;

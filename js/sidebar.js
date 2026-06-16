@@ -162,12 +162,16 @@ function filterTransactions(viewId) {
   state.selectedAccounts = [];
   localStorage.removeItem('wallet_selected_accounts');
   localStorage.setItem('wallet_last_filter', viewId);
+  const searchInput = document.getElementById('tx-search-input');
+  if (searchInput) searchInput.value = '';
   clearTxSelection();
   renderAll();
 }
 
 function toggleAccountSelection(accId) {
   showView('main');
+  const searchInput = document.getElementById('tx-search-input');
+  if (searchInput) searchInput.value = '';
   if (state.selectedAccounts.length === 0 && state.currentView !== 'all' && state.currentView !== 'multi' && !state.currentView.startsWith('type-') && state.currentView !== 'receivables') {
     state.selectedAccounts.push(state.currentView);
   }

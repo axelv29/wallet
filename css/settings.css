@@ -746,3 +746,25 @@
   border: 1px solid rgba(0,0,0,0.08);
   flex-shrink: 0;
 }
+
+/* ── Excluded Balance Categories ── */
+.set-cat-excl-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-mid);
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  transition: background 0.08s, border-color 0.08s, color 0.08s;
+  margin: 0 3px 5px 0;
+}
+.set-cat-excl-label input { display: none; }
+.set-cat-excl-label:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}

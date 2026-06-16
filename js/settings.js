@@ -15,6 +15,7 @@ function switchSettingsPane(name) {
     if (btn)  btn.classList.toggle('active', p === name);
   });
 
+  if (name === 'general') renderExcludedBalanceCats();
   if (name === 'accounts') {
     renderSettingsAccountsList();
     renderAccountTypesList();
@@ -45,6 +46,29 @@ function saveGeneralSettings(event) {
   // Visual feedback
   const btn = event.submitter;
   if (btn) { const t = btn.textContent; btn.textContent = '✓ Guardado'; setTimeout(() => { btn.textContent = t; }, 1500); }
+}
+
+// ── EXCLUDED BALANCE CATEGORIES ─────────────────────────────────
+function renderExcludedBalanceCats() {
+  const wrap = document.getElementById('set-excluded-cats-list');
+  if (!wrap) return;
+  const cats = state.predefined.categories.map(c => typeof c === 'string' ? c : c.name);
+  const excluded = new Set(state.settings.excludedBalanceCats || []);
+  wrap.innerHTML = '';
+  cats.forEach(cat => {
+    const label = document.createElement('label');
+    label.className = 'set-cat-excl-label';
+    label.innerHTML = `<input type="checkbox" name="set-excluded-cat" value="${cat}" ${excluded.has(cat) ? 'checked' : ''}><span>${cat}</span>`;
+    label.querySelector('input').addEventListener('change', saveExcludedBalanceCats);
+    wrap.appendChild(label);
+  });
+}
+
+function saveExcludedBalanceCats() {
+  const checks = document.querySelectorAll('input[name="set-excluded-cat"]');
+  state.settings.excludedBalanceCats = [];
+  checks.forEach(cb => { if (cb.checked) state.settings.excludedBalanceCats.push(cb.value); });
+  localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
 }
 
 // ── ACCOUNTS ──────────────────────────────────────────────────

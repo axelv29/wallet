@@ -40,6 +40,7 @@ let state = {
     ]
   },
   settings: { geminiKey: '', theme: 'light', colorScheme: 'default', currency: 'UYU', showSymbol: true, decimals: 2, amountStyle: 'default',
+    excludedBalanceCats: ['Transferencias', 'Ajuste de saldo', 'Pagos'],
     viewPrefs: {
       showImportBtn: true,
       showFilterBtn: true,
@@ -242,6 +243,11 @@ function loadSettings() {
       state.settings = parsed;
       if (parsed.period) state.period = parsed.period;
     } catch (e) { /* corrupted */ }
+  }
+  // Ensure excludedBalanceCats exists (migration)
+  if (!state.settings.excludedBalanceCats) {
+    state.settings.excludedBalanceCats = ['Transferencias', 'Ajuste de saldo', 'Pagos'];
+    localStorage.setItem('wallet_settings', JSON.stringify(state.settings));
   }
 }
 

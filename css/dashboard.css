@@ -1,30 +1,7 @@
 
 /* ═══════════════════════════════════════════════════════════
-   DASHBOARD — "nly" style: yellow/gold accent, DM Sans,
-   monthly balance hero, smooth line/area charts, metric cards
-   ═══════════════════════════════════════════════════════════ */
-
-/* ── Dashboard color overrides ── */
-#view-dashboard {
-  --accent:       #e6b800;
-  --accent-hover: #d4a800;
-  --accent-soft:  #fef3c7;
-  --positive:     #22c55e;
-  --negative:     #ef4444;
-  --warn:         #d97706;
-  --accent-savings: #0284c7;
-  --accent-gradient: linear-gradient(135deg, #e6b800, #f59e0b);
-}
-:root.theme-dark #view-dashboard {
-  --accent:       #fbbf24;
-  --accent-hover: #f59e0b;
-  --accent-soft:  #422006;
-  --positive:     #4ade80;
-  --negative:     #f87171;
-  --warn:         #f59e0b;
-  --accent-savings: #38bdf8;
-  --accent-gradient: linear-gradient(135deg, #fbbf24, #f59e0b);
-}
+    DASHBOARD — uses global theme accent
+    ═══════════════════════════════════════════════════════════ */
 
 /* ── Scroll container ── */
 .dash-scroll {
@@ -302,7 +279,7 @@
 .dash-summary-card-icon svg { width: 18px; height: 18px; }
 .dash-summary-card-icon.income   { background: rgba(34,197,94,0.1);  color: var(--positive); }
 .dash-summary-card-icon.expense  { background: rgba(239,68,68,0.1);  color: var(--negative); }
-.dash-summary-card-icon.balance  { background: rgba(230,184,0,0.12); color: var(--accent); }
+.dash-summary-card-icon.balance  { background: rgba(100,100,100,0.1);  color: var(--text-mid); }
 .dash-summary-card-icon.savings  { background: rgba(139,92,246,0.1); color: #8b5cf6; }
 
 .dash-summary-card-body {
@@ -352,54 +329,6 @@
 }
 
 /* ── Chart nav (inside section cards) ── */
-.dash-chart-range {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  margin-left: 8px;
-}
-.dash-range-btn {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 10px;
-  font-weight: 500;
-  font-family: var(--font-ui);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-xs);
-  color: var(--text-lo);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.dash-range-btn:hover {
-  color: var(--text-mid);
-  border-color: var(--border);
-}
-.dash-range-btn.active {
-  color: var(--text-hi);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.dash-chart-legend {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: 8px;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-lo);
-}
-.dash-chart-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.dash-chart-legend-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 .dash-chart-nav {
   display: flex;
   align-items: center;
@@ -743,7 +672,7 @@
   align-items: center;
   flex-shrink: 0;
 }
-.dash-cat-icon svg { width: 12px; height: 12px; }
+.dash-cat-icon svg { width: 12px; height: 12px; color: #4b5563; }
 .dash-cat-compare {
   font-size: 10px;
   font-weight: 600;
@@ -989,6 +918,10 @@
    ═══════════════════════════════════════════════════════════ */
 .dash-cal-wrap {
   padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
 }
 .dash-cal-month-nav {
   display: flex;
@@ -1053,12 +986,47 @@
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 .dash-cal-lvl-0 { background: transparent; }
-.dash-cal-lvl-1 { background: color-mix(in srgb, var(--accent) 8%, var(--bg-root)); }
-.dash-cal-lvl-2 { background: color-mix(in srgb, var(--accent) 18%, var(--bg-root)); }
-.dash-cal-lvl-3 { background: color-mix(in srgb, var(--accent) 30%, var(--bg-root)); }
-.dash-cal-lvl-4 { background: color-mix(in srgb, var(--accent) 48%, var(--bg-root)); }
-.dash-cal-lvl-5 { background: color-mix(in srgb, var(--accent) 70%, var(--bg-root)); }
-.dash-cal-lvl-1, .dash-cal-lvl-2, .dash-cal-lvl-3, .dash-cal-lvl-4, .dash-cal-lvl-5 { color: var(--text-hi); }
+.dash-cal-lvl-1 { background: color-mix(in srgb, var(--accent) 12%, var(--bg-root)); }
+.dash-cal-lvl-2 { background: color-mix(in srgb, var(--accent) 26%, var(--bg-root)); }
+.dash-cal-lvl-3 { background: color-mix(in srgb, var(--accent) 42%, var(--bg-root)); }
+.dash-cal-lvl-4 { background: color-mix(in srgb, var(--accent) 58%, var(--bg-root)); }
+.dash-cal-lvl-5 { background: color-mix(in srgb, var(--accent) 72%, var(--bg-root)); }
+.dash-cal-lvl-6 { background: color-mix(in srgb, var(--accent) 85%, var(--bg-root)); }
+.dash-cal-lvl-7 { background: color-mix(in srgb, var(--accent) 96%, var(--bg-root)); }
+.dash-cal-lvl-1, .dash-cal-lvl-2, .dash-cal-lvl-3, .dash-cal-lvl-4, .dash-cal-lvl-5, .dash-cal-lvl-6, .dash-cal-lvl-7 { color: var(--text-hi); }
+
+/* ── Heatmap card flex centering ── */
+.dash-section-calendario .dash-card {
+  display: flex;
+  flex-direction: column;
+}
+.dash-section-calendario .dash-card-head {
+  flex-shrink: 0;
+}
+
+/* ── Legend ── */
+.dash-cal-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 6px 0 0;
+}
+.dash-cal-legend-label {
+  font-size: 9px;
+  color: var(--text-lo);
+  font-weight: 500;
+}
+.dash-cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+}
+.dash-cal-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
 
 /* ═══════════════════════════════════════════════════════════
    DAILY INSIGHTS PANEL

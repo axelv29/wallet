@@ -1118,6 +1118,10 @@ function updateFilterBadge() {
 
 function clearAllFilters() {
   state.tableFilters = [];
+  const searchInput = document.getElementById('tx-search-input');
+  if (searchInput) searchInput.value = '';
+  const searchBox = document.getElementById('search-box');
+  if (searchBox) searchBox.classList.remove('expanded');
   renderFilterPanel();
   applyFilters();
 }
@@ -2141,15 +2145,28 @@ function sortTransactions(arr) {
 }
 
 function updateSortIndicators() {
+  const sortLabels = {
+    date:     { asc: 'Menor fecha primero', desc: 'Fecha más reciente primero' },
+    account:  { asc: 'Cuenta A-Z', desc: 'Cuenta Z-A' },
+    payee:    { asc: 'Beneficiario A-Z', desc: 'Beneficiario Z-A' },
+    notes:    { asc: 'Notas A-Z', desc: 'Notas Z-A' },
+    tags:     { asc: 'Etiquetas A-Z', desc: 'Etiquetas Z-A' },
+    category: { asc: 'Categoría A-Z', desc: 'Categoría Z-A' },
+    amount:   { asc: 'Menor a mayor', desc: 'Mayor a menor' },
+    cuota:    { asc: 'Cuota ↑', desc: 'Cuota ↓' },
+  };
   document.querySelectorAll('.col-sortable').forEach(th => {
     const col = th.dataset.sort;
     const arrow = th.querySelector('.sort-arrow');
     if (arrow) arrow.textContent = '';
     th.classList.remove('sort-active', 'sort-desc');
+    th.removeAttribute('title');
     if (col === state.sortColumn && state.sortColumn) {
       th.classList.add('sort-active');
       th.classList.toggle('sort-desc', state.sortDirection === 'desc');
       if (arrow) arrow.textContent = state.sortDirection === 'asc' ? '↑' : '↓';
+      const labels = sortLabels[col];
+      if (labels) th.title = labels[state.sortDirection] || '';
     }
   });
 }
@@ -2668,14 +2685,13 @@ function renderTransactions() {
 
   // Render in-period rows: closing groups for CC + normal rows
   if (showClosing && sortedCcGroups.length > 0) {
-    // Render CC closing groups (with both present and future txs inside)
-    sortedCcGroups.forEach(group => {
+    // Helper: render a closing group header + its txs
+    const renderClosingGroup = (group) => {
       const isOpen = isClosingGroupOpen(group.key);
       const groupAccountId = group.txs[0]?.account_id || '';
       const paid = isClosingPaid(group.key, group.total, groupAccountId);
       const status = getClosingStatus(group.period, groupAccountId);
       const totalHtml = formatCurrency(group.total);
-
 
       const isCurrentPeriod = group.period === getCurrentYearMonth();
       const payIcon = paid ? 'calendar-check' : (isCurrentPeriod ? 'calendar-1' : (status ? status.icon : 'circle'));
@@ -2720,22 +2736,27 @@ function renderTransactions() {
 
       if (isOpen) {
         const sorted = [...group.txs].sort((a, b) => {
-          // When sorting by date, interleave future + present by date
           if (state.sortColumn === 'date') {
             const dir = state.sortDirection === 'asc' ? 1 : -1;
             return dir * (a.date || '').localeCompare(b.date || '');
           }
-          // Default: future first
           return (b.is_future ? 1 : 0) - (a.is_future ? 1 : 0);
         });
-        // All txs in group should be from same account (one CC)
-        const groupAccountId = group.txs[0]?.account_id;
         sorted.forEach(tx => appendTxRow(tx, group.period));
       }
-    });
-    // Render non-CC in-period rows
+    };
+
+    // Closing groups at the top, sorted among themselves
+    sortedCcGroups.forEach(group => renderClosingGroup(group));
+    // Separator before non-CC rows
+    if (nonCCTx.length > 0 || inPeriodRows.some(tx => ungroupedCcIds.has(tx.id))) {
+      const lastRow = tbody.lastElementChild;
+      if (lastRow && !lastRow.classList.contains('closing-group-row')) {
+        lastRow.classList.add('closing-group-last');
+      }
+    }
+    // Non-CC rows sorted independently (closing groups don't affect their order)
     nonCCTx.forEach(tx => appendTxRow(tx, null));
-    // Render CC transactions without a closing schedule as normal rows
     inPeriodRows.filter(tx => ungroupedCcIds.has(tx.id)).forEach(tx => appendTxRow(tx, null));
   } else {
     // No closing groups — render all as normal

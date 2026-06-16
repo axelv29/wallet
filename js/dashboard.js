@@ -16,15 +16,14 @@ let dashState = {
   lineChartInstance: null,
   donutChartInstance: null,
   topMode: 'expense',
-  chartRange: 6, // 6, 12, or 0 (all)
   hiddenCats: (() => {
     try {
       const saved = JSON.parse(localStorage.getItem('wallet_hidden_cats'));
       return {
-        expenses: new Set(saved?.expenses || ['Ajuste de saldos']),
-        income: new Set(saved?.income || ['Ajuste de saldos']),
+        expenses: new Set(saved?.expenses || ['Ajuste de saldo']),
+        income: new Set(saved?.income || ['Ajuste de saldo']),
       };
-    } catch { return { expenses: new Set(['Ajuste de saldos']), income: new Set(['Ajuste de saldos']) }; }
+    } catch { return { expenses: new Set(['Ajuste de saldo']), income: new Set(['Ajuste de saldo']) }; }
   })(),
 };
 
@@ -706,19 +705,28 @@ function updateLineTooltip(canvas) {
       ctx.fillText(label, idxToX(i), padT + chartH + 10);
     });
 
+    // Draw small dots for all data points (always visible)
+    const drawAllDots = (pts, color) => {
+      if (!pts) return;
+      pts.forEach((p, i) => {
+        if (i === idx) return;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+    };
+    drawAllDots(layout.incomePoints, layout.incomeColor);
+    drawAllDots(layout.expensePoints, layout.expenseColor);
+    if (layout.hasSavings) drawAllDots(layout.savingsPoints, layout.savingsColor);
+
     if (idx >= 0 && idx < n) {
-      const lx = idxToX(idx);
-      ctx.beginPath();
-      ctx.moveTo(lx, padT);
-      ctx.lineTo(lx, padT + chartH);
-      ctx.strokeStyle = layout.hoverBandColor;
-      ctx.lineWidth = Math.max(chartW / n * 0.6, 20);
-      ctx.stroke();
 
       const drawDot = (pts, color) => {
         if (pts && pts[idx]) {
           const p = pts[idx];
-          ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+          ctx.beginPath(); ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
           ctx.fillStyle = color; ctx.fill();
           ctx.strokeStyle = isDark ? '#1a1a1e' : '#fff';
           ctx.lineWidth = 2; ctx.stroke();
@@ -1073,19 +1081,32 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
   const isExp = dashState.donutMode === 'expense';
   const total = isExp ? totalExpenses : totalIncome;
   const filtered = monthTxs.filter(tx => isExp ? tx.amount < 0 : tx.amount > 0);
+  const excludedCats = new Set(state.settings.excludedBalanceCats || []);
+
+  // Hidden cats set
+  const key = isExp ? 'expenses' : 'income';
+  if (!dashState.hiddenCats[key]) dashState.hiddenCats[key] = new Set();
+  const hidden = dashState.hiddenCats[key];
 
   // Build category totals
   const catTotals = {};
   filtered.forEach(tx => {
+    if (excludedCats.has(tx.category_name)) return;
     const cat = tx.category_name || 'Otros';
     catTotals[cat] = (catTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
   });
-  const entries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  const entries = Object.entries(catTotals).sort((a, b) => {
+    const aH = hidden.has(a[0]) ? 1 : 0;
+    const bH = hidden.has(b[0]) ? 1 : 0;
+    if (aH !== bH) return aH - bH;
+    return b[1] - a[1];
+  });
 
   // Build previous period totals (for per-row comparison)
   const prevTotals = {};
   if (prevTxs) {
     prevTxs.forEach(tx => {
+      if (excludedCats.has(tx.category_name)) return;
       if (isExp ? tx.amount < 0 : tx.amount > 0) {
         const cat = tx.category_name || 'Otros';
         prevTotals[cat] = (prevTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
@@ -1103,18 +1124,14 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
     prevPeriodLabel = monthNames[pm];
   }
 
-  // Color map from donut chart
+  // Color map — assign colors by amount-sorted order (hidden cats stay in place)
+  const allSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
   const colorMap = {};
-  getChartColors(entries.length).forEach((c, i) => { colorMap[entries[i][0]] = c; });
+  getChartColors(allSorted.length).forEach((c, i) => { colorMap[allSorted[i][0]] = c; });
 
   // Update title
   const title = document.getElementById('dash-donut-title');
   if (title) title.textContent = isExp ? 'Distribución de gastos' : 'Distribución de ingresos';
-
-  // Hidden cats set
-  const key = isExp ? 'expenses' : 'income';
-  if (!dashState.hiddenCats[key]) dashState.hiddenCats[key] = new Set();
-  const hidden = dashState.hiddenCats[key];
 
   // Update center total (visible only, excluding hidden categories)
   const visibleTotal = entries.filter(([k]) => !hidden.has(k)).reduce((sum, [, v]) => sum + v, 0);
@@ -1187,9 +1204,10 @@ function dashGoToCategory(catName) {
   const searchInput = document.getElementById('tx-search-input');
   if (searchInput) {
     searchInput.value = catName;
-    // Trigger input event so any listeners fire
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
+  const searchBox = document.getElementById('search-box');
+  if (searchBox) searchBox.classList.add('expanded');
   state.currentView = 'all';
   state.selectedAccounts = [];
   showView('main');
@@ -1240,7 +1258,9 @@ function renderDashboard() {
   const prevTxs  = dashGetPrevTxForPeriod().filter(tx => dashIncludeTx(tx));
 
   let totalIncome = 0, totalExpenses = 0;
+  const dashExcludedCats = new Set(state.settings.excludedBalanceCats || []);
   monthTxs.forEach(tx => {
+    if (dashExcludedCats.has(tx.category_name)) return;
     const val = getTxAmountInSettingsCurrency(tx);
     if (val > 0) totalIncome += val;
     else totalExpenses += Math.abs(val);
@@ -1249,6 +1269,7 @@ function renderDashboard() {
 
   let prevIncome = 0, prevExpenses = 0;
   prevTxs.forEach(tx => {
+    if (dashExcludedCats.has(tx.category_name)) return;
     const val = getTxAmountInSettingsCurrency(tx);
     if (val > 0) prevIncome += val;
     else prevExpenses += Math.abs(val);
@@ -1277,6 +1298,7 @@ function renderDashboard() {
       recent = recent.filter(tx => accSet.has(tx.account_id));
     }
     recent = recent.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+    recent = recent.filter(tx => !dashExcludedCats.has(tx.category_name));
     if (recent.length === 0) {
       recentList.innerHTML = '<div class="dash-empty">Sin movimientos aún</div>';
     } else {
@@ -1320,6 +1342,7 @@ function renderDashboard() {
     }
     topTxs.sort((a, b) => topIsExpense ? a.amount - b.amount : b.amount - a.amount);
     topTxs = topTxs.slice(0, 10);
+    topTxs = topTxs.filter(tx => !dashExcludedCats.has(tx.category_name));
     if (topTxs.length === 0) {
       topList.innerHTML = `<div class="dash-empty">Sin ${topIsExpense ? 'gastos' : 'ingresos'} en este período</div>`;
     } else {
@@ -1360,6 +1383,19 @@ function renderDashboard() {
     renderDashCharts();
     dashUpdateChartLabel();
   }, 30);
+
+  // ResizeObserver on chart wrapper: re-render chart when container resizes (e.g. sidebar toggle)
+  const wrap = document.querySelector('.dash-line-chart-wrap');
+  if (wrap && !wrap._ro) {
+    let roTimer;
+    wrap._ro = new ResizeObserver(() => {
+      clearTimeout(roTimer);
+      roTimer = setTimeout(() => {
+        if (dashState.visibleSections.resumen) renderLineChart();
+      }, 50);
+    });
+    wrap._ro.observe(wrap);
+  }
 }
 
 function dashGetChartEndMonth() {
@@ -1402,26 +1438,20 @@ function renderLineChart() {
   const incomeData = [];
   const expenseData = [];
   const savingsData = [];
-  const end = dashGetChartEndMonth();
+  const center = dashGetChartEndMonth();
 
-  let numMonths = 6;
-  if (dashState.chartRange === 12) numMonths = 12;
-  else if (dashState.chartRange === 0) {
-    const dates = state.transactions.map(tx => new Date(tx.date + 'T00:00:00'));
-    const minDate = dates.length > 0 ? new Date(Math.min(...dates)) : new Date(end.year, end.month - 5, 1);
-    const totalM = (end.year - minDate.getFullYear()) * 12 + (end.month - minDate.getMonth());
-    numMonths = Math.max(totalM + 1, 1);
-  }
+  // Always show 6 months: 4 before + center + 1 after = 6 total
+  const numMonths = 6;
 
   let prevYear = null;
   for (let i = numMonths - 1; i >= 0; i--) {
-    let m = end.month - i, y = end.year;
+    // i=5 → 4 months before center, i=0 → 2 months after center
+    let m = center.month - (i - 2), y = center.year;
     while (m < 0) { m += 12; y--; }
     while (m > 11) { m -= 12; y++; }
     const d = new Date(y, m, 1);
     const monthLabel = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
     let label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
-    // Add year suffix when year changes (or for the first label)
     if (prevYear === null || y !== prevYear) {
       label += ` ${y}`;
     }
@@ -1437,7 +1467,6 @@ function renderLineChart() {
         else exp += Math.abs(conv);
       }
     });
-    // No skip: include all months even if inc/exp are zero
     labels.push(label);
     incomeData.push(inc);
     expenseData.push(exp);
@@ -1446,26 +1475,6 @@ function renderLineChart() {
   drawLineChart(lineCanvas, labels, incomeData, expenseData, savingsData);
 
   // Populate inline legend
-  const legendEl = document.getElementById('dash-chart-legend');
-  if (legendEl) {
-    const hasIncome = incomeData.some(v => v > 0);
-    const hasExpense = expenseData.some(v => v > 0);
-    const hasSavings = savingsData.some(v => v !== 0);
-    legendEl.innerHTML = '';
-    if (hasIncome) legendEl.innerHTML += '<span class="dash-chart-legend-item"><span class="dash-chart-legend-dot" style="background:#22c55e"></span>Ingresos</span>';
-    if (hasExpense) legendEl.innerHTML += '<span class="dash-chart-legend-item"><span class="dash-chart-legend-dot" style="background:#ef4444"></span>Gastos</span>';
-    if (hasSavings) legendEl.innerHTML += '<span class="dash-chart-legend-item"><span class="dash-chart-legend-dot" style="background:#0284c7"></span>Ahorro</span>';
-  }
-
-  document.querySelectorAll('.dash-range-btn').forEach(btn => {
-    const val = parseInt(btn.dataset.range, 10);
-    btn.classList.toggle('active', val === dashState.chartRange);
-  });
-}
-
-function dashSetChartRange(range) {
-  dashState.chartRange = range;
-  renderLineChart();
 }
 
 function renderDashCharts() {
@@ -1477,7 +1486,9 @@ function renderDashCharts() {
     const isExp = dashState.donutMode === 'expense';
     const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
     const catTotals = {};
+    const donutExcluded = new Set(state.settings.excludedBalanceCats || []);
     monthTxs.filter(tx => isExp ? tx.amount < 0 : tx.amount > 0).forEach(tx => {
+      if (donutExcluded.has(tx.category_name)) return;
       const cat = tx.category_name || 'Otros';
       catTotals[cat] = (catTotals[cat] || 0) + (isExp ? Math.abs(getTxAmountInSettingsCurrency(tx)) : getTxAmountInSettingsCurrency(tx));
     });
@@ -1522,8 +1533,12 @@ function renderCalendarHeatmap() {
     labelEl.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' }).replace(/^./, s => s.toUpperCase());
   }
 
-  // Gather transactions for period
-  const txs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
+  // Gather transactions for this calendar month (not dashboard period)
+  const txs = state.transactions.filter(tx => {
+    if (isTxExcluded(tx) || tx.split_parent_id) return false;
+    const d = new Date(tx.date + 'T00:00:00');
+    return d.getMonth() === month && d.getFullYear() === year;
+  }).filter(tx => dashIncludeTx(tx));
   const settingsCur = state.settings.currency || 'UYU';
 
   const dailyTotals = {};
@@ -1563,11 +1578,24 @@ function renderCalendarHeatmap() {
       }
       const total = dailyTotals[dayNum] || 0;
       let intensity;
-    if (total > 0 && maxDay > 0) {
-      intensity = Math.min(Math.max(1, Math.floor((total / maxDay) * 5)), 5);
-    } else {
-      intensity = 0;
-    }
+      if (total <= 0) {
+        intensity = 0;
+      } else if (total <= 250) {
+        intensity = 1;
+      } else if (total <= 500) {
+        intensity = 2;
+      } else if (total <= 1000) {
+        intensity = 3;
+      } else if (total <= 2000) {
+        intensity = 4;
+      } else if (total <= 3500) {
+        intensity = 5;
+      } else if (total <= 5000) {
+        intensity = 6;
+      } else {
+        intensity = 7;
+      }
+      const heatLabels = ['Sin gastos', 'Hasta $250', '$250 – $500', '$500 – $1.000', '$1.000 – $2.000', '$2.000 – $3.500', '$3.500 – $5.000', 'Más de $5.000'];
       const isToday = dayNum === today.day && month === today.month && year === today.year;
 
       const cell = document.createElement('div');
@@ -1580,8 +1608,11 @@ function renderCalendarHeatmap() {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
         cell.dataset.date = dateStr;
         cell.dataset.amount = total;
+        cell.dataset.heatLabel = heatLabels[intensity];
         cell.addEventListener('mouseenter', showCalTooltip);
         cell.addEventListener('mouseleave', hideCalTooltip);
+      } else {
+        cell.title = heatLabels[intensity];
       }
       grid.appendChild(cell);
     }
@@ -1589,6 +1620,22 @@ function renderCalendarHeatmap() {
 
   // Hide tooltip when leaving the grid
   grid.addEventListener('mouseleave', hideCalTooltip);
+
+  // Render legend
+  const calCard = grid.closest('.dash-card');
+  if (calCard) {
+    let legend = calCard.querySelector('.dash-cal-legend');
+    if (!legend) {
+      legend = document.createElement('div');
+      legend.className = 'dash-cal-legend';
+      grid.parentNode.appendChild(legend);
+    }
+    legend.innerHTML = `
+      <span class="dash-cal-legend-label">0</span>
+      ${[1,2,3,4,5,6,7].map(l => `<span class="dash-cal-legend-item"><span class="dash-cal-legend-swatch dash-cal-lvl-${l}"></span></span>`).join('')}
+      <span class="dash-cal-legend-label">5000+</span>
+    `;
+  }
 
   // Render insights
   renderDailyInsights(txs, year, month, daysInMonth, dailyTotals, maxDay, settingsCur);
@@ -1600,7 +1647,8 @@ function showCalTooltip(e) {
   if (!tip) return;
   const dateStr = el.dataset.date;
   const amount = parseFloat(el.dataset.amount);
-  tip.innerHTML = `<div class="tooltip-title">${formatDate(dateStr)}</div><div class="tooltip-row"><span class="tooltip-val">${formatCurrency(amount)}</span></div>`;
+  const heatLabel = el.dataset.heatLabel || '';
+  tip.innerHTML = `<div class="tooltip-title">${formatDate(dateStr)}</div><div class="tooltip-row"><span class="tooltip-val">${formatCurrency(amount)}</span></div><div class="tooltip-row" style="font-size:10px;color:var(--text-lo)">${heatLabel}</div>`;
   tip.style.display = 'block';
   const rect = el.getBoundingClientRect();
   tip.style.left = (rect.left + rect.width / 2) + 'px';
@@ -1804,28 +1852,18 @@ function renderAccountCards() {
   const wrap = document.getElementById('dash-section-cuentas');
   if (wrap && wrap.classList.contains('dash-hidden')) { container.innerHTML = ''; return; }
 
-  const settingsCur = state.settings.currency || 'UYU';
   const accFilter = dashState.accounts !== null ? (dashState.accounts.length > 0 ? new Set(dashState.accounts) : null) : null;
-  const period = dashGetPeriod();
 
-  // Calculate per-account balance from transactions
+  // Calculate per-account balance from transactions (same logic as sidebar)
   const txBalances = {};
+  state.accounts.forEach(a => { txBalances[a.id] = 0; });
   state.transactions.forEach(tx => {
     if (isTxExcluded(tx) || tx.split_parent_id) return;
-    if (period.year != null && period.month != null) {
-      const d = new Date(tx.date + 'T00:00:00');
-      if (d.getMonth() !== period.month || d.getFullYear() !== period.year) return;
-    } else if (period.range && period.range.start && tx.date < period.range.start) return;
+    if (!isTxInPeriod(tx)) return;
     if (accFilter && !accFilter.has(tx.account_id)) return;
-
-    const acc = state.accounts.find(a => a.id === tx.account_id);
-    if (!acc) return;
-    const accCur = acc.currency || settingsCur;
-    const converted = typeof convertCurrency === 'function'
-      ? convertCurrency(Number(tx.amount) || 0, accCur, settingsCur)
-      : (Number(tx.amount) || 0);
-    const val = (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
-    txBalances[tx.account_id] = (txBalances[tx.account_id] || 0) + val;
+    if (txBalances[tx.account_id] !== undefined) {
+      txBalances[tx.account_id] += Number(tx.amount) || 0;
+    }
   });
 
   const accounts = state.accounts.filter(a => a.type === 'liquid' || a.type === 'credit_card');
@@ -1842,27 +1880,35 @@ function renderAccountCards() {
     const isNegative = bal < 0;
     const color = cardColors[i % cardColors.length];
     const typeLabel = acc.type === 'liquid' ? 'Débito / Efectivo' : 'Tarjeta de crédito';
+    const last4 = acc.id.slice(-4).toUpperCase();
 
     return `<div class="dash-acc-card" onclick="dashGoToAccount('${acc.id}')" title="Ver movimientos de ${acc.name}">
       <svg class="dash-acc-card-svg" viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="acc-grad-${i}" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="${color}" stop-opacity=".85"/>
-            <stop offset="100%" stop-color="${color}" stop-opacity=".5"/>
+            <stop offset="0%" stop-color="${color}" stop-opacity=".9"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity=".55"/>
           </linearGradient>
         </defs>
+        <!-- Card background -->
         <rect x="0" y="0" width="320" height="200" rx="12" fill="url(#acc-grad-${i})"/>
-        <text x="20" y="40" fill="rgba(255,255,255,0.7)" font-size="10" font-family="system-ui, sans-serif">${typeLabel}</text>
-        <text x="20" y="70" fill="white" font-size="16" font-weight="600" font-family="system-ui, sans-serif">${acc.name}</text>
-        <text x="20" y="130" fill="rgba(255,255,255,0.6)" font-size="10" font-family="system-ui, sans-serif">Saldo</text>
-        <text x="20" y="160" fill="white" font-size="22" font-weight="600" font-family="system-ui, sans-serif">${formatAccountCurrency(Math.abs(bal), acc.currency)}</text>
-        ${isNegative ? '<text x="20" y="178" fill="rgba(255,200,200,0.8)" font-size="9" font-family="system-ui, sans-serif">Saldo negativo</text>' : ''}
-        <text x="300" y="40" fill="rgba(255,255,255,0.7)" font-size="10" font-family="system-ui, sans-serif" text-anchor="end">${acc.currency}</text>
-        <!-- Brand chip -->
-        <rect x="250" y="155" width="50" height="24" rx="4" fill="rgba(255,255,255,0.15)"/>
-        <text x="275" y="171" fill="white" font-size="10" font-weight="600" font-family="system-ui, sans-serif" text-anchor="middle">${acc.id.slice(-4).toUpperCase()}</text>
-        <!-- Simulated chip -->
-        <rect x="20" y="85" width="32" height="24" rx="3" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+        <!-- Top: type + currency -->
+        <text x="22" y="26" fill="rgba(255,255,255,0.55)" font-size="9" font-weight="500" font-family="system-ui, sans-serif" letter-spacing="0.5">${typeLabel.toUpperCase()}</text>
+        <text x="298" y="26" fill="rgba(255,255,255,0.55)" font-size="9" font-weight="600" font-family="system-ui, sans-serif" text-anchor="end">${acc.currency}</text>
+        <!-- Account name -->
+        <text x="22" y="46" fill="white" font-size="14" font-weight="600" font-family="system-ui, sans-serif">${acc.name}</text>
+        <!-- Black magnetic stripe (near top) -->
+        <rect x="0" y="56" width="320" height="32" fill="rgba(0,0,0,0.8)"/>
+        <!-- EMV Chip (below stripe, right side) -->
+        <rect x="248" y="100" width="40" height="28" rx="5" fill="#e8b830" stroke="rgba(0,0,0,0.12)" stroke-width="0.5"/>
+        <line x1="248" y1="110" x2="288" y2="110" stroke="rgba(0,0,0,0.1)" stroke-width="0.5"/>
+        <line x1="268" y1="100" x2="268" y2="128" stroke="rgba(0,0,0,0.1)" stroke-width="0.5"/>
+        <!-- Bottom section: balance + card number -->
+        <text x="22" y="118" fill="rgba(255,255,255,0.5)" font-size="9" font-weight="500" font-family="system-ui, sans-serif" letter-spacing="0.3">SALDO</text>
+        <text x="22" y="150" fill="white" font-size="24" font-weight="700" font-family="system-ui, sans-serif">${isNegative ? '−' : ''}${formatAccountCurrency(Math.abs(bal), acc.currency)}</text>
+        ${isNegative ? '<text x="22" y="168" fill="rgba(255,255,255,0.45)" font-size="10" font-family="system-ui, sans-serif">Saldo negativo</text>' : ''}
+        <!-- Card number (last 4) -->
+        <text x="22" y="188" fill="rgba(255,255,255,0.35)" font-size="12" font-weight="600" font-family="system-ui, sans-serif" letter-spacing="2">•••• •••• •••• ${last4}</text>
       </svg>
     </div>`;
   }).join('') + '</div>';
