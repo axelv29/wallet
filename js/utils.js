@@ -180,7 +180,7 @@ function getBillingPeriodTxs(accountId, transactions) {
     if (!groups[key]) groups[key] = { key, txs: [], total: 0, label: getClosingPeriodMonthLabel(key) };
     groups[key].txs.push(tx);
     const isPayment = (tx.tags || []).includes('Pago de tarjeta');
-    if (!isPayment && !tx.excluded) {
+    if (!isPayment && !isTxExcluded(tx)) {
       groups[key].total += Number(convertCurrency(Number(tx.amount) || 0, accCur, settingsCur)) || Number(tx.amount) || 0;
     }
   });
@@ -349,7 +349,7 @@ function getClosingPeriodTotal(periodKey, accountId) {
     })
     .reduce((sum, tx) => {
       const isPayment = (tx.tags || []).includes('Pago de tarjeta');
-      if (isPayment || tx.excluded) return sum;
+      if (isPayment || isTxExcluded(tx)) return sum;
       const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
       return sum + (converted !== null ? converted : (Number(tx.amount) || 0));
     }, 0)
@@ -417,7 +417,7 @@ function calculateCycleBalance(accountId) {
   state.transactions.forEach(tx => {
     if (tx.account_id !== accountId) return;
     if (!includeCcFutureTx(tx)) return;
-    if (tx.excluded) return;
+    if (isTxExcluded(tx)) return;
     if (tx.split_parent_id) return;
     if (tx.date < startStr) return;
     const converted = convertCurrency(Number(tx.amount) || 0, accCur, settingsCur);
@@ -438,12 +438,16 @@ function getTxAmountInSettingsCurrency(tx) {
   return (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
 }
 
+function isTxExcluded(tx) {
+  return tx.excluded || (tx.tags || []).includes('Oculto');
+}
+
 function calculateBalances(accountIds) {
   const settingsCur = state.settings.currency || 'UYU';
   const balances = { liquid: 0, credit_card: 0, credit_card_cycle: 0, receivables: 0 };
   const accFilter = accountIds ? new Set(accountIds) : null;
   state.transactions.forEach(tx => {
-    if (tx.excluded) return;
+    if (isTxExcluded(tx)) return;
     if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
     if (accFilter && !accFilter.has(tx.account_id)) return;

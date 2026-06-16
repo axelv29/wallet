@@ -11,6 +11,7 @@
 function setupSearchableSelects() {
   bindSearchSelect('tx-payee-search',    'dropdown-payee',    'dropdown-payee-list',    () => state.predefined.payees);
   bindSearchSelect('tx-category-search', 'dropdown-category', 'dropdown-category-list', () => state.predefined.categories);
+  bindSearchSelect('tx-debtor-search',   'dropdown-debtor',   'dropdown-debtor-list',   () => state.predefined.payees);
 }
 
 function bindSearchSelect(inputId, dropdownId, listId, dataAccessor) {
@@ -57,7 +58,8 @@ function renderTagsChecklist(selectedTags) {
 
   const SPECIAL_TAGS = [
     { name: 'Pago de tarjeta', icon: 'credit-card', color: '#22c55e' },
-    { name: 'Oculto', icon: 'eye-off', color: '#94a3b8' }
+    { name: 'Oculto', icon: 'eye-off', color: '#94a3b8' },
+    { name: 'A cobrar', icon: 'clock', color: '#b45309' }
   ];
   const specialNames = SPECIAL_TAGS.map(t => t.name);
 
@@ -124,6 +126,23 @@ function renderTagsChecklist(selectedTags) {
         if (excl) excl.checked = this.checked;
       });
     }
+    // A cobrar syncs with receivable checkbox
+    if (st.name === 'A cobrar') {
+      label.querySelector('input').addEventListener('change', function() {
+        const recv = document.getElementById('tx-is-receivable');
+        if (recv) {
+          recv.checked = this.checked;
+          toggleReceivableFields(this.checked);
+          if (this.checked) {
+            const payeeVal = document.getElementById('tx-payee-search')?.value?.trim();
+            const debtorInput = document.getElementById('tx-debtor-search');
+            if (debtorInput && payeeVal && !debtorInput.value.trim()) {
+              debtorInput.value = payeeVal;
+            }
+          }
+        }
+      });
+    }
     specialWrap.appendChild(label);
   });
   checklist.appendChild(specialWrap);
@@ -137,6 +156,25 @@ function renderTagsChecklist(selectedTags) {
       // Visual update
       const ocultoLabel = ocultoInput?.closest('.tag-check-label');
       if (ocultoLabel) ocultoLabel.classList.toggle('tag-check-special-active', this.checked);
+    };
+  }
+
+  // Sync receivable checkbox ↔ A cobrar tag
+  const recvCb = document.getElementById('tx-is-receivable');
+  if (recvCb) {
+    recvCb.onchange = function() {
+      const recvInput = checklist.querySelector('input[name="tx-tags"][value="A cobrar"]');
+      if (recvInput) recvInput.checked = this.checked;
+      const recvLabel = recvInput?.closest('.tag-check-label');
+      if (recvLabel) recvLabel.classList.toggle('tag-check-special-active', this.checked);
+      toggleReceivableFields(this.checked);
+      if (this.checked) {
+        const payeeVal = document.getElementById('tx-payee-search')?.value?.trim();
+        const debtorInput = document.getElementById('tx-debtor-search');
+        if (debtorInput && payeeVal && !debtorInput.value.trim()) {
+          debtorInput.value = payeeVal;
+        }
+      }
     };
   }
 
@@ -250,7 +288,11 @@ function openTransactionModal(txId) {
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = !!tx.is_receivable;
     toggleReceivableFields(!!tx.is_receivable);
+    const noDueDateChk = document.getElementById('tx-no-due-date');
+    noDueDateChk.checked = !tx.no_due_date && !!tx.due_date;
     document.getElementById('tx-due-date').value = tx.due_date || '';
+    document.getElementById('tx-due-date').disabled = !noDueDateChk.checked;
+    document.getElementById('tx-debtor-search').value = tx.debtor || '';
 
     document.getElementById('tx-is-excluded').checked = !!tx.excluded;
     // Sync excluded → Oculto tag visual
@@ -259,6 +301,15 @@ function openTransactionModal(txId) {
       if (ocultoInput) {
         ocultoInput.checked = true;
         const lbl = ocultoInput.closest('.tag-check-label');
+        if (lbl) lbl.classList.add('tag-check-special-active');
+      }
+    }
+    // Sync receivable → A cobrar tag visual
+    if (tx.is_receivable) {
+      const recvInput = document.getElementById('tx-tags-checklist')?.querySelector('input[name="tx-tags"][value="A cobrar"]');
+      if (recvInput) {
+        recvInput.checked = true;
+        const lbl = recvInput.closest('.tag-check-label');
         if (lbl) lbl.classList.add('tag-check-special-active');
       }
     }
@@ -296,6 +347,9 @@ function openTransactionModal(txId) {
     const chk = document.getElementById('tx-is-receivable');
     chk.checked = false;
     toggleReceivableFields(false);
+    document.getElementById('tx-no-due-date').checked = false;
+    document.getElementById('tx-due-date').disabled = true;
+    document.getElementById('tx-debtor-search').value = '';
 
     document.getElementById('tx-is-excluded').checked = false;
 
@@ -347,6 +401,12 @@ function closeTransactionModal() {
 
 function toggleReceivableFields(show) {
   document.getElementById('tx-receivable-details').style.display = show ? 'block' : 'none';
+}
+
+function toggleNoDueDate(checked) {
+  const dateInput = document.getElementById('tx-due-date');
+  dateInput.disabled = !checked;
+  if (!checked) dateInput.value = '';
 }
 
 function onAccountChangeInModal() {
@@ -488,11 +548,15 @@ async function handleTransactionSubmit(event) {
   const notes       = document.getElementById('tx-notes').value.trim();
   const isReceivable = document.getElementById('tx-is-receivable').checked;
   const dueDate     = document.getElementById('tx-due-date').value;
+  const noDueDate   = !document.getElementById('tx-no-due-date').checked;
+  const debtor      = document.getElementById('tx-debtor-search').value.trim();
   const isExcluded  = document.getElementById('tx-is-excluded').checked;
 
   if (state._batchEditIds) {
     const activeTags = [];
-    document.querySelectorAll('input[name="tx-tags"]:checked').forEach(c => activeTags.push(c.value));
+    document.querySelectorAll('input[name="tx-tags"]:checked').forEach(c => {
+      if (c.value !== 'Oculto' && c.value !== 'A cobrar') activeTags.push(c.value);
+    });
     const amount = !isNaN(rawAmount) ? Math.abs(rawAmount) * state.currentTxSign : null;
 
     const tagsChanged = document.querySelectorAll('input[name="tx-tags"]').length > 0;
@@ -536,7 +600,9 @@ async function handleTransactionSubmit(event) {
   }
 
   const activeTags = [];
-  document.querySelectorAll('input[name="tx-tags"]:checked').forEach(c => activeTags.push(c.value));
+  document.querySelectorAll('input[name="tx-tags"]:checked').forEach(c => {
+    if (c.value !== 'Oculto' && c.value !== 'A cobrar') activeTags.push(c.value);
+  });
 
   const amount = Math.abs(rawAmount) * state.currentTxSign;
 
@@ -607,7 +673,9 @@ async function handleTransactionSubmit(event) {
         tx.notes = notes;
         tx.tags = activeTags;
         tx.is_receivable = isReceivable;
-        tx.due_date = isReceivable ? dueDate : '';
+        tx.due_date = isReceivable && !noDueDate ? dueDate : '';
+        tx.no_due_date = isReceivable ? noDueDate : false;
+        tx.debtor = isReceivable ? debtor : '';
         tx.excluded = isExcluded;
       } else {
         tx.date = dateVal;
@@ -620,7 +688,9 @@ async function handleTransactionSubmit(event) {
         tx.notes = notes;
         tx.tags = activeTags;
         tx.is_receivable = isReceivable;
-        tx.due_date = isReceivable ? dueDate : '';
+        tx.due_date = isReceivable && !noDueDate ? dueDate : '';
+        tx.no_due_date = isReceivable ? noDueDate : false;
+        tx.debtor = isReceivable ? debtor : '';
         tx.excluded = isExcluded;
         if (tx.installment_group && tx.installment_total) {
           const newIdx = parseInt(document.getElementById('tx-installment-index').value) || tx.installment_index;
@@ -677,7 +747,9 @@ async function handleTransactionSubmit(event) {
         notes,
         tags: activeTags,
         is_receivable: isReceivable,
-        due_date: isReceivable ? dueDate : '',
+        due_date: isReceivable && !noDueDate ? dueDate : '',
+        no_due_date: isReceivable ? noDueDate : false,
+        debtor: isReceivable ? debtor : '',
         excluded: isExcluded
       });
     }
@@ -734,6 +806,8 @@ async function deleteTransaction(txId) {
     }
   } else {
     if (!await showConfirm('¿Seguro que deseas eliminar esta transacción?', { title: 'Eliminar transacción', confirmText: 'Eliminar', danger: true })) return;
+    // Restore receivable if deleting a refund
+    _restoreReceivableFromRefund(tx);
     state.transactions = state.transactions.filter(t => t.id !== txId);
     state.selectedTxIds.delete(txId);
   }
@@ -746,17 +820,18 @@ async function markAsCollected(txId) {
   if (!tx) return;
   const acc = state.accounts.find(a => a.id === tx.account_id);
   const accCur = acc?.currency || state.settings.currency || 'UYU';
-  if (await showConfirm(`¿Marcar como cobrado el préstamo de ${formatAccountCurrency(Math.abs(tx.amount), accCur)} de ${tx.payee}?`, { title: 'Cobrar préstamo', confirmText: 'Marcar cobrado' })) {
+  const debtorName = tx.debtor || tx.payee;
+  if (await showConfirm(`¿Marcar como cobrado el préstamo de ${formatAccountCurrency(Math.abs(tx.amount), accCur)} de ${debtorName}?`, { title: 'Cobrar préstamo', confirmText: 'Marcar cobrado' })) {
     tx.is_receivable = false;
     state.transactions.unshift({
       id: 'tx-' + Date.now() + '-refund',
       date: new Date().toISOString().split('T')[0],
       account_id: tx.account_id,
-      payee: 'Cobro: ' + tx.payee,
-      category_name: 'Otros',
+      payee: debtorName,
+      category_name: 'Pagos',
       amount: Math.abs(tx.amount),
-      notes: 'Reintegro préstamo del ' + tx.date,
-      tags: [],
+      notes: 'Préstamo cobrado ' + tx.payee,
+      tags: [...(tx.tags || [])],
       is_receivable: false
     });
     saveData('transactions');
@@ -1217,7 +1292,7 @@ function _countExcludedInSelection() {
   let excludedCount = 0;
   state.selectedTxIds.forEach(id => {
     const tx = state.transactions.find(t => t.id === id);
-    if (tx && tx.excluded) excludedCount++;
+    if (tx && isTxExcluded(tx)) excludedCount++;
   });
   return excludedCount;
 }
@@ -1225,7 +1300,7 @@ function _countExcludedInSelection() {
 function _filterExcludedFromSelection() {
   state.selectedTxIds.forEach(id => {
     const tx = state.transactions.find(t => t.id === id);
-    if (tx && tx.excluded) state.selectedTxIds.delete(id);
+    if (tx && isTxExcluded(tx)) state.selectedTxIds.delete(id);
   });
 }
 
@@ -2065,6 +2140,60 @@ function updateSortIndicators() {
   });
 }
 
+// ── RECEIVABLE HELPERS ────────────────────────────────────────
+function _findRefundTx(tx) {
+  const debtorName = tx.debtor || tx.payee;
+  return state.transactions.find(t =>
+    t.id !== tx.id
+    && t.payee === debtorName
+    && t.account_id === tx.account_id
+    && Math.abs(Number(t.amount) || 0) === Math.abs(Number(tx.amount) || 0)
+    && t.notes.startsWith('Préstamo cobrado ')
+  ) || null;
+}
+
+function _getReceivablePill(tx) {
+  const refund = _findRefundTx(tx);
+  if (refund) {
+    return '<span class="tag-pill-collected"><i data-lucide="check-circle"></i> Cobrado</span>';
+  }
+  if (tx.is_receivable) {
+    if (tx.due_date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const due = new Date(tx.due_date + 'T00:00:00');
+      const diffMs = due - today;
+      const diffDays = Math.round(diffMs / 86400000);
+      if (diffDays < 0) {
+        const overdueDays = Math.abs(diffDays);
+        const label = overdueDays === 1 ? 'Hace 1 día vencido' : `Hace ${overdueDays} días vencido`;
+        return `<span class="tag-pill-overdue" title="${label}"><i data-lucide="clock-alert"></i> A cobrar</span>`;
+      }
+      if (diffDays === 0) {
+        return '<span class="tag-pill-receivable" title="El cobro es hoy"><i data-lucide="clock"></i> A cobrar</span>';
+      }
+      const label = diffDays === 1 ? 'Falta 1 día para el cobro' : `Faltan ${diffDays} días para el cobro`;
+      return `<span class="tag-pill-receivable" title="${label}"><i data-lucide="clock"></i> A cobrar</span>`;
+    }
+    return '<span class="tag-pill-receivable"><i data-lucide="clock"></i> A cobrar</span>';
+  }
+  return '';
+}
+
+function _restoreReceivableFromRefund(refundTx) {
+  if (!refundTx.notes.startsWith('Préstamo cobrado ')) return null;
+  const original = state.transactions.find(t =>
+    t.payee === refundTx.payee
+    && t.account_id === refundTx.account_id
+    && Math.abs(Number(t.amount) || 0) === Math.abs(Number(refundTx.amount) || 0)
+  );
+  if (original) {
+    original.is_receivable = true;
+    return original;
+  }
+  return null;
+}
+
 // ── RENDER TABLE ─────────────────────────────────────────────
 function renderTransactions() {
   const tbody  = document.getElementById('tx-table-body');
@@ -2249,7 +2378,7 @@ function renderTransactions() {
     ccGroups[key].txs.push(tx);
     // Exclude payment txs and excluded txs from total
     const isPayment = (tx.tags || []).includes('Pago de tarjeta');
-    if (!isPayment && !tx.excluded) {
+    if (!isPayment && !isTxExcluded(tx)) {
       const accCur = acc.currency || (state.settings.currency || 'UYU');
       const converted = convertCurrency(Number(tx.amount) || 0, accCur, state.settings.currency || 'UYU');
       ccGroups[key].total += converted !== null ? converted : (Number(tx.amount) || 0);
@@ -2276,17 +2405,18 @@ function renderTransactions() {
     // A future tx shows normal (not dimmed) if it's within the closing period's month
     const isFutureRow = tx.is_future && (!closingPeriod || tx.date.substring(0, 7) !== closingPeriod);
 
-    const tagPills = (tx.tags || []).filter(tag => tag !== 'Pago de tarjeta').map(tag => {
+    const tagPills = (tx.tags || []).filter(tag => tag !== 'Pago de tarjeta' && tag !== 'Oculto').map(tag => {
       const c = _tagColor(tag);
       return `<span class="tag-pill" style="background:${c.bg};color:${c.text};">#${tag}</span>`;
     }).join('');
 
-    const excludedPill = tx.excluded ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
+    const excludedPill = isTxExcluded(tx) ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
     const hasPaymentTag = (tx.tags || []).includes('Pago de tarjeta');
     const paymentPill = hasPaymentTag ? '<span class="tag-pill-payment"><i data-lucide="credit-card"></i>Pago</span>' : '';
+    const receivablePill = _getReceivablePill(tx);
 
     const notesHtml = tx.notes || '';
-    const tagsHtml  = (tagPills || '') + excludedPill + paymentPill;
+    const tagsHtml  = (tagPills || '') + excludedPill + paymentPill + receivablePill;
 
     const accCurrency = acc?.currency || state.settings.currency || 'UYU';
     const amtStyle = state.settings.amountStyle || 'default';
@@ -2409,15 +2539,16 @@ function renderTransactions() {
       : (showSign ? '+' : '') + formatAccountCurrency(child.amount, accCurrency);
     const amountClass = showColor ? (isExpense ? 'expense' : 'income') : 'amount-no-color';
 
-    const tagPills = (child.tags || []).filter(tag => tag !== 'Pago de tarjeta').map(tag => {
+    const tagPills = (child.tags || []).filter(tag => tag !== 'Pago de tarjeta' && tag !== 'Oculto').map(tag => {
       const c = _tagColor(tag);
       return `<span class="tag-pill" style="background:${c.bg};color:${c.text};">#${tag}</span>`;
     }).join('');
-    const excludedPill = child.excluded ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
+    const excludedPill = isTxExcluded(child) ? '<span class="tag-pill-excluded"><i data-lucide="eye-off"></i>Oculto</span>' : '';
     const hasPaymentTag = (child.tags || []).includes('Pago de tarjeta');
     const paymentPill = hasPaymentTag ? '<span class="tag-pill-payment"><i data-lucide="credit-card"></i>Pago</span>' : '';
+    const receivablePill = _getReceivablePill(child);
     const notesHtml = child.notes || '';
-    const tagsHtml = (tagPills || '') + excludedPill + paymentPill;
+    const tagsHtml = (tagPills || '') + excludedPill + paymentPill + receivablePill;
 
     let childActionsHtml = `
       <div class="row-action-dropdown">

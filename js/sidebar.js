@@ -49,7 +49,7 @@ function renderSidebar() {
   state.accounts.forEach(acc => { accBalances[acc.id] = 0; });
   state.transactions.forEach(tx => {
     if (!includeCcFutureTx(tx)) return;
-    if (tx.excluded) return;
+    if (isTxExcluded(tx)) return;
     if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
     if (accBalances[tx.account_id] !== undefined) {
@@ -255,7 +255,7 @@ function renderHeaderAndMetrics() {
       state.transactions.forEach(tx => {
         if (tx.account_id !== a.id) return;
         if (!includeCcFutureTx(tx)) return;
-        if (tx.excluded) return;
+        if (isTxExcluded(tx)) return;
         if (tx.split_parent_id) return;
         if (!isTxInPeriod(tx)) return;
         bal += Number(tx.amount) || 0;

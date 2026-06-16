@@ -1631,7 +1631,7 @@ function calculateAccountBalance(accountId) {
   state.transactions.forEach(tx => {
     if (tx.account_id !== accountId) return;
     if (!includeCcFutureTx(tx)) return;
-    if (tx.excluded) return;
+    if (isTxExcluded(tx)) return;
     if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
     balance += Number(tx.amount) || 0;
