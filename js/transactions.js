@@ -2680,7 +2680,7 @@ function renderTransactions() {
       const isCurrentPeriod = group.period === getCurrentYearMonth();
       const payIcon = paid ? 'calendar-check' : (isCurrentPeriod ? 'calendar-1' : (status ? status.icon : 'circle'));
       const payOpacity = '1';
-      const payColor = paid ? 'var(--positive)' : (isCurrentPeriod ? 'var(--text-mid)' : (status ? status.color : 'var(--text-lo)'));
+      const payColor = (isCurrentPeriod ? 'var(--text-mid)' : (status ? status.color : 'var(--text-lo)'));
       const statusDetail = status && status.detail ? ` · ${status.detail}` : '';
       const payTitle = paid
         ? `Pagado${statusDetail} — click para marcar como no pagado`

@@ -177,7 +177,7 @@
   color: var(--accent);
 }
 
-.closing-paid-btn.paid {
+.closing-paid-btn.paid:hover {
   background: var(--positive-bg);
   color: var(--positive);
 }
