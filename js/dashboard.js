@@ -916,24 +916,37 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
       list.innerHTML = '<div class="dash-empty">Sin datos en este período</div>';
     } else {
       const maxVal = entries[0][1];
+      const hiddenKey = isExp ? 'expenses' : 'income';
+      const hiddenSet = dashState.hiddenCats[hiddenKey] || new Set();
+      const catColors = {};
+      getChartColors(entries.length).forEach((c, i) => { catColors[entries[i][0]] = c; });
+
       entries.forEach(([cat, amount]) => {
         const pct = maxVal > 0 ? (amount / maxVal) * 100 : 0;
         const totalPct = total > 0 ? (amount / total * 100).toFixed(0) : 0;
         const catObj = state.predefined.categories.find(c => (typeof c === 'string' ? c : c.name) === cat);
         const catIcon = catObj && typeof catObj !== 'string' ? catObj.icon : 'tag';
+        const color = catColors[cat] || 'var(--text-lo)';
+        const isHidden = hiddenSet.has(cat);
         const row = document.createElement('div');
-        row.className = 'dash-cat-row dash-cat-row-clickable';
+        row.className = 'dash-cat-row' + (isHidden ? ' cat-hidden' : '') + ' dash-cat-row-clickable';
         row.title = 'Ver movimientos de "' + cat + '"';
-        row.addEventListener('click', () => dashGoToCategory(cat));
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.dash-cat-eye')) return;
+          dashGoToCategory(cat);
+        });
         row.innerHTML = `
           <div class="dash-cat-top">
             <span class="dash-cat-label">
-              <span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>
+              <span class="dash-cat-icon" style="color:${color}"><i data-lucide="${catIcon}"></i></span>
               <span class="dash-cat-name">${cat}</span>
+              <button class="dash-cat-eye" onclick="event.stopPropagation();dashToggleCat('${cat.replace(/'/g, "\\'")}','${isExp ? 'expense' : 'income'}')" title="${isHidden ? 'Mostrar categoría' : 'Ocultar categoría'}">
+                <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
+              </button>
             </span>
             <span class="dash-cat-amount">${formatCurrency(amount)}<span class="dash-cat-pct">${totalPct}%</span></span>
           </div>
-          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%"></div></div>
+          <div class="dash-cat-bar-track"><div class="dash-cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
         `;
         list.appendChild(row);
       });
@@ -1275,7 +1288,9 @@ function renderDashCharts() {
     const allSorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
     const dColorMap = {};
     getChartColors(allSorted.length).forEach((c, i) => { dColorMap[allSorted[i][0]] = c; });
-    const entries = allSorted.slice(0, 8);
+    const hiddenKey = isExp ? 'expenses' : 'income';
+    const hiddenSet = dashState.hiddenCats[hiddenKey] || new Set();
+    const entries = allSorted.filter(([k]) => !hiddenSet.has(k)).slice(0, 8);
     const colors = entries.map(([k]) => dColorMap[k] || '#6b7280');
     drawDonutChart(donutCanvas, null, entries.map(e => e[1]), entries.map(e => e[0]), colors, isExp ? 'Total gastos' : 'Total ingresos');
   }
