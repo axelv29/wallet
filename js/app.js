@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
   try { initSidebarCollapse(); } catch(e) { console.warn('sidebar collapse init failed', e); }
   const lastView = localStorage.getItem('wallet_last_view') || 'dashboard';
   const lastFilter = localStorage.getItem('wallet_last_filter');
+  const url = location.pathname + location.search;
+  history.replaceState({ view: lastView }, '', url);
 
   // Fetch exchange rates, then render
   fetchExchangeRates().then(() => {
@@ -43,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ids.length > 1) {
           state.selectedAccounts = ids;
           state.currentView = 'multi';
-          showView('main');
+          showView('main', false);
           clearTxSelection();
           renderAll();
         } else {
@@ -53,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filterTransactions(lastFilter);
       }
     } else {
-      showView(lastView);
+      showView(lastView, false);
     }
     renderAll();
     updatePeriodLabel();
@@ -74,6 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDashCharts();
       }
     }, 120);
+  });
+
+  // SPA history navigation
+  window.addEventListener('popstate', (e) => {
+    const view = e.state && e.state.view;
+    if (view && ['dashboard', 'main', 'settings'].includes(view)) {
+      showView(view, false);
+      if (view === 'main') renderAll();
+    }
   });
 
   // Close dropdowns on outside click
@@ -187,7 +198,8 @@ function initSidebarCollapse() {
 }
 
 // ── VIEW SWITCHING ────────────────────────────────────────────
-function showView(name) {
+function showView(name, recordHistory) {
+  if (recordHistory === undefined) recordHistory = true;
   ['dashboard', 'main', 'settings'].forEach(v => {
     const el = document.getElementById('view-' + v);
     if (el) el.style.display = v === name ? 'flex' : 'none';
@@ -227,6 +239,11 @@ function showView(name) {
     const radio = document.querySelector(`input[name="amount-style"][value="${amountStyle}"]`);
     if (radio) radio.checked = true;
     syncThemeUI();
+  }
+
+  if (recordHistory) {
+    const url = location.pathname + location.search;
+    history.pushState({ view: name }, '', url);
   }
 }
 
@@ -942,8 +959,10 @@ window.dashToggleTop             = dashToggleTop;
 window.dashToggleCat            = dashToggleCat;
 window.dashChartPrevMonth        = dashChartPrevMonth;
 window.dashChartNextMonth        = dashChartNextMonth;
+window.dashSetChartRange         = dashSetChartRange;
 window.dashToggleDonutMode       = dashToggleDonutMode;
 window.dashGoToCategory          = dashGoToCategory;
+window.dashGoToAccount           = dashGoToAccount;
 window.onCsvFileSelected         = onCsvFileSelected;
 window.reparseCsv                = reparseCsv;
 window.onCsvMappingChange        = onCsvMappingChange;

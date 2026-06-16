@@ -299,7 +299,7 @@
 .predefined-icon-btn {
   background: none;
   border: none;
-  color: var(--text-mid);
+  color: var(--text-lo);
   cursor: pointer;
   display: inline-flex;
   align-items: center;

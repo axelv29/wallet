@@ -8,9 +8,10 @@
 let dashState = {
   month: null,
   chartMonth: null,
+  calMonth: null,
   periodType: 'month',
   accounts: null,
-  visibleSections: { resumen: true, categorias: true },
+  visibleSections: { resumen: true, categorias: true, calendario: true, cuentas: true },
   donutMode: 'expense',
   lineChartInstance: null,
   donutChartInstance: null,
@@ -145,9 +146,34 @@ function dashNextMonth() {
   renderDashboard();
 }
 
+function dashCalPrevMonth() {
+  const p = dashGetCalMonth();
+  let m = p.month - 1, y = p.year;
+  if (m < 0) { m = 11; y--; }
+  dashState.calMonth = { year: y, month: m };
+  renderCalendarHeatmap();
+}
+
+function dashCalNextMonth() {
+  const p = dashGetCalMonth();
+  let m = p.month + 1, y = p.year;
+  if (m > 11) { m = 0; y++; }
+  dashState.calMonth = { year: y, month: m };
+  renderCalendarHeatmap();
+}
+
+function dashGetCalMonth() {
+  if (dashState.calMonth) return dashState.calMonth;
+  const p = dashGetPeriod();
+  if (p.year != null) return { year: p.year, month: p.month };
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() };
+}
+
 function dashSetPeriod(type) {
   dashState.periodType = type;
   if (type !== 'month') dashState.month = null;
+  dashState.calMonth = null;
   renderDashboard();
 }
 
@@ -169,6 +195,8 @@ function dashBuildSectionMenu() {
   const sections = [
     { id: 'resumen', label: 'Resumen' },
     { id: 'categorias', label: 'Categorías' },
+    { id: 'calendario', label: 'Calendario' },
+    { id: 'cuentas', label: 'Cuentas' },
   ];
   sections.forEach(s => {
     const label = document.createElement('label');
@@ -347,41 +375,87 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.scale(dpr, dpr);
 
   const W = rect.width, H = rect.height;
-  const padL = 52, padR = 12, padT = 20, padB = 36;
+  const padL = 56, padR = 16, padT = 16, padB = 34;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
   const n = labels.length;
+  if (n === 0) return;
 
   const isDark = document.documentElement.classList.contains('theme-dark');
   const textColor = isDark ? '#a1a1aa' : '#71717a';
   const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const zeroLineColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.18)';
   const incomeColor = '#22c55e';
-  const incomeFill = isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)';
   const expenseColor = '#ef4444';
-  const expenseFill = isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)';
   const savingsColor = '#0284c7';
+  const hoverBandColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
   const allVals = [...incomeData, ...expenseData, ...(savingsData || [])];
-  const maxVal = Math.max(...allVals, 1) * 1.1;
+  const dataMax = Math.max(...allVals.filter(v => v >= 0), 0);
+  const dataMin = Math.min(...allVals.filter(v => v < 0), 0);
+  const hasNegative = dataMin < 0;
+  const yMax = dataMax > 0 ? dataMax * 1.12 : 100;
+  const yMin = hasNegative ? dataMin * 1.12 : 0;
+  const yRange = yMax - yMin;
 
   ctx.clearRect(0, 0, W, H);
 
-  // Grid lines (dashed)
-  ctx.strokeStyle = gridColor;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  for (let i = 0; i <= 4; i++) {
-    const y = padT + (chartH / 4) * i;
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-    const val = maxVal * (1 - i / 4);
-    ctx.fillStyle = textColor;
-    ctx.font = '10px "DM Sans", -apple-system, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val.toFixed(0), padL - 6, y + 3.5);
+  function valToY(val) {
+    return padT + chartH - ((val - yMin) / yRange) * chartH;
   }
-  ctx.setLineDash([]);
+  function idxToX(i) {
+    return padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
+  }
 
-  // Helper: smooth curve through points
+  const baselineY = valToY(0);
+
+  function niceStep(range) {
+    const rough = range / 5;
+    if (rough <= 0) return 1;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const norm = rough / mag;
+    if (norm <= 1.5) return mag;
+    if (norm <= 3.5) return 2 * mag;
+    if (norm <= 7.5) return 5 * mag;
+    return 10 * mag;
+  }
+
+  const step = niceStep(yRange);
+  const gridStart = Math.ceil(yMin / step) * step;
+  const gridVals = [];
+  for (let v = gridStart; v <= yMax + step * 0.001; v += step) {
+    gridVals.push(Math.round(v * 1e6) / 1e6);
+  }
+
+  gridVals.forEach(val => {
+    const y = valToY(val);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + chartW, y);
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([3, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textColor;
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const abs = Math.abs(val);
+    const formatted = abs >= 10000 ? (abs / 1000).toFixed(0) + 'k' : abs >= 1000 ? (abs / 1000).toFixed(1) + 'k' : abs.toFixed(0);
+    ctx.fillText(val < 0 ? '-' + formatted : formatted, padL - 8, y);
+  });
+
+  if (hasNegative) {
+    ctx.beginPath();
+    ctx.moveTo(padL, baselineY);
+    ctx.lineTo(padL + chartW, baselineY);
+    ctx.strokeStyle = zeroLineColor;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+
   function smoothCurve(points) {
     if (points.length === 0) return;
     ctx.moveTo(points[0].x, points[0].y);
@@ -390,68 +464,64 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
       ctx.lineTo(points[1].x, points[1].y);
       return;
     }
-    for (let i = 1; i < points.length - 1; i++) {
-      const p0 = points[i - 1];
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
       const p1 = points[i];
       const p2 = points[i + 1];
+      const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
       const cp1x = p1.x + (p2.x - p0.x) / 6;
       const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p2.x - p0.x) / 6;
-      const cp2y = p2.y - (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
     }
   }
 
   function getPoints(data) {
-    return data.map((val, i) => ({
-      x: padL + (i / (n - 1)) * chartW,
-      y: padT + chartH - (val / maxVal) * chartH,
-    }));
+    return data.map((val, i) => ({ x: idxToX(i), y: valToY(val) }));
   }
 
-  // Income area fill
+  function buildAreaPath(points) {
+    if (points.length === 0) return;
+    ctx.moveTo(points[0].x, baselineY);
+    ctx.lineTo(points[0].x, points[0].y);
+    if (points.length === 2) {
+      ctx.lineTo(points[1].x, points[1].y);
+    } else {
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i === 0 ? i : i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+      }
+    }
+    ctx.lineTo(points[points.length - 1].x, baselineY);
+    ctx.closePath();
+  }
+
   const incomePoints = getPoints(incomeData);
-  ctx.beginPath();
-  ctx.moveTo(incomePoints[0].x, padT + chartH);
-  ctx.lineTo(incomePoints[0].x, incomePoints[0].y);
-  for (let i = 1; i < incomePoints.length - 1; i++) {
-    const p0 = incomePoints[i - 1], p1 = incomePoints[i], p2 = incomePoints[i + 1];
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p2.x - p0.x) / 6;
-    const cp2y = p2.y - (p2.y - p0.y) / 6;
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-  }
-  if (incomePoints.length > 1) {
-    ctx.lineTo(incomePoints[incomePoints.length - 1].x, incomePoints[incomePoints.length - 1].y);
-  }
-  ctx.lineTo(incomePoints[incomePoints.length - 1].x, padT + chartH);
-  ctx.closePath();
-  ctx.fillStyle = incomeFill;
-  ctx.fill();
-
-  // Expense area fill
   const expensePoints = getPoints(expenseData);
-  ctx.beginPath();
-  ctx.moveTo(expensePoints[0].x, padT + chartH);
-  ctx.lineTo(expensePoints[0].x, expensePoints[0].y);
-  for (let i = 1; i < expensePoints.length - 1; i++) {
-    const p0 = expensePoints[i - 1], p1 = expensePoints[i], p2 = expensePoints[i + 1];
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p2.x - p0.x) / 6;
-    const cp2y = p2.y - (p2.y - p0.y) / 6;
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-  }
-  if (expensePoints.length > 1) {
-    ctx.lineTo(expensePoints[expensePoints.length - 1].x, expensePoints[expensePoints.length - 1].y);
-  }
-  ctx.lineTo(expensePoints[expensePoints.length - 1].x, padT + chartH);
-  ctx.closePath();
-  ctx.fillStyle = expenseFill;
-  ctx.fill();
+  const hasSavingsData = savingsData && savingsData.some(v => v !== 0);
+  const savingsPoints = hasSavingsData ? getPoints(savingsData) : [];
 
-  // Income line
+  function fillArea(points, top, bot) {
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bot);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    buildAreaPath(points);
+    ctx.fill();
+  }
+
+  fillArea(incomePoints, isDark ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.10)', isDark ? 'rgba(34,197,94,0.02)' : 'rgba(34,197,94,0.01)');
+  fillArea(expensePoints, isDark ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.10)', isDark ? 'rgba(239,68,68,0.02)' : 'rgba(239,68,68,0.01)');
+
   ctx.beginPath();
   smoothCurve(incomePoints);
   ctx.strokeStyle = incomeColor;
@@ -460,7 +530,6 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Expense line
   ctx.beginPath();
   smoothCurve(expensePoints);
   ctx.strokeStyle = expenseColor;
@@ -469,94 +538,36 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Savings line
-  const savingsPoints = savingsData ? getPoints(savingsData) : [];
-  if (savingsPoints.length > 1 && savingsData.some(v => v !== 0)) {
+  if (savingsPoints.length > 1) {
     ctx.beginPath();
     smoothCurve(savingsPoints);
     ctx.strokeStyle = savingsColor;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
+    ctx.setLineDash([6, 4]);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
-  // Data points (dots)
-  incomePoints.forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = incomeColor;
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  });
-  expensePoints.forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = expenseColor;
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  });
-  if (savingsPoints.length > 1 && savingsData.some(v => v !== 0)) {
-    savingsPoints.forEach(p => {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = savingsColor;
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    });
-  }
-
-  // X-axis labels
   labels.forEach((label, i) => {
-    const cx = padL + (i / (n - 1)) * chartW;
+    const x = idxToX(i);
     ctx.fillStyle = textColor;
     ctx.font = '10px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(label, cx, H - padB + 8);
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x, padT + chartH + 10);
   });
 
-  // Legend (top-left)
-  const legItems = [
-    { color: incomeColor, label: 'Ingresos' },
-    { color: expenseColor, label: 'Gastos' },
-  ];
-  if (savingsData && savingsData.some(v => v !== 0)) {
-    legItems.push({ color: savingsColor, label: 'Ahorro' });
-  }
-  let legX = padL;
-  ctx.textBaseline = 'middle';
-  legItems.forEach(item => {
-    const sw = 10, sh = 4;
-    ctx.fillStyle = item.color;
-    ctx.beginPath();
-    const rx = legX, ry = padT - 14, rr = 2;
-    ctx.moveTo(rx + rr, ry);
-    ctx.lineTo(rx + sw - rr, ry);
-    ctx.quadraticCurveTo(rx + sw, ry, rx + sw, ry + rr);
-    ctx.lineTo(rx + sw, ry + sh - rr);
-    ctx.quadraticCurveTo(rx + sw, ry + sh, rx + sw - rr, ry + sh);
-    ctx.lineTo(rx + rr, ry + sh);
-    ctx.quadraticCurveTo(rx, ry + sh, rx, ry + sh - rr);
-    ctx.lineTo(rx, ry + rr);
-    ctx.quadraticCurveTo(rx, ry, rx + rr, ry);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = textColor;
-    ctx.font = '10px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(item.label, legX + sw + 6, padT - 12);
-    legX += ctx.measureText(item.label).width + sw + 16;
-  });
-
-  // Attach data for tooltip
   canvas._chartData = { labels, incomeData, expenseData, savingsData: savingsData || [] };
-  canvas._chartLayout = { padL, padR, padT, padB, chartW, chartH, n, minVal: 0, maxVal, incomeColor, expenseColor, savingsColor };
+  canvas._chartLayout = {
+    padL, padR, padT, padB, chartW, chartH, n,
+    yMin, yMax, yRange, baselineY, isDark, hasNegative, zeroLineColor,
+    incomeColor, expenseColor, savingsColor, hoverBandColor,
+    hasSavings: savingsPoints.length > 1,
+    incomePoints, expensePoints, savingsPoints
+  };
+  canvas._hoverIdx = -1;
   updateLineTooltip(canvas);
 }
 
@@ -564,40 +575,197 @@ function updateLineTooltip(canvas) {
   const tooltip = document.getElementById('dash-line-tooltip');
   if (!tooltip) return;
 
-  const onMove = (e) => {
+  function findNearest(clientX) {
+    const layout = canvas._chartLayout;
+    if (!layout || layout.n === 0) return -1;
     const r = canvas.getBoundingClientRect();
-    const mx = (e.clientX - r.left) * (canvas.width / (r.width * (window.devicePixelRatio || 1)));
+    const mx = clientX - r.left;
+    let best = -1, bestDist = Infinity;
+    for (let i = 0; i < layout.n; i++) {
+      const x = layout.padL + (layout.n === 1 ? layout.chartW / 2 : (i / (layout.n - 1)) * layout.chartW);
+      const d = Math.abs(mx - x);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return bestDist < 40 ? best : -1;
+  }
+
+  function drawHoverState(idx) {
+    const layout = canvas._chartLayout;
+    const data = canvas._chartData;
+    if (!layout || !data) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const ctx = canvas.getContext('2d');
+    const r = canvas.getBoundingClientRect();
+    canvas.width = r.width * dpr;
+    canvas.height = r.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const W = r.width, H = r.height;
+    const { padL, padT, padB, chartW, chartH, n, yMin, yMax, yRange, baselineY, isDark } = layout;
+    const textColor = isDark ? '#a1a1aa' : '#71717a';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const zeroLineColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.18)';
+
+    ctx.clearRect(0, 0, W, H);
+
+    function valToY(val) { return padT + chartH - ((val - yMin) / yRange) * chartH; }
+    function idxToX(i) { return padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW); }
+    function niceStep(range) {
+      const rough = range / 5;
+      if (rough <= 0) return 1;
+      const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+      const norm = rough / mag;
+      if (norm <= 1.5) return mag;
+      if (norm <= 3.5) return 2 * mag;
+      if (norm <= 7.5) return 5 * mag;
+      return 10 * mag;
+    }
+
+    const step = niceStep(yRange);
+    const gridStart = Math.ceil(yMin / step) * step;
+    for (let v = gridStart; v <= yMax + step * 0.001; v += step) {
+      const gv = Math.round(v * 1e6) / 1e6;
+      const y = valToY(gv);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y);
+      ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
+      ctx.setLineDash([3, 4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = textColor; ctx.font = '10px system-ui, sans-serif';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      const abs = Math.abs(gv);
+      const f = abs >= 10000 ? (abs / 1000).toFixed(0) + 'k' : abs >= 1000 ? (abs / 1000).toFixed(1) + 'k' : abs.toFixed(0);
+      ctx.fillText(gv < 0 ? '-' + f : f, padL - 8, y);
+    }
+
+    if (layout.hasNegative) {
+      ctx.beginPath(); ctx.moveTo(padL, baselineY); ctx.lineTo(padL + chartW, baselineY);
+      ctx.strokeStyle = zeroLineColor; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke();
+    }
+
+    function smoothCurve(points) {
+      if (points.length === 0) return;
+      ctx.moveTo(points[0].x, points[0].y);
+      if (points.length === 1) return;
+      if (points.length === 2) { ctx.lineTo(points[1].x, points[1].y); return; }
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i === 0 ? i : i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+        ctx.bezierCurveTo(
+          p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+          p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+          p2.x, p2.y
+        );
+      }
+    }
+
+    function buildAreaPath(points) {
+      if (points.length === 0) return;
+      ctx.moveTo(points[0].x, baselineY);
+      ctx.lineTo(points[0].x, points[0].y);
+      if (points.length === 2) { ctx.lineTo(points[1].x, points[1].y); }
+      else {
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i === 0 ? i : i - 1];
+          const p1 = points[i], p2 = points[i + 1];
+          const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+            p2.x, p2.y
+          );
+        }
+      }
+      ctx.lineTo(points[points.length - 1].x, baselineY);
+      ctx.closePath();
+    }
+
+    function fillArea(points, top, bot) {
+      const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+      grad.addColorStop(0, top); grad.addColorStop(1, bot);
+      ctx.fillStyle = grad; ctx.beginPath(); buildAreaPath(points); ctx.fill();
+    }
+
+    fillArea(layout.incomePoints, isDark ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.10)', isDark ? 'rgba(34,197,94,0.02)' : 'rgba(34,197,94,0.01)');
+    fillArea(layout.expensePoints, isDark ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.10)', isDark ? 'rgba(239,68,68,0.02)' : 'rgba(239,68,68,0.01)');
+
+    ctx.beginPath(); smoothCurve(layout.incomePoints);
+    ctx.strokeStyle = layout.incomeColor; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.beginPath(); smoothCurve(layout.expensePoints);
+    ctx.strokeStyle = layout.expenseColor; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+    if (layout.hasSavings) {
+      ctx.beginPath(); smoothCurve(layout.savingsPoints);
+      ctx.strokeStyle = layout.savingsColor; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    data.labels.forEach((label, i) => {
+      ctx.fillStyle = textColor; ctx.font = '10px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(label, idxToX(i), padT + chartH + 10);
+    });
+
+    if (idx >= 0 && idx < n) {
+      const lx = idxToX(idx);
+      ctx.beginPath();
+      ctx.moveTo(lx, padT);
+      ctx.lineTo(lx, padT + chartH);
+      ctx.strokeStyle = layout.hoverBandColor;
+      ctx.lineWidth = Math.max(chartW / n * 0.6, 20);
+      ctx.stroke();
+
+      const drawDot = (pts, color) => {
+        if (pts && pts[idx]) {
+          const p = pts[idx];
+          ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = color; ctx.fill();
+          ctx.strokeStyle = isDark ? '#1a1a1e' : '#fff';
+          ctx.lineWidth = 2; ctx.stroke();
+        }
+      };
+      drawDot(layout.incomePoints, layout.incomeColor);
+      drawDot(layout.expensePoints, layout.expenseColor);
+      if (layout.hasSavings) drawDot(layout.savingsPoints, layout.savingsColor);
+    }
+  }
+
+  const onMove = (e) => {
     const data = canvas._chartData;
     const layout = canvas._chartLayout;
     if (!data || !layout || !data.labels.length) { tooltip.style.display = 'none'; return; }
 
-    const { labels, incomeData, expenseData, savingsData } = data;
-    const { padL, padT, chartW, chartH, n, incomeColor, expenseColor, savingsColor } = layout;
+    const idx = findNearest(e.clientX);
 
-    let idx = 0;
-    if (n > 1) {
-      idx = Math.round(((mx - padL) / chartW) * (n - 1));
-      idx = Math.max(0, Math.min(n - 1, idx));
+    if (idx !== canvas._hoverIdx) {
+      canvas._hoverIdx = idx;
+      drawHoverState(idx);
     }
 
-    const inc = incomeData[idx] || 0;
-    const exp = expenseData[idx] || 0;
-    const sav = savingsData && savingsData[idx] !== undefined ? savingsData[idx] : null;
+    if (idx >= 0) {
+      const inc = data.incomeData[idx] || 0;
+      const exp = data.expenseData[idx] || 0;
+      const sav = data.savingsData && data.savingsData[idx] !== undefined ? data.savingsData[idx] : null;
 
-    let html = `<div class="tooltip-title">${labels[idx]}</div>`;
-    html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${incomeColor}"></span>Ingresos: <strong>${formatCurrency(inc)}</strong></div>`;
-    html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${expenseColor}"></span>Gastos: <strong>${formatCurrency(exp)}</strong></div>`;
-    if (sav !== null) {
-      html += `<div class="tooltip-row"><span class="tooltip-dot" style="background:${savingsColor}"></span>Ahorro: <strong>${formatCurrency(sav)}</strong></div>`;
+      let html = '<div class="tooltip-title">' + data.labels[idx] + '</div>';
+      if (inc > 0) html += '<div class="tooltip-row"><span class="tooltip-dot" style="background:' + layout.incomeColor + '"></span>Ingresos: <strong>' + formatCurrency(inc) + '</strong></div>';
+      if (exp > 0) html += '<div class="tooltip-row"><span class="tooltip-dot" style="background:' + layout.expenseColor + '"></span>Gastos: <strong>' + formatCurrency(exp) + '</strong></div>';
+      if (sav !== null && layout.hasSavings) html += '<div class="tooltip-row"><span class="tooltip-dot" style="background:' + layout.savingsColor + '"></span>Ahorro: <strong>' + formatCurrency(sav) + '</strong></div>';
+
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 200) + 'px';
+      tooltip.style.top = Math.max(e.clientY - 10, 10) + 'px';
+    } else {
+      tooltip.style.display = 'none';
     }
-
-    tooltip.innerHTML = html;
-    tooltip.style.display = 'block';
-    tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 200) + 'px';
-    tooltip.style.top = Math.max(e.clientY - 10, 10) + 'px';
   };
 
-  const onOut = () => { tooltip.style.display = 'none'; };
+  const onOut = () => {
+    canvas._hoverIdx = -1;
+    tooltip.style.display = 'none';
+    drawHoverState(-1);
+  };
 
   canvas.removeEventListener('mousemove', canvas._lineTooltipMove);
   canvas.removeEventListener('mouseout', canvas._lineTooltipOut);
@@ -606,6 +774,8 @@ function updateLineTooltip(canvas) {
   canvas._lineTooltipMove = onMove;
   canvas._lineTooltipOut = onOut;
 }
+
+
 
 function drawDonutChart(canvas, centerEl, values, labels, colors, totalLabel) {
   const ctx = canvas.getContext('2d');
@@ -872,24 +1042,24 @@ function renderSavingsCard(totalIncome, totalExpenses, netDiff) {
     <div class="dash-savings-stats">
       <div class="dash-savings-stat">
         <span class="dash-savings-stat-label">
-          <span class="dash-savings-stat-dot" style="background:var(--positive)"></span>
+          <span class="dash-savings-stat-dot" style="background:#22c55e"></span>
           Ingresos
         </span>
         <span class="dash-savings-stat-val">${formatCurrency(totalIncome)}</span>
       </div>
       <div class="dash-savings-stat">
         <span class="dash-savings-stat-label">
-          <span class="dash-savings-stat-dot" style="background:var(--negative)"></span>
+          <span class="dash-savings-stat-dot" style="background:#ef4444"></span>
           Gastos
         </span>
         <span class="dash-savings-stat-val">${formatCurrency(totalExpenses)}</span>
       </div>
       <div class="dash-savings-stat">
         <span class="dash-savings-stat-label">
-          <span class="dash-savings-stat-dot" style="background:var(--accent)"></span>
+          <span class="dash-savings-stat-dot" style="background:#0284c7"></span>
           Ahorro
         </span>
-        <span class="dash-savings-stat-val" style="color:var(--accent)">${formatCurrency(savings)}</span>
+        <span class="dash-savings-stat-val" style="color:#0284c7">${formatCurrency(savings)}</span>
       </div>
     </div>`;
 
@@ -1183,6 +1353,8 @@ function renderDashboard() {
     if (el) el.classList.toggle('dash-hidden', !visible);
     if (cb) cb.checked = visible;
   });
+  renderCalendarHeatmap();
+  renderAccountCards();
   // Draw charts
   setTimeout(() => {
     renderDashCharts();
@@ -1241,12 +1413,19 @@ function renderLineChart() {
     numMonths = Math.max(totalM + 1, 1);
   }
 
+  let prevYear = null;
   for (let i = numMonths - 1; i >= 0; i--) {
     let m = end.month - i, y = end.year;
     while (m < 0) { m += 12; y--; }
     while (m > 11) { m -= 12; y++; }
     const d = new Date(y, m, 1);
-    const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
+    const monthLabel = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
+    let label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+    // Add year suffix when year changes (or for the first label)
+    if (prevYear === null || y !== prevYear) {
+      label += ` ${y}`;
+    }
+    prevYear = y;
     let inc = 0, exp = 0;
     const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
     state.transactions.forEach(tx => {
@@ -1258,13 +1437,25 @@ function renderLineChart() {
         else exp += Math.abs(conv);
       }
     });
-    if (inc === 0 && exp === 0) continue;
-    labels.push(label.charAt(0).toUpperCase() + label.slice(1));
+    // No skip: include all months even if inc/exp are zero
+    labels.push(label);
     incomeData.push(inc);
     expenseData.push(exp);
     savingsData.push(inc - exp);
   }
   drawLineChart(lineCanvas, labels, incomeData, expenseData, savingsData);
+
+  // Populate inline legend
+  const legendEl = document.getElementById('dash-chart-legend');
+  if (legendEl) {
+    const hasIncome = incomeData.some(v => v > 0);
+    const hasExpense = expenseData.some(v => v > 0);
+    const hasSavings = savingsData.some(v => v !== 0);
+    legendEl.innerHTML = '';
+    if (hasIncome) legendEl.innerHTML += '<span class="dash-chart-legend-item"><span class="dash-chart-legend-dot" style="background:#22c55e"></span>Ingresos</span>';
+    if (hasExpense) legendEl.innerHTML += '<span class="dash-chart-legend-item"><span class="dash-chart-legend-dot" style="background:#ef4444"></span>Gastos</span>';
+    if (hasSavings) legendEl.innerHTML += '<span class="dash-chart-legend-item"><span class="dash-chart-legend-dot" style="background:#0284c7"></span>Ahorro</span>';
+  }
 
   document.querySelectorAll('.dash-range-btn').forEach(btn => {
     const val = parseInt(btn.dataset.range, 10);
@@ -1307,4 +1498,378 @@ function dashIncludeTx(tx) {
   const acc = state.accounts.find(a => a.id === tx.account_id);
   if (acc && acc.type === 'credit_card') return true;
   return !tx.is_future;
+}
+
+function renderCalendarHeatmap() {
+  const wrap = document.getElementById('dash-section-calendario');
+  if (!wrap || wrap.classList.contains('dash-hidden')) return;
+  const grid = document.getElementById('dash-cal-grid');
+  const insightsEl = document.getElementById('dash-insights');
+  if (!grid) return;
+
+  const period = dashGetCalMonth();
+  const year = period.year, month = period.month;
+  if (year == null) {
+    grid.innerHTML = '';
+    if (insightsEl) insightsEl.innerHTML = '<div class="dash-empty">Seleccioná un mes para ver el calendario</div>';
+    return;
+  }
+
+  // Update month label
+  const labelEl = document.getElementById('dash-cal-month-label');
+  if (labelEl) {
+    const d = new Date(year, month, 1);
+    labelEl.textContent = d.toLocaleDateString('es-UY', { month: 'long', year: 'numeric' }).replace(/^./, s => s.toUpperCase());
+  }
+
+  // Gather transactions for period
+  const txs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
+  const settingsCur = state.settings.currency || 'UYU';
+
+  const dailyTotals = {};
+  txs.forEach(tx => {
+    const day = parseInt(tx.date.split('-')[2], 10);
+    const val = getTxAmountInSettingsCurrency(tx);
+    // Only include expenses for the heatmap
+    if (val < 0) {
+      dailyTotals[day] = (dailyTotals[day] || 0) + Math.abs(val);
+    }
+  });
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
+  const startOffset = firstDow === 0 ? 6 : firstDow - 1; // Mon=0
+
+  const vals = Object.values(dailyTotals);
+  const maxDay = vals.length ? Math.max(...vals) : 0;
+
+  const now = new Date();
+  const today = { year: now.getFullYear(), month: now.getMonth(), day: now.getDate() };
+
+  // Build grid
+  grid.innerHTML = '';
+  const totalCells = startOffset + daysInMonth;
+  const weeks = Math.ceil(totalCells / 7);
+
+  for (let w = 0; w < weeks; w++) {
+    for (let d = 0; d < 7; d++) {
+      const idx = w * 7 + d;
+      const dayNum = idx - startOffset + 1;
+      if (dayNum < 1 || dayNum > daysInMonth) {
+        const empty = document.createElement('div');
+        empty.className = 'dash-cal-day dash-cal-day-empty';
+        grid.appendChild(empty);
+        continue;
+      }
+      const total = dailyTotals[dayNum] || 0;
+      let intensity;
+    if (total > 0 && maxDay > 0) {
+      intensity = Math.min(Math.max(1, Math.floor((total / maxDay) * 5)), 5);
+    } else {
+      intensity = 0;
+    }
+      const isToday = dayNum === today.day && month === today.month && year === today.year;
+
+      const cell = document.createElement('div');
+      cell.className = 'dash-cal-day'
+        + (total > 0 ? ' dash-cal-day-has' : '')
+        + ' dash-cal-lvl-' + intensity
+        + (isToday ? ' dash-cal-day-today' : '');
+      cell.textContent = dayNum;
+      if (total > 0) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+        cell.dataset.date = dateStr;
+        cell.dataset.amount = total;
+        cell.addEventListener('mouseenter', showCalTooltip);
+        cell.addEventListener('mouseleave', hideCalTooltip);
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  // Hide tooltip when leaving the grid
+  grid.addEventListener('mouseleave', hideCalTooltip);
+
+  // Render insights
+  renderDailyInsights(txs, year, month, daysInMonth, dailyTotals, maxDay, settingsCur);
+}
+
+function showCalTooltip(e) {
+  const el = e.currentTarget;
+  const tip = document.getElementById('dash-cal-tooltip');
+  if (!tip) return;
+  const dateStr = el.dataset.date;
+  const amount = parseFloat(el.dataset.amount);
+  tip.innerHTML = `<div class="tooltip-title">${formatDate(dateStr)}</div><div class="tooltip-row"><span class="tooltip-val">${formatCurrency(amount)}</span></div>`;
+  tip.style.display = 'block';
+  const rect = el.getBoundingClientRect();
+  tip.style.left = (rect.left + rect.width / 2) + 'px';
+  tip.style.top = (rect.top - 8) + 'px';
+  tip.style.transform = 'translate(-50%, -100%)';
+}
+
+function hideCalTooltip() {
+  const tip = document.getElementById('dash-cal-tooltip');
+  if (tip) tip.style.display = 'none';
+}
+
+function renderDailyInsights(txs, year, month, daysInMonth, dailyTotals, maxDay, settingsCur) {
+  const el = document.getElementById('dash-insights');
+  if (!el) return;
+
+  const vals = Object.values(dailyTotals);
+  const totalSpend = vals.reduce((a, b) => a + b, 0);
+  const daysWithTx = Object.keys(dailyTotals).length;
+  const avgDaily = daysInMonth > 0 ? totalSpend / daysInMonth : 0;
+
+  // Today
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todaySpend = dailyTotals[now.getDate()] || 0;
+  const isCurrentMonth = now.getMonth() === month && now.getFullYear() === year;
+
+  // Previous month comparison
+  let prevMonthTotal = 0;
+  let prevMonthTxs = [];
+  const pm = month === 0 ? 11 : month - 1;
+  const py = month === 0 ? year - 1 : year;
+  const prevTxs = state.transactions.filter(tx => {
+    if (isTxExcluded(tx) || tx.split_parent_id) return false;
+    const d = new Date(tx.date + 'T00:00:00');
+    return d.getMonth() === pm && d.getFullYear() === py && dashIncludeTx(tx);
+  });
+  prevTxs.forEach(tx => {
+    const val = getTxAmountInSettingsCurrency(tx);
+    if (val < 0) prevMonthTotal += Math.abs(val);
+  });
+
+  // Delta vs previous month
+  const deltaPct = prevMonthTotal > 0 ? ((totalSpend - prevMonthTotal) / prevMonthTotal) * 100 : 0;
+  const deltaClass = Math.abs(deltaPct) < 0.5 ? 'neutral' : deltaPct > 0 ? 'up' : 'down';
+  const deltaArrow = deltaPct > 0 ? '▲' : deltaPct < 0 ? '▼' : '—';
+  const deltaText = Math.abs(deltaPct) < 0.5 ? 'Sin cambio vs mes anterior'
+    : `${deltaArrow} ${Math.abs(deltaPct).toFixed(1)}% vs mes anterior`;
+
+  // Day elapsed / projection
+  const daysElapsed = now.getDate();
+  const totalDays = daysInMonth;
+  const pctElapsed = totalDays > 0 ? (daysElapsed / totalDays) * 100 : 0;
+  const projected = avgDaily > 0 ? avgDaily * totalDays : 0;
+  const projDeltaPct = prevMonthTotal > 0 ? ((projected - prevMonthTotal) / prevMonthTotal) * 100 : 0;
+  const projDeltaClass = Math.abs(projDeltaPct) < 0.5 ? 'neutral' : projDeltaPct > 0 ? 'up' : 'down';
+  const projDeltaArrow = projDeltaPct > 0 ? '▲' : projDeltaPct < 0 ? '▼' : '—';
+  const projDeltaText = Math.abs(projDeltaPct) < 0.5 ? 'igual que mes pasado'
+    : `${projDeltaArrow} ${Math.abs(projDeltaPct).toFixed(1)}% vs mes pasado`;
+
+  // Today comparison vs daily average
+  const todayComparePct = avgDaily > 0 ? ((todaySpend - avgDaily) / avgDaily) * 100 : 0;
+  const todayCompareClass = todayComparePct > 5 ? 'over' : todayComparePct < -5 ? 'under' : '';
+  const todayCompareText = todaySpend === 0 ? ''
+    : Math.abs(todayComparePct) < 5 ? 'similar a tu promedio'
+    : `${todayComparePct > 0 ? '+' : ''}${todayComparePct.toFixed(0)}% vs tu promedio`;
+
+  // Busiest / quietest day
+  let bestDay = null, bestAmt = 0, worstDay = null, worstAmt = Infinity;
+  Object.entries(dailyTotals).forEach(([day, amt]) => {
+    if (amt > bestAmt) { bestAmt = amt; bestDay = parseInt(day); }
+    if (amt < worstAmt) { worstAmt = amt; worstDay = parseInt(day); }
+  });
+
+  // Weekday data
+  const weekdayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const weekdayTotals = [0, 0, 0, 0, 0, 0, 0];
+  const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
+  txs.forEach(tx => {
+    const val = getTxAmountInSettingsCurrency(tx);
+    if (val >= 0) return; // expenses only
+    const d = new Date(tx.date + 'T00:00:00');
+    const dow = d.getDay();
+    const wIdx = dow === 0 ? 6 : dow - 1;
+    weekdayTotals[wIdx] += Math.abs(val);
+    weekdayCounts[wIdx]++;
+  });
+
+  const weekdayAvgs = weekdayNames.map((_, i) => weekdayCounts[i] > 0 ? weekdayTotals[i] / weekdayCounts[i] : 0);
+  const maxWday = Math.max(...weekdayAvgs, 1);
+
+  // Weekend average
+  const weekendTotal = weekdayTotals[5] + weekdayTotals[6];
+  const weekendCount = weekdayCounts[5] + weekdayCounts[6];
+  const weekendAvg = weekendCount > 0 ? weekendTotal / weekendCount : 0;
+
+  // Week average (Mon-Fri)
+  const weekTotal = weekdayTotals.slice(0, 5).reduce((a, b) => a + b, 0);
+  const weekCount = weekdayCounts.slice(0, 5).reduce((a, b) => a + b, 0);
+  const weekAvg = weekCount > 0 ? weekTotal / weekCount : 0;
+
+  // Spending streak (consecutive days without expenses)
+  let streak = 0;
+  const todayD = now.getDate();
+  for (let d = todayD; d >= 1; d--) {
+    if (dailyTotals[d] && dailyTotals[d] > 0) break;
+    streak++;
+  }
+  // Don't count today if it has no spending (subtract 1 if today has no spending)
+  if (todaySpend === 0 && streak > 0) streak--;
+  streak = Math.max(0, streak);
+
+  // Build weekday bars HTML
+  const wdayBars = weekdayNames.map((name, i) => {
+    const pct = maxWday > 0 ? (weekdayAvgs[i] / maxWday) * 100 : 0;
+    return `<div class="dash-insight-wday-row">
+      <span class="dash-insight-wday-name">${name}</span>
+      <div class="dash-insight-wday-track">
+        <div class="dash-insight-wday-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="dash-insight-wday-amt">${weekdayAvgs[i] > 0 ? formatCurrency(weekdayAvgs[i]) : '—'}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="dash-insight-month">
+      <span class="dash-insight-month-label">Gasto del mes</span>
+      <span class="dash-insight-month-val">${formatCurrency(totalSpend)}</span>
+      <span class="dash-insight-month-delta ${deltaClass}">${deltaText}</span>
+    </div>
+
+    <div class="dash-insight-velocity">
+      <div class="dash-insight-velocity-label">Al ritmo actual</div>
+      <div class="dash-insight-velocity-bar">
+        <div class="dash-insight-velocity-fill" style="width:${Math.min(pctElapsed, 100)}%"></div>
+      </div>
+      <div class="dash-insight-velocity-info">
+        <span>Día ${daysElapsed} de ${totalDays}</span>
+        <span>${pctElapsed.toFixed(0)}%</span>
+      </div>
+      <div class="dash-insight-velocity-proj">
+        <span>Proyectado:</span>
+        <span class="dash-insight-velocity-proj-val">${formatCurrency(projected)}</span>
+        <span class="dash-insight-velocity-proj-delta ${projDeltaClass}">${projDeltaText}</span>
+      </div>
+    </div>
+
+    <div class="dash-insight-today">
+      <div class="dash-insight-today-label">${isCurrentMonth ? 'Hoy' : 'Promedio diario'}</div>
+      ${isCurrentMonth ? (todaySpend > 0 ? `
+      <div class="dash-insight-today-row">
+        <span class="dash-insight-today-val">${formatCurrency(todaySpend)}</span>
+        ${todayCompareText ? `<span class="dash-insight-today-compare ${todayCompareClass}">${todayCompareText}</span>` : ''}
+      </div>` : `<span class="dash-insight-today-none">No registraste gastos hoy</span>`)
+      : `<div class="dash-insight-today-row"><span class="dash-insight-today-val">${formatCurrency(avgDaily)}</span><span class="dash-insight-today-compare neutral">/día</span></div>`}
+    </div>
+
+    <div class="dash-insight-metrics">
+      <div class="dash-insight-metric">
+        <span class="dash-insight-metric-label">Día peak</span>
+        <span class="dash-insight-metric-val">${bestDay ? formatCurrency(bestAmt) : '—'}</span>
+        <span class="dash-insight-metric-sub">${bestDay ? bestDay + ' de ' + (month + 1) : ''}</span>
+      </div>
+      <div class="dash-insight-metric">
+        <span class="dash-insight-metric-label">Promedio</span>
+        <span class="dash-insight-metric-val">${formatCurrency(avgDaily)}</span>
+        <span class="dash-insight-metric-sub">/día</span>
+      </div>
+      <div class="dash-insight-metric">
+        <span class="dash-insight-metric-label">Racha</span>
+        <span class="dash-insight-metric-val">${streak}</span>
+        <span class="dash-insight-metric-sub">${streak === 1 ? 'día sin gastos' : 'días sin gastos'}</span>
+      </div>
+      <div class="dash-insight-metric">
+        <span class="dash-insight-metric-label">Semana</span>
+        <span class="dash-insight-metric-val">${formatCurrency(weekAvg)}</span>
+        <span class="dash-insight-metric-sub">/día (lun–vie)</span>
+      </div>
+      <div class="dash-insight-metric">
+        <span class="dash-insight-metric-label">Finde</span>
+        <span class="dash-insight-metric-val">${formatCurrency(weekendAvg)}</span>
+        <span class="dash-insight-metric-sub">/día (sáb–dom)</span>
+      </div>
+      <div class="dash-insight-metric">
+        <span class="dash-insight-metric-label">Días c/gasto</span>
+        <span class="dash-insight-metric-val">${daysWithTx}</span>
+        <span class="dash-insight-metric-sub">de ${daysInMonth}</span>
+      </div>
+    </div>
+
+    <div class="dash-insight-weekdays">
+      <div class="dash-insight-weekdays-title">Patrón semanal</div>
+      ${wdayBars}
+    </div>
+  `;
+}
+
+function renderAccountCards() {
+  const container = document.getElementById('dash-acc-cards');
+  if (!container) return;
+  const wrap = document.getElementById('dash-section-cuentas');
+  if (wrap && wrap.classList.contains('dash-hidden')) { container.innerHTML = ''; return; }
+
+  const settingsCur = state.settings.currency || 'UYU';
+  const accFilter = dashState.accounts !== null ? (dashState.accounts.length > 0 ? new Set(dashState.accounts) : null) : null;
+  const period = dashGetPeriod();
+
+  // Calculate per-account balance from transactions
+  const txBalances = {};
+  state.transactions.forEach(tx => {
+    if (isTxExcluded(tx) || tx.split_parent_id) return;
+    if (period.year != null && period.month != null) {
+      const d = new Date(tx.date + 'T00:00:00');
+      if (d.getMonth() !== period.month || d.getFullYear() !== period.year) return;
+    } else if (period.range && period.range.start && tx.date < period.range.start) return;
+    if (accFilter && !accFilter.has(tx.account_id)) return;
+
+    const acc = state.accounts.find(a => a.id === tx.account_id);
+    if (!acc) return;
+    const accCur = acc.currency || settingsCur;
+    const converted = typeof convertCurrency === 'function'
+      ? convertCurrency(Number(tx.amount) || 0, accCur, settingsCur)
+      : (Number(tx.amount) || 0);
+    const val = (converted !== null && converted !== undefined) ? converted : (Number(tx.amount) || 0);
+    txBalances[tx.account_id] = (txBalances[tx.account_id] || 0) + val;
+  });
+
+  const accounts = state.accounts.filter(a => a.type === 'liquid' || a.type === 'credit_card');
+
+  if (accounts.length === 0) {
+    container.innerHTML = '<div class="dash-empty">No hay cuentas configuradas</div>';
+    return;
+  }
+
+  const cardColors = ['#5b52f5', '#059669', '#d97706', '#dc2626', '#0891b2', '#7c3aed', '#db2777', '#2563eb'];
+
+  container.innerHTML = '<div class="dash-acc-cards-grid">' + accounts.map((acc, i) => {
+    const bal = acc.balance + (txBalances[acc.id] || 0);
+    const isNegative = bal < 0;
+    const color = cardColors[i % cardColors.length];
+    const typeLabel = acc.type === 'liquid' ? 'Débito / Efectivo' : 'Tarjeta de crédito';
+
+    return `<div class="dash-acc-card" onclick="dashGoToAccount('${acc.id}')" title="Ver movimientos de ${acc.name}">
+      <svg class="dash-acc-card-svg" viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="acc-grad-${i}" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity=".85"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity=".5"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="320" height="200" rx="12" fill="url(#acc-grad-${i})"/>
+        <text x="20" y="40" fill="rgba(255,255,255,0.7)" font-size="10" font-family="system-ui, sans-serif">${typeLabel}</text>
+        <text x="20" y="70" fill="white" font-size="16" font-weight="600" font-family="system-ui, sans-serif">${acc.name}</text>
+        <text x="20" y="130" fill="rgba(255,255,255,0.6)" font-size="10" font-family="system-ui, sans-serif">Saldo</text>
+        <text x="20" y="160" fill="white" font-size="22" font-weight="600" font-family="system-ui, sans-serif">${formatAccountCurrency(Math.abs(bal), acc.currency)}</text>
+        ${isNegative ? '<text x="20" y="178" fill="rgba(255,200,200,0.8)" font-size="9" font-family="system-ui, sans-serif">Saldo negativo</text>' : ''}
+        <text x="300" y="40" fill="rgba(255,255,255,0.7)" font-size="10" font-family="system-ui, sans-serif" text-anchor="end">${acc.currency}</text>
+        <!-- Brand chip -->
+        <rect x="250" y="155" width="50" height="24" rx="4" fill="rgba(255,255,255,0.15)"/>
+        <text x="275" y="171" fill="white" font-size="10" font-weight="600" font-family="system-ui, sans-serif" text-anchor="middle">${acc.id.slice(-4).toUpperCase()}</text>
+        <!-- Simulated chip -->
+        <rect x="20" y="85" width="32" height="24" rx="3" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+      </svg>
+    </div>`;
+  }).join('') + '</div>';
+
+  lucide.createIcons();
+}
+
+function dashGoToAccount(accountId) {
+  filterTransactions(accountId);
 }

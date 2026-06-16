@@ -333,6 +333,7 @@
               <div class="dash-card-head">
                 <i data-lucide="bar-chart-2"></i>
                 <span>Ingresos vs Gastos</span>
+                <div class="dash-chart-legend" id="dash-chart-legend"></div>
                 <div class="dash-chart-range">
                   <button class="dash-range-btn active" data-range="6" onclick="dashSetChartRange(6)">6m</button>
                   <button class="dash-range-btn" data-range="12" onclick="dashSetChartRange(12)">12m</button>
@@ -421,12 +422,59 @@
           </div>
         </div>
 
+        <!-- ── SECTION: Calendario (heatmap) ── -->
+        <div class="dash-section-block" id="dash-section-calendario">
+          <div class="dash-cols">
+            <div class="dash-card">
+              <div class="dash-card-head">
+                <i data-lucide="calendar"></i>
+                <span>Mapa de calor</span>
+              </div>
+              <div class="dash-cal-wrap">
+                <div class="dash-cal-month-nav">
+                  <button class="dash-month-btn" onclick="dashCalPrevMonth()"><i data-lucide="chevron-left"></i></button>
+                  <span class="dash-cal-month-label" id="dash-cal-month-label"></span>
+                  <button class="dash-month-btn" onclick="dashCalNextMonth()"><i data-lucide="chevron-right"></i></button>
+                </div>
+                <div class="dash-cal-head">
+                  <span class="dash-cal-head-day">L</span>
+                  <span class="dash-cal-head-day">M</span>
+                  <span class="dash-cal-head-day">M</span>
+                  <span class="dash-cal-head-day">J</span>
+                  <span class="dash-cal-head-day">V</span>
+                  <span class="dash-cal-head-day">S</span>
+                  <span class="dash-cal-head-day">D</span>
+                </div>
+                <div class="dash-cal-grid" id="dash-cal-grid"></div>
+              </div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-head">
+                <i data-lucide="bar-chart-3"></i>
+                <span>Insights diarios</span>
+              </div>
+              <div class="dash-insights" id="dash-insights"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECTION: Cuentas (tarjetas SVG) ── -->
+        <div class="dash-section-block" id="dash-section-cuentas">
+          <div class="dash-card">
+            <div class="dash-card-head">
+              <i data-lucide="credit-card"></i>
+              <span>Tus cuentas</span>
+            </div>
+            <div class="dash-acc-cards" id="dash-acc-cards"></div>
+          </div>
+        </div>
 
       </div><!-- /dash-scroll -->
 
       <!-- Chart tooltips (positioned via JS) -->
       <div class="dash-chart-tooltip" id="dash-donut-tooltip" style="display:none;"></div>
       <div class="dash-chart-tooltip" id="dash-line-tooltip" style="display:none;"></div>
+      <div class="dash-chart-tooltip" id="dash-cal-tooltip" style="display:none;"></div>
     </div>
 
     <!-- ── Vista: Ajustes ── -->
