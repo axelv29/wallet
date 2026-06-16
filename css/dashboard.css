@@ -461,6 +461,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  align-items: start;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -536,7 +537,7 @@
 .dash-chart-layout {
   display: grid;
   grid-template-columns: 1fr 220px;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* ── Savings side card ── */
@@ -715,11 +716,7 @@
   cursor: pointer;
   transition: color 0.12s;
 }
-.dash-cat-name:hover {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
+.dash-cat-name:hover { color: var(--accent); }
 .dash-cat-icon {
   display: flex;
   align-items: center;
@@ -820,21 +817,29 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  max-height: 340px;
 }
 .dash-donut-card .dash-card-head {
   width: 100%;
+}
+.dash-donut-card .dash-donut-wrap {
+  max-height: 280px;
 }
 
 /* ── Categories card ── */
 .dash-cats-card {
   display: flex;
   flex-direction: column;
-  max-height: 400px;
+  max-height: 340px;
 }
 .dash-cats-card .dash-cat-list {
-  max-height: none;
-  flex: 1;
+  max-height: 280px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.dash-cats-card .dash-cat-list:hover {
+  scrollbar-color: var(--border) transparent;
 }
 
 /* ═══════════════════════════════════════════════════════════

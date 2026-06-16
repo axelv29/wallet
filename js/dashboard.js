@@ -359,7 +359,7 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   const incomeFill = isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)';
   const expenseColor = '#ef4444';
   const expenseFill = isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)';
-  const savingsColor = '#3b82f6'; // blue-500
+  const savingsColor = '#2563eb';
 
   const allVals = [...incomeData, ...expenseData, ...(savingsData || [])];
   const maxVal = Math.max(...allVals, 1) * 1.1;
@@ -445,13 +445,13 @@ function drawLineChart(canvas, labels, incomeData, expenseData, savingsData) {
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Savings line (continuous)
+  // Savings line
   const savingsPoints = savingsData ? getPoints(savingsData) : [];
   if (savingsPoints.length > 1 && savingsData.some(v => v !== 0)) {
     ctx.beginPath();
     smoothCurve(savingsPoints);
     ctx.strokeStyle = savingsColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.stroke();
@@ -889,6 +889,16 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
     });
   }
 
+  // Previous period label for tooltips
+  let prevPeriodLabel = 'período anterior';
+  if (dashState.periodType === 'month') {
+    const p = dashGetPeriod();
+    let pm = p.month - 1, py = p.year;
+    if (pm < 0) { pm = 11; py--; }
+    const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    prevPeriodLabel = monthNames[pm];
+  }
+
   // Color map from donut chart
   const colorMap = {};
   getChartColors(entries.length).forEach((c, i) => { colorMap[entries[i][0]] = c; });
@@ -902,14 +912,10 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
   if (!dashState.hiddenCats[key]) dashState.hiddenCats[key] = new Set();
   const hidden = dashState.hiddenCats[key];
 
-  // Update center total (excluding hidden categories)
+  // Update center total (visible only, excluding hidden categories)
+  const visibleTotal = entries.filter(([k]) => !hidden.has(k)).reduce((sum, [, v]) => sum + v, 0);
   const totalEl = document.getElementById('dash-donut-total');
-  if (totalEl) {
-    const visibleTotal = entries
-      .filter(([cat]) => !hidden.has(cat))
-      .reduce((sum, [, amt]) => sum + amt, 0);
-    totalEl.textContent = formatCurrency(visibleTotal);
-  }
+  if (totalEl) totalEl.textContent = formatCurrency(visibleTotal);
 
   // Render cat list
   const list = document.getElementById('dash-donut-cat-list');
@@ -938,7 +944,7 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
         if (hasPrev && prevTxs.length > 0) {
           const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '—';
           const compClass = diff === 0 ? '' : (isUpBad ? 'comp-bad' : 'comp-good');
-          compareHtml = `<span class="dash-cat-compare ${compClass}" title="${diff === 0 ? 'Sin cambio vs período anterior' : (diff > 0 ? 'Aumentó' : 'Disminuyó') + ' vs período anterior'}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>`;
+          compareHtml = `<span class="dash-cat-compare ${compClass}" title="vs ${prevPeriodLabel}">${diff === 0 ? '—' : arrow + ' ' + pctChange + '%'}</span>`;
         }
 
         const row = document.createElement('div');
@@ -947,14 +953,14 @@ function renderDonutCategories(monthTxs, totalIncome, totalExpenses, prevTxs) {
           <div class="dash-cat-top">
             <span class="dash-cat-label">
               <span class="dash-cat-icon"><i data-lucide="${catIcon}"></i></span>
-              <span class="dash-cat-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')" title="Ver movimientos de ${cat}">${cat}</span>
+              <span class="dash-cat-name" onclick="dashGoToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</span>
               <button class="dash-cat-eye" onclick="event.stopPropagation();dashToggleCat('${cat.replace(/'/g, "\\'")}','${isExp ? 'expense' : 'income'}')" title="${isHidden ? 'Mostrar' : 'Ocultar'}">
                 <i data-lucide="${isHidden ? 'eye-off' : 'eye'}"></i>
               </button>
             </span>
             <span class="dash-cat-amount">
               ${formatCurrency(amount)}
-              <span class="dash-cat-pct">${totalPct}%</span>
+              <span class="dash-cat-pct" title="${totalPct}% del total">${totalPct}%</span>
               ${compareHtml}
             </span>
           </div>
@@ -1207,7 +1213,6 @@ function renderLineChart() {
     while (m > 11) { m -= 12; y++; }
     const d = new Date(y, m, 1);
     const label = d.toLocaleDateString('es-UY', { month: 'short' }).replace('.', '');
-    labels.push(label.charAt(0).toUpperCase() + label.slice(1));
     let inc = 0, exp = 0;
     const accFilter = dashState.accounts !== null ? new Set(dashState.accounts) : null;
     state.transactions.forEach(tx => {
@@ -1219,31 +1224,13 @@ function renderLineChart() {
         else exp += Math.abs(conv);
       }
     });
+    if (inc === 0 && exp === 0) continue;
+    labels.push(label.charAt(0).toUpperCase() + label.slice(1));
     incomeData.push(inc);
     expenseData.push(exp);
     savingsData.push(inc - exp);
   }
-
-  // Filter out months with no income AND no expense
-  const filteredLabels = [], filteredIncome = [], filteredExpense = [], filteredSavings = [];
-  for (let i = 0; i < numMonths; i++) {
-    if (incomeData[i] !== 0 || expenseData[i] !== 0) {
-      filteredLabels.push(labels[i]);
-      filteredIncome.push(incomeData[i]);
-      filteredExpense.push(expenseData[i]);
-      filteredSavings.push(savingsData[i]);
-    }
-  }
-
-  if (filteredLabels.length === 0) {
-    // Keep at least the last month so chart isn't blank
-    filteredLabels.push(labels[labels.length - 1]);
-    filteredIncome.push(incomeData[incomeData.length - 1]);
-    filteredExpense.push(expenseData[expenseData.length - 1]);
-    filteredSavings.push(savingsData[savingsData.length - 1]);
-  }
-
-  drawLineChart(lineCanvas, filteredLabels, filteredIncome, filteredExpense, filteredSavings);
+  drawLineChart(lineCanvas, labels, incomeData, expenseData, savingsData);
 
   document.querySelectorAll('.dash-range-btn').forEach(btn => {
     const val = parseInt(btn.dataset.range, 10);
