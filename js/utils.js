@@ -447,12 +447,15 @@ function calculateBalances(accountIds) {
   const balances = { liquid: 0, credit_card: 0, credit_card_cycle: 0, receivables: 0 };
   const accFilter = accountIds ? new Set(accountIds) : null;
   const exclCats = new Set(state.settings.excludedBalanceCats || []);
+  const excludedAccIds = new Set(state.accounts.filter(a => a.excluded).map(a => a.id));
   state.transactions.forEach(tx => {
     if (isTxExcluded(tx)) return;
     if (tx.split_parent_id) return;
     if (!isTxInPeriod(tx)) return;
-    if (exclCats.has(tx.category_name)) return;
+    if ((tx.tags || []).includes('Pago de tarjeta')) { /* always include payments */ }
+    else if (exclCats.has(tx.category_name)) return;
     if (accFilter && !accFilter.has(tx.account_id)) return;
+    if (excludedAccIds.has(tx.account_id)) return;
     const acc = state.accounts.find(a => a.id === tx.account_id);
     if (!acc) return;
     if (!includeCcFutureTx(tx)) return;
@@ -476,13 +479,13 @@ function calculateBalances(accountIds) {
 
   // Calculate cycle balance for all credit card accounts
   if (!accFilter) {
-    state.accounts.filter(a => a.type === 'credit_card').forEach(acc => {
+    state.accounts.filter(a => a.type === 'credit_card' && !a.excluded).forEach(acc => {
       balances.credit_card_cycle += calculateCycleBalance(acc.id);
     });
   } else {
     accFilter.forEach(id => {
       const acc = state.accounts.find(a => a.id === id);
-      if (acc && acc.type === 'credit_card') {
+      if (acc && acc.type === 'credit_card' && !acc.excluded) {
         balances.credit_card_cycle += calculateCycleBalance(id);
       }
     });

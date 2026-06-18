@@ -402,6 +402,23 @@
   font-weight: 500;
 }
 
+.account-item-sidebar.account-excluded {
+  opacity: 0.55;
+}
+
+.account-item-sidebar.account-excluded .acc-balance-sidebar {
+  opacity: 0.45;
+}
+
+.acc-excluded-badge {
+  font-size: 9px;
+  color: var(--text-lo);
+  background: var(--bg-raised);
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
 .acc-name-sidebar {
   flex: 1;
   overflow: hidden;

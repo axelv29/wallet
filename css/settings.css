@@ -215,6 +215,33 @@
   color: var(--text-hi);
 }
 
+.account-list-item.account-excluded {
+  opacity: 0.55;
+}
+
+.acc-excluded-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+
+.acc-excluded-toggle input[type="checkbox"] {
+  width: auto;
+  height: auto;
+}
+
+.acc-excluded-badge {
+  font-size: 9px;
+  color: var(--text-lo);
+  background: var(--bg-raised);
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
 .acc-list-type {
   font-size: 10.5px;
   color: var(--text-lo);

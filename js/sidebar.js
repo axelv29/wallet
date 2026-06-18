@@ -64,7 +64,7 @@ function renderSidebar() {
     const isActive = state.selectedAccounts.length > 0
       ? state.selectedAccounts.includes(acc.id)
       : state.currentView === acc.id;
-    li.className = 'account-item-sidebar' + (isActive ? ' active' : '');
+    li.className = 'account-item-sidebar' + (isActive ? ' active' : '') + (acc.excluded ? ' account-excluded' : '');
     li.onclick = (e) => {
       const onDashboard = document.getElementById('view-dashboard')?.style.display !== 'none';
       if (e.ctrlKey || e.metaKey) {
@@ -88,7 +88,7 @@ function renderSidebar() {
 
 
     li.innerHTML = `
-      <span class="acc-name-sidebar">${acc.name}${showCurrencyCode ? ' <span class="acc-currency-code">' + accCurrency + '</span>' : ''}</span>
+      <span class="acc-name-sidebar">${acc.name}${showCurrencyCode ? ' <span class="acc-currency-code">' + accCurrency + '</span>' : ''}${acc.excluded ? ' <span class="acc-excluded-badge">Excluida</span>' : ''}</span>
       ${scheduleHtml ? scheduleHtml : ''}
       <span class="acc-balance-sidebar ${val < 0 ? 'negative' : ''}" ${tooltip ? 'title="' + tooltip + '"' : ''}>${formatAccountCurrency(val, accCurrency)}</span>
     `;

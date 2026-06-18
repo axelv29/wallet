@@ -239,11 +239,11 @@ function renderSettingsAccountsList() {
       }
     }
     const item = document.createElement('div');
-    item.className = 'account-list-item';
+    item.className = 'account-list-item' + (acc.excluded ? ' account-excluded' : '');
     item.style.cursor = 'pointer';
     item.innerHTML = `
       <div class="acc-list-info">
-        <span class="acc-list-name">${acc.name}</span>
+        <span class="acc-list-name">${acc.name}${acc.excluded ? ' <span class="acc-excluded-badge">Excluida</span>' : ''}</span>
         <span class="acc-list-type">${typeLabel}${scheduleInfo}${curLabel}</span>
       </div>
       <span class="acc-list-actions">
@@ -270,6 +270,7 @@ function openEditAccountModal(accId) {
   document.getElementById('acc-edit-id').value = acc.id;
   document.getElementById('acc-edit-name').value = acc.name;
   document.getElementById('acc-edit-currency').value = acc.currency || state.settings.currency || 'UYU';
+  document.getElementById('acc-edit-excluded').checked = !!acc.excluded;
   // Populate type select
   const typeEl = document.getElementById('acc-edit-type');
   const types = state.predefined.account_types || [];
@@ -1638,6 +1639,7 @@ function saveAccountEdit(event) {
   acc.name = document.getElementById('acc-edit-name').value.trim();
   acc.type = document.getElementById('acc-edit-type').value;
   acc.currency = document.getElementById('acc-edit-currency').value;
+  acc.excluded = document.getElementById('acc-edit-excluded').checked;
   if (acc.type !== 'credit_card') {
     delete acc.card_schedule;
   }

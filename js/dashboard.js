@@ -71,11 +71,13 @@ function toDateStr(d) {
 
 function dashGetTxForPeriod() {
   const period = dashGetPeriod();
+  const excludedAccIds = new Set(state.accounts.filter(a => a.excluded).map(a => a.id));
   let txs;
   if (period.range && (period.range.start || period.range.end)) {
     txs = state.transactions.filter(tx => {
       if (isTxExcluded(tx)) return false;
       if (tx.split_parent_id) return false;
+      if (excludedAccIds.has(tx.account_id)) return false;
       if (period.range.start && tx.date < period.range.start) return false;
       if (period.range.end && tx.date > period.range.end) return false;
       return true;
@@ -83,12 +85,14 @@ function dashGetTxForPeriod() {
   } else if (period.year != null) {
     txs = state.transactions.filter(tx => {
       if (tx.split_parent_id) return false;
+      if (excludedAccIds.has(tx.account_id)) return false;
       const d = new Date(tx.date + 'T00:00:00');
       return !isTxExcluded(tx) && d.getMonth() === period.month && d.getFullYear() === period.year;
     });
   } else {
     txs = state.transactions.filter(tx => {
       if (tx.split_parent_id) return false;
+      if (excludedAccIds.has(tx.account_id)) return false;
       return !isTxExcluded(tx);
     });
   }
@@ -102,6 +106,7 @@ function dashGetTxForPeriod() {
 // Get transactions for the PREVIOUS period (for comparison)
 function dashGetPrevTxForPeriod() {
   const period = dashGetPeriod();
+  const excludedAccIds = new Set(state.accounts.filter(a => a.excluded).map(a => a.id));
   if (period.range && period.range.start) {
     const start = new Date(period.range.start + 'T00:00:00');
     const end = period.range.end ? new Date(period.range.end + 'T00:00:00') : new Date();
@@ -110,6 +115,7 @@ function dashGetPrevTxForPeriod() {
     const prevStart = new Date(prevEnd.getTime() - durationMs);
     return state.transactions.filter(tx => {
       if (isTxExcluded(tx) || tx.split_parent_id) return false;
+      if (excludedAccIds.has(tx.account_id)) return false;
       if (tx.date < toDateStr(prevStart)) return false;
       if (tx.date > toDateStr(prevEnd)) return false;
       return true;
@@ -120,6 +126,7 @@ function dashGetPrevTxForPeriod() {
     if (pm < 0) { pm = 11; py--; }
     return state.transactions.filter(tx => {
       if (tx.split_parent_id) return false;
+      if (excludedAccIds.has(tx.account_id)) return false;
       const d = new Date(tx.date + 'T00:00:00');
       return !isTxExcluded(tx) && d.getMonth() === pm && d.getFullYear() === py;
     });
@@ -1247,15 +1254,16 @@ function renderDashboard() {
   if (nextBtn) nextBtn.style.display = isMonthMode ? '' : 'none';
 
   // ── Filter transactions for selected period ──
-  const dashIncludeTx = (tx) => {
+  const dashIncludeTxLocal = (tx) => {
     if (isTxExcluded(tx) || tx.split_parent_id) return false;
     const acc = state.accounts.find(a => a.id === tx.account_id);
+    if (acc && acc.excluded) return false;
     if (acc && acc.type === 'credit_card') return true;
     return !tx.is_future;
   };
 
-  const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTx(tx));
-  const prevTxs  = dashGetPrevTxForPeriod().filter(tx => dashIncludeTx(tx));
+  const monthTxs = dashGetTxForPeriod().filter(tx => dashIncludeTxLocal(tx));
+  const prevTxs  = dashGetPrevTxForPeriod().filter(tx => dashIncludeTxLocal(tx));
 
   let totalIncome = 0, totalExpenses = 0;
   const dashExcludedCats = new Set(state.settings.excludedBalanceCats || []);
@@ -1507,6 +1515,7 @@ function renderDashCharts() {
 function dashIncludeTx(tx) {
   if (isTxExcluded(tx) || tx.split_parent_id) return false;
   const acc = state.accounts.find(a => a.id === tx.account_id);
+  if (acc && acc.excluded) return false;
   if (acc && acc.type === 'credit_card') return true;
   return !tx.is_future;
 }
@@ -1866,7 +1875,7 @@ function renderAccountCards() {
     }
   });
 
-  const accounts = state.accounts.filter(a => a.type === 'liquid' || a.type === 'credit_card');
+  const accounts = state.accounts.filter(a => !a.excluded && (a.type === 'liquid' || a.type === 'credit_card'));
 
   if (accounts.length === 0) {
     container.innerHTML = '<div class="dash-empty">No hay cuentas configuradas</div>';

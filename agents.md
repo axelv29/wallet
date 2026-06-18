@@ -61,6 +61,7 @@
 - `split-rows-wrap` — Contenedor de filas de división
 - `split-total-val` / `split-remaining` — Info de monto total y restante
 - `acc-name` / `acc-type` / `acc-balance` / `acc-close-day` / `acc-due-day` — Formulario de cuenta
+- `acc-edit-excluded` — Checkbox de excluir cuenta en modal de edición
 - `cc-closing-fields` — Campos extra de tarjeta de crédito
 - `accounts-scroll-container` — Lista de cuentas en settings
 - `predefined-payees-list` / `predefined-categories-list` / `predefined-tags-list` — Listas editables
@@ -127,6 +128,9 @@
 - `split-actions-row` — Botones de acción del modal (Agregar, Igualar, Eliminar)
 - `calc-error` — Mensaje de error de calculadora en editor inline de monto
 - `calc-error-modal` — Mensaje de error de calculadora en input de monto del modal
+- `account-excluded` — Item de cuenta excluida en sidebar (texto opaco, badge)
+- `acc-excluded-badge` — Badge "Excluida" en sidebar y lista de cuentas
+- `acc-excluded-toggle` — Toggle de excluir en modal de edición de cuenta
 
 ### Tipos de cuenta (`acc.type`)
 - `'liquid'` — Cuenta líquida (efectivo/débito)
@@ -141,8 +145,9 @@
   type: 'liquid',           // 'liquid' | 'credit_card'
   balance: 1047.40,
   currency: 'ARS',          // 'ARS' | 'USD' | 'EUR' | 'UYU'
-  card_closing_day: 20,     // solo credit_card
-  card_due_day: 30          // solo credit_card
+  excluded: false,          // excluir del balance total, estadísticas y dashboard
+  card_closing_day: 20,     // solo credit_card (obsoleto, migrado a card_schedule)
+  card_due_day: 30          // solo credit_card (obsoleto, migrado a card_schedule)
 }
 ```
 
